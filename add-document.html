@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Document - Expiry Tracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="container">
+            <nav class="navbar">
+                <a href="dashboard.html" class="logo">📅 Expiry Tracker</a>
+                <ul class="nav-links">
+                    <li><a href="dashboard.html">Dashboard</a></li>
+                    <li><a href="documents.html">Documents</a></li>
+                    <li><a href="add-document.html" class="active">Add Document</a></li>
+                    <li><a href="settings.html">Settings</a></li>
+                </ul>
+                <div class="user-info">
+                    <span class="user-email" id="user-email"></span>
+                    <button class="btn btn-outline" id="logout-btn">Logout</button>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="container">
+        <div id="add-page" class="page">
+            <div class="form-card">
+                <h1 class="form-title">Add New Document</h1>
+                <form id="add-document-form">
+                    <div class="form-group">
+                        <label for="doc-type">Document Type</label>
+                        <select id="doc-type" class="form-control" required>
+                            <option value="">Select document type</option>
+                            <option value="Vehicle RC">Vehicle RC</option>
+                            <option value="Driving License">Driving License</option>
+                            <option value="Passport">Passport</option>
+                            <option value="Insurance">Insurance</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="doc-name">Document Name / Title</label>
+                        <input type="text" id="doc-name" class="form-control" placeholder="Enter document name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="doc-number">Document Number</label>
+                        <input type="text" id="doc-number" class="form-control" placeholder="Enter document number" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="issue-date">Issue Date</label>
+                        <input type="date" id="issue-date" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="expiry-date">Expiry Date</label>
+                        <input type="date" id="expiry-date" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="notes">Notes (Optional)</label>
+                        <textarea id="notes" class="form-control" rows="3" placeholder="Add any additional notes"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="file-upload">Upload Document (Optional)</label>
+                        <input type="file" id="file-upload" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                        <small class="form-text">Supported formats: PDF, JPG, PNG (Max 5MB)</small>
+                    </div>
+                    <div class="form-actions">
+                        <a href="documents.html" class="btn btn-outline">Cancel</a>
+                        <button type="submit" class="btn btn-primary">Save Document</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loading" class="loading hidden">
+        <div class="spinner"></div>
+    </div>
+
+    <script src="firebase-config.js"></script>
+    <script src="script.js"></script>
+    <script>
+        // Add document page specific functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const logoutBtn = document.getElementById('logout-btn');
+            const addDocumentForm = document.getElementById('add-document-form');
+            
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', function() {
+                    firebase.auth().signOut().then(() => {
+                        window.location.href = 'index.html';
+                    });
+                });
+            }
+            
+            // Check auth state
+            firebase.auth().onAuthStateChanged((user) => {
+                if (!user) {
+                    window.location.href = 'index.html';
+                } else {
+                    document.getElementById('user-email').textContent = user.email;
+                }
+            });
+            
+            // Set today's date as default for issue date
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('issue-date').value = today;
+            
+            // Set default expiry date to 1 year from now
+            const oneYearFromNow = new Date();
+            oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+            document.getElementById('expiry-date').value = oneYearFromNow.toISOString().split('T')[0];
+            
+            // Handle form submission
+            addDocumentForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                handleAddDocument();
+            });
+            
+            function handleAddDocument() {
+                const user = firebase.auth().currentUser;
+                if (!user) return;
+                
+                const docData = {
+                    type: document.getElementById('doc-type').value,
+                    name: document.getElementById('doc-name').value,
+                    number: document.getElementById('doc-number').value,
+                    issueDate: document.getElementById('issue-date').value,
+                    expiryDate: document.getElementById('expiry-date').value,
+                    notes: document.getElementById('notes').value,
+                    userId: user.uid,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                // Handle file upload if present
+                const fileInput = document.getElementById('file-upload');
+                const file = fileInput.files[0];
+                
+                showLoading();
+                
+                if (file) {
+                    // Validate file size (5MB max)
+                    if (file.size > 5 * 1024 * 1024) {
+                        hideLoading();
+                        alert('File size must be less than 5MB');
+                        return;
+                    }
+                    
+                    const storageRef = firebase.storage().ref();
+                    const fileRef = storageRef.child(`documents/${user.uid}/${Date.now()}_${file.name}`);
+                    
+                    fileRef.put(file)
+                        .then(snapshot => snapshot.ref.getDownloadURL())
+                        .then(url => {
+                            docData.fileUrl = url;
+                            docData.fileName = file.name;
+                            return firebase.firestore().collection('documents').add(docData);
+                        })
+                        .then(() => {
+                            hideLoading();
+                            alert('Document added successfully!');
+                            window.location.href = 'documents.html';
+                        })
+                        .catch(error => {
+                            hideLoading();
+                            console.error('Error adding document: ', error);
+                            alert('Error adding document: ' + error.message);
+                        });
+                } else {
+                    firebase.firestore().collection('documents').add(docData)
+                        .then(() => {
+                            hideLoading();
+                            alert('Document added successfully!');
+                            window.location.href = 'documents.html';
+                        })
+                        .catch(error => {
+                            hideLoading();
+                            console.error('Error adding document: ', error);
+                            alert('Error adding document: ' + error.message);
+                        });
+                }
+            }
+            
+            function showLoading() {
+                const loading = document.getElementById('loading');
+                if (loading) loading.classList.remove('hidden');
+            }
+            
+            function hideLoading() {
+                const loading = document.getElementById('loading');
+                if (loading) loading.classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
