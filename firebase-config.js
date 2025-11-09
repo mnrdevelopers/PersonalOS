@@ -1,5 +1,5 @@
-// Firebase configuration
-  const firebaseConfig = {
+// Firebase configuration - REPLACE WITH YOUR ACTUAL CONFIG
+const firebaseConfig = {
   apiKey: "AIzaSyBnRKEd7Up3qbwC3mqCQhQLD2_Wd11rdzw",
   authDomain: "expiry-tracker-aadcc.firebaseapp.com",
   projectId: "expiry-tracker-aadcc",
@@ -10,8 +10,11 @@
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+} else {
+    firebase.app(); // if already initialized, use that one
+}
 
 // Firebase services
 const auth = firebase.auth();
@@ -23,3 +26,8 @@ db.enablePersistence()
   .catch((err) => {
       console.log('Firebase persistence error: ', err);
   });
+
+// Export for use in other files
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { auth, db, storage };
+}
