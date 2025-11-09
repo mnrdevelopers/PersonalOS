@@ -1,5 +1,4 @@
 // Firebase configuration
-const firebaseConfig = {
   const firebaseConfig = {
   apiKey: "AIzaSyBnRKEd7Up3qbwC3mqCQhQLD2_Wd11rdzw",
   authDomain: "expiry-tracker-aadcc.firebaseapp.com",
