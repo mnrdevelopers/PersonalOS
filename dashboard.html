@@ -123,9 +123,10 @@
             const user = auth.currentUser;
             if (!user) return;
             
+            // FIX: Removed .orderBy('expiryDate', 'asc') to prevent potential Firestore index issues
+            // We will sort client-side instead.
             unsubscribeDocuments = db.collection('documents')
                 .where('userId', '==', user.uid)
-                .orderBy('expiryDate', 'asc')
                 .onSnapshot((snapshot) => {
                     documents = [];
                     snapshot.forEach(doc => {
@@ -140,6 +141,9 @@
                         });
                     });
                     
+                    // Client-side sorting by expiryDate after fetching
+                    documents.sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime());
+                    
                     updateDashboard();
                     checkReminders();
 
@@ -153,6 +157,16 @@
                     // Hide loading on error to prevent infinite spin
                     hideLoading();
                     isInitialLoad = false;
+                    
+                    // Show a message to the user about the error
+                    const alertsList = document.getElementById('alerts-list');
+                    if (alertsList) {
+                         alertsList.innerHTML = `
+                             <div class="error-message" style="margin: 0;">
+                                 Error loading documents. Please try refreshing the page. (Details: ${error.message})
+                             </div>
+                         `;
+                    }
                 });
         }
         
