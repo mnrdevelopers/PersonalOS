@@ -34,8 +34,12 @@ function initApp() {
             // Update user profile information
             updateUserProfile(user);
             
-            // Initialize push notifications
-            await initializePushNotifications();
+            // Initialize push notifications (safely)
+            try {
+                await initializePushNotifications();
+            } catch (error) {
+                console.warn('Push notifications not available:', error);
+            }
             
             // Redirect to dashboard if on login page
             if (window.location.pathname.includes('index.html') || window.location.pathname === '/') {
@@ -45,8 +49,12 @@ function initApp() {
             setupDocumentsListener();
         } else {
             // User is signed out - remove FCM token
-            if (fcmToken) {
-                await removeFCMToken(fcmToken);
+            if (fcmToken && currentUser) {
+                try {
+                    await removeFCMToken(fcmToken);
+                } catch (error) {
+                    console.error('Error removing FCM token:', error);
+                }
                 fcmToken = null;
             }
             
@@ -914,23 +922,37 @@ function updateUserProfile(user) {
 // Initialize push notifications
 async function initializePushNotifications() {
     try {
+        // Check if messaging is available
+        if (!isMessagingAvailable()) {
+            console.warn('Firebase Messaging is not available');
+            return;
+        }
+
+        // Check if notifications are supported
+        if (!('Notification' in window)) {
+            console.warn('This browser does not support notifications');
+            return;
+        }
+
         // Request notification permission
         const permission = await Notification.requestPermission();
         
         if (permission === 'granted') {
             console.log('Notification permission granted.');
             
-            // Get FCM token
-            fcmToken = await messaging.getToken({
-                vapidKey: 'BNIPHzoLaLW03Tpb0qrqIMgx5M-aFVOndk9-EtIljjiz2NCJkrLzXHxBgmClb7KdX08BOU5fffhDM08Dzs1G8nE' // You need to generate this
-            });
-            
-            if (fcmToken) {
-                console.log('FCM Token:', fcmToken);
-                await saveFCMToken(fcmToken);
-                setupMessageHandlers();
-            } else {
-                console.log('No registration token available.');
+            try {
+                // Get FCM token
+                fcmToken = await messaging.getToken();
+                
+                if (fcmToken) {
+                    console.log('FCM Token:', fcmToken);
+                    await saveFCMToken(fcmToken);
+                    setupMessageHandlers();
+                } else {
+                    console.log('No registration token available.');
+                }
+            } catch (tokenError) {
+                console.error('Error getting FCM token:', tokenError);
             }
         } else {
             console.log('Unable to get permission to notify.');
@@ -947,7 +969,9 @@ async function saveFCMToken(token) {
     try {
         await db.collection('users').doc(currentUser.uid).set({
             fcmTokens: firebase.firestore.FieldValue.arrayUnion(token),
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            email: currentUser.email,
+            displayName: currentUser.displayName
         }, { merge: true });
         
         console.log('FCM token saved to Firestore');
@@ -973,6 +997,8 @@ async function removeFCMToken(token) {
 
 // Setup message handlers for foreground messages
 function setupMessageHandlers() {
+    if (!isMessagingAvailable()) return;
+
     // Handle foreground messages
     messaging.onMessage((payload) => {
         console.log('Received foreground message: ', payload);
@@ -980,20 +1006,42 @@ function setupMessageHandlers() {
         // Show in-app notification
         showCustomNotification(payload);
     });
+
+    // Handle token refresh
+    messaging.onTokenRefresh(async () => {
+        try {
+            const newToken = await messaging.getToken();
+            console.log('FCM token refreshed:', newToken);
+            
+            if (fcmToken && currentUser) {
+                // Remove old token
+                await removeFCMToken(fcmToken);
+            }
+            
+            fcmToken = newToken;
+            await saveFCMToken(newToken);
+        } catch (error) {
+            console.error('Error refreshing FCM token:', error);
+        }
+    });
 }
 
 // Show custom notification for foreground messages
 function showCustomNotification(payload) {
     const notification = document.createElement('div');
     notification.className = 'push-notification';
+    
+    const title = payload.notification?.title || payload.data?.title || 'Expiry Tracker';
+    const body = payload.notification?.body || payload.data?.body || 'You have a new notification';
+    
     notification.innerHTML = `
         <div class="notification-content">
             <div class="notification-icon">
                 <i class="fas fa-bell"></i>
             </div>
             <div class="notification-body">
-                <div class="notification-title">${payload.notification?.title || 'Expiry Tracker'}</div>
-                <div class="notification-message">${payload.notification?.body || 'You have a new notification'}</div>
+                <div class="notification-title">${title}</div>
+                <div class="notification-message">${body}</div>
             </div>
             <button class="notification-close">
                 <i class="fas fa-times"></i>
@@ -1021,10 +1069,9 @@ function showCustomNotification(payload) {
     // Click to open relevant page
     notification.addEventListener('click', () => {
         hideNotification(notification);
-        if (payload.data?.page) {
-            window.location.href = payload.data.page;
-        } else {
-            window.location.href = 'dashboard.html';
+        const page = payload.data?.page || 'dashboard.html';
+        if (!window.location.href.includes(page)) {
+            window.location.href = page;
         }
     });
 }
@@ -1041,9 +1088,7 @@ function hideNotification(notification) {
 // Send push notification (for testing and reminders)
 async function sendPushNotification(userId, title, body, data = {}) {
     try {
-        // In a real app, you would call a Cloud Function here
-        // For now, we'll simulate it by showing local notifications
-        
+        // Check if we can show notifications
         if ('Notification' in window && Notification.permission === 'granted') {
             // Show local notification
             const notification = new Notification(title, {
@@ -1057,26 +1102,21 @@ async function sendPushNotification(userId, title, body, data = {}) {
             
             notification.onclick = () => {
                 window.focus();
-                if (data.page) {
+                if (data.page && !window.location.href.includes(data.page)) {
                     window.location.href = data.page;
                 }
                 notification.close();
             };
+            
+            // Auto close after 10 seconds
+            setTimeout(() => {
+                notification.close();
+            }, 10000);
         }
         
-        // For actual FCM, you would use:
-        // await fetch('YOUR_CLOUD_FUNCTION_URL', {
-        //     method: 'POST',
-        //     headers: {
-        //         'Content-Type': 'application/json',
-        //     },
-        //     body: JSON.stringify({
-        //         userId: userId,
-        //         title: title,
-        //         body: body,
-        //         data: data
-        //     })
-        // });
+        // For actual FCM implementation, you would need a Cloud Function
+        // This is a simplified version that works without backend
+        console.log('Push notification would be sent:', { userId, title, body, data });
         
     } catch (error) {
         console.error('Error sending push notification:', error);
@@ -1085,7 +1125,6 @@ async function sendPushNotification(userId, title, body, data = {}) {
 
 // Enhanced reminder system with push notifications
 function checkReminders() {
-    const today = new Date();
     const preferences = JSON.parse(localStorage.getItem('notificationPreferences') || '{}');
     
     documents.forEach(doc => {
@@ -1099,24 +1138,29 @@ function checkReminders() {
         if (lastAlertDate !== todayStr) {
             let shouldNotify = false;
             let message = '';
+            let type = 'info';
             
             if (preferences.notify30Days && daysRemaining === 30) {
                 shouldNotify = true;
                 message = `Your ${doc.name} (${doc.type}) expires in 30 days`;
+                type = 'warning';
             } else if (preferences.notify7Days && daysRemaining === 7) {
                 shouldNotify = true;
                 message = `Your ${doc.name} (${doc.type}) expires in 7 days`;
+                type = 'warning';
             } else if (preferences.notify1Day && daysRemaining === 1) {
                 shouldNotify = true;
                 message = `Your ${doc.name} (${doc.type}) expires tomorrow`;
+                type = 'warning';
             } else if (preferences.notifyExpired && daysRemaining <= 0) {
                 shouldNotify = true;
                 message = `Your ${doc.name} (${doc.type}) has expired`;
+                type = 'error';
             }
             
             if (shouldNotify && message) {
-                // Show local notification
-                showToast(message, daysRemaining > 0 ? 'warning' : 'error');
+                // Show in-app toast notification
+                showToast(message, type);
                 
                 // Send push notification
                 if (currentUser) {
@@ -1124,7 +1168,11 @@ function checkReminders() {
                         currentUser.uid,
                         'Expiry Tracker Alert',
                         message,
-                        { page: 'documents.html', docId: doc.id }
+                        { 
+                            page: 'documents.html', 
+                            docId: doc.id,
+                            type: type
+                        }
                     );
                 }
                 
@@ -1132,4 +1180,9 @@ function checkReminders() {
             }
         }
     });
+}
+
+// Check if messaging is available
+function isMessagingAvailable() {
+    return messaging !== null && typeof messaging !== 'undefined';
 }
