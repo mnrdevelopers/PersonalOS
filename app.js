@@ -280,16 +280,18 @@ function handleForgotPassword(e) {
 }
 
 function handleLogout() {
-    // We sign out the user, show a success message, and then explicitly redirect
     auth.signOut()
         .then(() => {
-            showSuccess('Logged out successfully');
-            // FIX: Explicitly redirect to the login page immediately after sign out
-            // and return to ensure no other listener code runs immediately.
-            navigateTo('index.html');
-            return; // Stop execution here
+            // Clear any stored data
+            currentUser = null;
+            documents = [];
+            notifications = [];
+            
+            // Redirect to login page immediately
+            window.location.href = 'index.html';
         })
         .catch(error => {
+            console.error('Error logging out: ', error);
             showError('Error logging out: ' + error.message);
         });
 }
@@ -885,61 +887,10 @@ async function deleteNotification(notificationId) {
     }
 }
 
-// Settings Functions
 function loadSettings() {
-    if (!currentUser) return; // FIX: Prevent attempting to load preferences if user is not authenticated yet.
-    
-    loadEmailPreferences();
-    setupSettingsForm();
-}
-
-async function loadEmailPreferences() {
-    try {
-        const userDoc = await db.collection('users').doc(currentUser.uid).get();
-        const userData = userDoc.data();
-        
-        const preferences = userData?.emailPreferences || {
-            notify30Days: true,
-            notify7Days: true,
-            notify1Day: true,
-            notifyExpired: true
-        };
-        
-        setCheckboxValue('notify-30-days', preferences.notify30Days);
-        setCheckboxValue('notify-7-days', preferences.notify7Days);
-        setCheckboxValue('notify-1-day', preferences.notify1Day);
-        setCheckboxValue('notify-expired', preferences.notifyExpired);
-        
-    } catch (error) {
-        console.error('Error loading email preferences:', error);
-    }
-}
-
-function setupSettingsForm() {
-    const saveButton = getElement('save-email-preferences');
-    if (saveButton) {
-        addEventListener(saveButton, 'click', saveEmailPreferences);
-    }
-}
-
-async function saveEmailPreferences() {
-    const preferences = {
-        notify30Days: getCheckboxValue('notify-30-days'),
-        notify7Days: getCheckboxValue('notify-7-days'),
-        notify1Day: getCheckboxValue('notify-1-day'),
-        notifyExpired: getCheckboxValue('notify-expired')
-    };
-    
-    try {
-        await db.collection('users').doc(currentUser.uid).set({
-            emailPreferences: preferences,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
-        
-        showToast('Email preferences saved!', 'success');
-    } catch (error) {
-        showError('Error saving preferences');
-    }
+    // Settings page initialization without email preferences
+    // This function can be empty or contain other settings-related logic
+    console.log('Settings loaded');
 }
 
 // Utility Functions
