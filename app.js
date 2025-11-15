@@ -1274,21 +1274,29 @@ async function registerServiceWorker() {
             const basePath = currentPath.substring(0, currentPath.lastIndexOf('/'));
             const swPath = `${basePath}/firebase-messaging-sw.js`;
             
+            console.log('Registering service worker from:', swPath);
+            
             const registration = await navigator.serviceWorker.register(swPath, {
                 scope: basePath + '/'
             });
             
             console.log('ServiceWorker registration successful with scope: ', registration.scope);
-            
-            // Update messaging to use this service worker
-            if (messaging) {
-                messaging.useServiceWorker(registration);
-            }
-            
             return registration;
         } catch (error) {
             console.error('ServiceWorker registration failed: ', error);
-            throw error;
+            
+            // Try fallback path
+            try {
+                console.log('Trying fallback service worker registration...');
+                const fallbackRegistration = await navigator.serviceWorker.register('./firebase-messaging-sw.js', {
+                    scope: './'
+                });
+                console.log('Fallback ServiceWorker registration successful');
+                return fallbackRegistration;
+            } catch (fallbackError) {
+                console.error('Fallback ServiceWorker registration also failed: ', fallbackError);
+                throw error; // Throw original error
+            }
         }
     } else {
         throw new Error('Service workers are not supported in this browser');
