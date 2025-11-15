@@ -4,6 +4,9 @@ let documents = [];
 let unsubscribeDocuments = null;
 let documentToDelete = null;
 
+// Push Notification Functions
+let fcmToken = null;
+
 // DOM Elements (will be initialized per page)
 let authForm, authTitle, authSubmit, authSwitchLink, forgotPasswordLink;
 let nameField, confirmPasswordField, authError, authSuccess;
@@ -22,7 +25,7 @@ let isLoginMode = true;
 // Initialize the app for pages that need it
 function initApp() {
     // Auth state observer
-    auth.onAuthStateChanged((user) => {
+    auth.onAuthStateChanged(async (user) => {
         if (user) {
             // User is signed in
             currentUser = user;
@@ -31,6 +34,9 @@ function initApp() {
             // Update user profile information
             updateUserProfile(user);
             
+            // Initialize push notifications
+            await initializePushNotifications();
+            
             // Redirect to dashboard if on login page
             if (window.location.pathname.includes('index.html') || window.location.pathname === '/') {
                 window.location.href = 'dashboard.html';
@@ -38,7 +44,12 @@ function initApp() {
             
             setupDocumentsListener();
         } else {
-            // User is signed out
+            // User is signed out - remove FCM token
+            if (fcmToken) {
+                await removeFCMToken(fcmToken);
+                fcmToken = null;
+            }
+            
             currentUser = null;
             // Redirect to login if not on login page
             if (!window.location.pathname.includes('index.html') && window.location.pathname !== '/') {
@@ -898,4 +909,227 @@ function updateUserProfile(user) {
     if (currentEmail) {
         currentEmail.textContent = user.email;
     }
+}
+
+// Initialize push notifications
+async function initializePushNotifications() {
+    try {
+        // Request notification permission
+        const permission = await Notification.requestPermission();
+        
+        if (permission === 'granted') {
+            console.log('Notification permission granted.');
+            
+            // Get FCM token
+            fcmToken = await messaging.getToken({
+                vapidKey: 'YOUR_VAPID_KEY_HERE' // You need to generate this
+            });
+            
+            if (fcmToken) {
+                console.log('FCM Token:', fcmToken);
+                await saveFCMToken(fcmToken);
+                setupMessageHandlers();
+            } else {
+                console.log('No registration token available.');
+            }
+        } else {
+            console.log('Unable to get permission to notify.');
+        }
+    } catch (error) {
+        console.error('Error initializing push notifications:', error);
+    }
+}
+
+// Save FCM token to Firestore
+async function saveFCMToken(token) {
+    if (!currentUser) return;
+    
+    try {
+        await db.collection('users').doc(currentUser.uid).set({
+            fcmTokens: firebase.firestore.FieldValue.arrayUnion(token),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        
+        console.log('FCM token saved to Firestore');
+    } catch (error) {
+        console.error('Error saving FCM token:', error);
+    }
+}
+
+// Remove FCM token when user logs out
+async function removeFCMToken(token) {
+    if (!currentUser || !token) return;
+    
+    try {
+        await db.collection('users').doc(currentUser.uid).update({
+            fcmTokens: firebase.firestore.FieldValue.arrayRemove(token)
+        });
+        
+        console.log('FCM token removed from Firestore');
+    } catch (error) {
+        console.error('Error removing FCM token:', error);
+    }
+}
+
+// Setup message handlers for foreground messages
+function setupMessageHandlers() {
+    // Handle foreground messages
+    messaging.onMessage((payload) => {
+        console.log('Received foreground message: ', payload);
+        
+        // Show in-app notification
+        showCustomNotification(payload);
+    });
+}
+
+// Show custom notification for foreground messages
+function showCustomNotification(payload) {
+    const notification = document.createElement('div');
+    notification.className = 'push-notification';
+    notification.innerHTML = `
+        <div class="notification-content">
+            <div class="notification-icon">
+                <i class="fas fa-bell"></i>
+            </div>
+            <div class="notification-body">
+                <div class="notification-title">${payload.notification?.title || 'Expiry Tracker'}</div>
+                <div class="notification-message">${payload.notification?.body || 'You have a new notification'}</div>
+            </div>
+            <button class="notification-close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Show notification
+    setTimeout(() => {
+        notification.classList.add('show');
+    }, 100);
+    
+    // Auto hide after 5 seconds
+    setTimeout(() => {
+        hideNotification(notification);
+    }, 5000);
+    
+    // Close button
+    notification.querySelector('.notification-close').addEventListener('click', () => {
+        hideNotification(notification);
+    });
+    
+    // Click to open relevant page
+    notification.addEventListener('click', () => {
+        hideNotification(notification);
+        if (payload.data?.page) {
+            window.location.href = payload.data.page;
+        } else {
+            window.location.href = 'dashboard.html';
+        }
+    });
+}
+
+function hideNotification(notification) {
+    notification.classList.remove('show');
+    setTimeout(() => {
+        if (document.body.contains(notification)) {
+            document.body.removeChild(notification);
+        }
+    }, 300);
+}
+
+// Send push notification (for testing and reminders)
+async function sendPushNotification(userId, title, body, data = {}) {
+    try {
+        // In a real app, you would call a Cloud Function here
+        // For now, we'll simulate it by showing local notifications
+        
+        if ('Notification' in window && Notification.permission === 'granted') {
+            // Show local notification
+            const notification = new Notification(title, {
+                body: body,
+                icon: '/icon-192.png',
+                badge: '/icon-192.png',
+                tag: 'expiry-tracker',
+                requireInteraction: true,
+                data: data
+            });
+            
+            notification.onclick = () => {
+                window.focus();
+                if (data.page) {
+                    window.location.href = data.page;
+                }
+                notification.close();
+            };
+        }
+        
+        // For actual FCM, you would use:
+        // await fetch('YOUR_CLOUD_FUNCTION_URL', {
+        //     method: 'POST',
+        //     headers: {
+        //         'Content-Type': 'application/json',
+        //     },
+        //     body: JSON.stringify({
+        //         userId: userId,
+        //         title: title,
+        //         body: body,
+        //         data: data
+        //     })
+        // });
+        
+    } catch (error) {
+        console.error('Error sending push notification:', error);
+    }
+}
+
+// Enhanced reminder system with push notifications
+function checkReminders() {
+    const today = new Date();
+    const preferences = JSON.parse(localStorage.getItem('notificationPreferences') || '{}');
+    
+    documents.forEach(doc => {
+        const daysRemaining = getDaysRemaining(doc.expiryDate);
+        
+        // Check if we should show a reminder based on user preferences
+        const alertKey = `alert_${doc.id}_${daysRemaining}`;
+        const lastAlertDate = localStorage.getItem(alertKey);
+        const todayStr = new Date().toDateString();
+        
+        if (lastAlertDate !== todayStr) {
+            let shouldNotify = false;
+            let message = '';
+            
+            if (preferences.notify30Days && daysRemaining === 30) {
+                shouldNotify = true;
+                message = `Your ${doc.name} (${doc.type}) expires in 30 days`;
+            } else if (preferences.notify7Days && daysRemaining === 7) {
+                shouldNotify = true;
+                message = `Your ${doc.name} (${doc.type}) expires in 7 days`;
+            } else if (preferences.notify1Day && daysRemaining === 1) {
+                shouldNotify = true;
+                message = `Your ${doc.name} (${doc.type}) expires tomorrow`;
+            } else if (preferences.notifyExpired && daysRemaining <= 0) {
+                shouldNotify = true;
+                message = `Your ${doc.name} (${doc.type}) has expired`;
+            }
+            
+            if (shouldNotify && message) {
+                // Show local notification
+                showToast(message, daysRemaining > 0 ? 'warning' : 'error');
+                
+                // Send push notification
+                if (currentUser) {
+                    sendPushNotification(
+                        currentUser.uid,
+                        'Expiry Tracker Alert',
+                        message,
+                        { page: 'documents.html', docId: doc.id }
+                    );
+                }
+                
+                localStorage.setItem(alertKey, todayStr);
+            }
+        }
+    });
 }
