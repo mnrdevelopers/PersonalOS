@@ -9,12 +9,16 @@ const firebaseConfig = {
   measurementId: "G-ST64HBYQLD"
 };
 
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
+// Check if Firebase is already initialized
+if (!firebase.apps.length) {
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+}
 
 // Initialize services
 const auth = firebase.auth();
 const db = firebase.firestore();
+const storage = firebase.storage();
 
 // Make sure they are globally accessible
 window.auth = auth;
