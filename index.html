@@ -5,21 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Expiry Tracker - Login</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
-    
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="auth-container">
         <div class="auth-card">
-            <div class="app-logo">
-                <h1>📅 Expiry Tracker</h1>
-            </div>
-            <h2 class="auth-title" id="auth-title">Login to Your Account</h2>
+            <h2 class="auth-title" id="auth-title">Login to Expiry Tracker</h2>
             <form id="auth-form">
                 <div class="form-group" id="name-field" style="display: none;">
                     <label for="name">Full Name</label>
@@ -39,7 +30,7 @@
                 </div>
                 <div id="auth-error" class="error-message"></div>
                 <div id="auth-success" class="success-message"></div>
-                <button type="submit" class="btn btn-primary" id="auth-submit" style="width: 100%;">Login</button>
+                <button type="submit" class="btn" id="auth-submit" style="width: 100%;">Login</button>
             </form>
             <div class="auth-switch">
                 <a href="#" id="auth-switch-link">Don't have an account? Sign up</a>
@@ -50,12 +41,13 @@
         </div>
     </div>
 
-    <!-- Loading Indicator -->
-    <div id="loading" class="loading hidden">
-        <div class="spinner"></div>
-    </div>
-
     <script src="firebase-config.js"></script>
-    <script src="script.js"></script>
+    <script src="app.js"></script>
+    <script>
+        // Initialize auth functionality for index page
+        document.addEventListener('DOMContentLoaded', function() {
+            initAuth();
+        });
+    </script>
 </body>
 </html>
