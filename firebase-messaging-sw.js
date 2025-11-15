@@ -12,27 +12,37 @@ const firebaseConfig = {
   measurementId: "G-ST64HBYQLD"
 };
 
-// Initialize Firebase
 firebase.initializeApp(firebaseConfig);
-
-// Initialize Firebase Messaging
 const messaging = firebase.messaging();
 
-// Handle background messages
+// Enhanced background message handler
 messaging.onBackgroundMessage((payload) => {
     console.log('Received background message: ', payload);
     
-    const notificationTitle = payload.notification?.title || 'Expiry Tracker';
+    const notificationTitle = payload.data?.title || payload.notification?.title || 'Expiry Tracker';
+    const notificationBody = payload.data?.body || payload.notification?.body || 'You have a new notification';
+    const docId = payload.data?.docId || '';
+    const docName = payload.data?.docName || '';
+    const docType = payload.data?.docType || '';
+    
     const notificationOptions = {
-        body: payload.notification?.body || 'You have a new notification',
+        body: notificationBody,
         icon: '/icon-192.png',
         badge: '/icon-192.png',
-        tag: 'expiry-tracker-notification',
+        tag: 'expiry-tracker',
         requireInteraction: true,
+        data: {
+            docId: docId,
+            docName: docName,
+            docType: docType,
+            page: payload.data?.page || 'documents.html',
+            type: payload.data?.type || 'info',
+            timestamp: new Date().toISOString()
+        },
         actions: [
             {
-                action: 'open',
-                title: 'Open App'
+                action: 'view',
+                title: 'View Document'
             },
             {
                 action: 'dismiss',
@@ -41,43 +51,43 @@ messaging.onBackgroundMessage((payload) => {
         ]
     };
 
-    // Show notification
-    self.registration.showNotification(notificationTitle, notificationOptions);
+    return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-// Handle notification click
+// Enhanced notification click handler
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
     
-    if (event.action === 'open') {
-        // Open the app
-        event.waitUntil(
-            clients.matchAll({ type: 'window' }).then((clientList) => {
-                for (const client of clientList) {
-                    if (client.url.includes('/dashboard.html') && 'focus' in client) {
-                        return client.focus();
-                    }
-                }
-                if (clients.openWindow) {
-                    return clients.openWindow('/dashboard.html');
-                }
-            })
-        );
-    } else if (event.action === 'dismiss') {
-        // Notification dismissed, do nothing
-    } else {
-        // Default click behavior
-        event.waitUntil(
-            clients.matchAll({ type: 'window' }).then((clientList) => {
-                for (const client of clientList) {
-                    if (client.url.includes('/dashboard.html') && 'focus' in client) {
-                        return client.focus();
-                    }
-                }
-                if (clients.openWindow) {
-                    return clients.openWindow('/dashboard.html');
-                }
-            })
-        );
+    const targetPage = event.notification.data?.page || 'dashboard.html';
+    const docId = event.notification.data?.docId;
+    
+    let targetUrl = targetPage;
+    if (docId && targetPage === 'documents.html') {
+        targetUrl = `${targetPage}#doc-${docId}`;
     }
+    
+    event.waitUntil(
+        clients.matchAll({ 
+            type: 'window',
+            includeUncontrolled: true 
+        }).then((clientList) => {
+            // Check if app is already open
+            for (const client of clientList) {
+                if (client.url.includes(targetPage) && 'focus' in client) {
+                    client.postMessage({
+                        type: 'NOTIFICATION_CLICK',
+                        data: event.notification.data
+                    });
+                    return client.focus();
+                }
+            }
+            // Open new window
+            return clients.openWindow(targetUrl);
+        })
+    );
+});
+
+// Handle notification actions
+self.addEventListener('notificationclose', (event) => {
+    console.log('Notification closed:', event.notification.tag);
 });
