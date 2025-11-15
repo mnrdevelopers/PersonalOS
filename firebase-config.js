@@ -1,4 +1,4 @@
-// Firebase configuration - REPLACE WITH YOUR ACTUAL CONFIG
+// Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBnRKEd7Up3qbwC3mqCQhQLD2_Wd11rdzw",
   authDomain: "expiry-tracker-aadcc.firebaseapp.com",
@@ -15,7 +15,9 @@ firebase.initializeApp(firebaseConfig);
 // Initialize services
 const auth = firebase.auth();
 const db = firebase.firestore();
+const storage = firebase.storage();
 
 // Make sure they are globally accessible
 window.auth = auth;
 window.db = db;
+window.storage = storage;
