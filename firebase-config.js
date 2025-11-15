@@ -25,8 +25,6 @@ let functions = null;
 try {
     if (firebase.functions) {
         functions = firebase.functions();
-        // If you want to use emulator for development, uncomment below:
-        // functions.useEmulator('localhost', 5001);
     } else {
         console.warn('Firebase Functions not available');
     }
@@ -40,9 +38,24 @@ try {
     if (firebase.messaging && typeof firebase.messaging === 'function') {
         messaging = firebase.messaging();
         
-        // Use your VAPID key here (get from Firebase Console → Cloud Messaging)
-        // Replace 'YOUR_VAPID_KEY_HERE' with your actual VAPID key
+        // Configure service worker path for GitHub Pages
+        const currentPath = window.location.pathname;
+        const basePath = currentPath.substring(0, currentPath.lastIndexOf('/'));
+        const swPath = `${basePath}/firebase-messaging-sw.js`;
+        
         messaging.usePublicVapidKey('BNIPHzoLaLW03Tpb0qrqIMgx5M-aFVOndk9-EtIljjiz2NCJkrLzXHxBgmClb7KdX08BOU5fffhDM08Dzs1G8nE');
+        
+        // Set service worker registration with explicit scope
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register(swPath, { scope: basePath + '/' })
+                .then((registration) => {
+                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    messaging.useServiceWorker(registration);
+                })
+                .catch((error) => {
+                    console.error('ServiceWorker registration failed: ', error);
+                });
+        }
         
         console.log('Firebase Messaging initialized successfully');
     } else {
