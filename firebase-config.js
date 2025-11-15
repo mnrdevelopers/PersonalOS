@@ -31,7 +31,7 @@ if (firebase.messaging && typeof firebase.messaging === 'function') {
         messaging = firebase.messaging();
         
         // Configure messaging for background notifications
-        messaging.usePublicVapidKey('YOUR_VAPID_KEY_HERE'); // Replace with your VAPID key
+        messaging.usePublicVapidKey('BNIPHzoLaLW03Tpb0qrqIMgx5M-aFVOndk9-EtIljjiz2NCJkrLzXHxBgmClb7KdX08BOU5fffhDM08Dzs1G8nE'); // Replace with your VAPID key
         
     } catch (error) {
         console.warn('Firebase Messaging initialization failed:', error);
