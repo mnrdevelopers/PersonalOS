@@ -135,15 +135,20 @@ function setupAuthEventListeners() {
 }
 
 function setupEventListeners() {
-    // Logout buttons
-    if (logoutBtn) {
-        addEventListener(logoutBtn, 'click', handleLogout);
-    }
-    if (sidebarLogout) {
-        addEventListener(sidebarLogout, 'click', handleLogout);
-    }
+    // Enhanced logout button handling
+    const logoutButtons = [
+        'logout-btn',
+        'sidebar-logout'
+    ];
     
-    // Other event listeners
+    logoutButtons.forEach(btnId => {
+        const btn = getElement(btnId);
+        if (btn) {
+            addEventListener(btn, 'click', handleLogout);
+        }
+    });
+    
+    // Other event listeners...
     if (addDocumentBtn) {
         addEventListener(addDocumentBtn, 'click', () => navigateTo('add.html'));
     }
