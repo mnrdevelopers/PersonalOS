@@ -15,10 +15,11 @@ if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
 }
 
-// Initialize services
+// Initialize Firebase services
 const auth = firebase.auth();
 const db = firebase.firestore();
 const storage = firebase.storage();
+const messaging = firebase.messaging()
 
 // Make sure they are globally accessible
 window.auth = auth;
