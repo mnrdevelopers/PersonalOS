@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notifications - Expiry Tracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
+</head>
+<body>
+    <!-- Header with Notifications Bell -->
+    <header class="header">
+        <div class="navbar">
+            <button class="back-btn" id="back-btn">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h1 class="page-title">Notifications</h1>
+            <div class="nav-actions">
+                <button class="icon-btn" id="mark-all-read">
+                    <i class="fas fa-check-double"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Notifications Filter -->
+            <div class="notifications-filter">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="expiring">Expiring</button>
+                <button class="filter-btn" data-filter="expired">Expired</button>
+                <button class="filter-btn" data-filter="unread">Unread</button>
+            </div>
+
+            <!-- Notifications List -->
+            <div class="notifications-list" id="notifications-list">
+                <!-- Notifications will be loaded here -->
+                <div class="empty-state">
+                    <i class="fas fa-bell-slash"></i>
+                    <h3>No notifications</h3>
+                    <p>You're all caught up! New alerts will appear here.</p>
+                </div>
+            </div>
+
+            <!-- Load More Button -->
+            <div class="load-more-container hidden" id="load-more-container">
+                <button class="btn btn-outline" id="load-more-btn">Load More</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <a href="dashboard.html" class="nav-item">
+            <i class="fas fa-home nav-icon"></i>
+            <span class="nav-label">Home</span>
+        </a>
+        <a href="documents.html" class="nav-item">
+            <i class="fas fa-file-alt nav-icon"></i>
+            <span class="nav-label">Docs</span>
+        </a>
+        <a href="add.html" class="nav-item">
+            <i class="fas fa-plus nav-icon"></i>
+            <span class="nav-label">Add</span>
+        </a>
+        <a href="notifications.html" class="nav-item active">
+            <i class="fas fa-bell nav-icon"></i>
+            <span class="nav-label">Alerts</span>
+        </a>
+        <a href="settings.html" class="nav-item">
+            <i class="fas fa-cog nav-icon"></i>
+            <span class="nav-label">Settings</span>
+        </a>
+    </nav>
+
+    <!-- Loading -->
+    <div id="loading" class="loading hidden">
+        <div class="spinner"></div>
+    </div>
+
+    <script src="firebase-config.js"></script>
+    <script src="app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            initApp();
+            loadNotifications();
+            setupNotificationsEvents();
+        });
+    </script>
+</body>
+</html>
