@@ -1225,11 +1225,22 @@ function isFunctionsAvailable() {
 async function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
         try {
-            // Use relative path for GitHub Pages
-            const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js', {
-                scope: './'
+            // Calculate correct path for GitHub Pages
+            const currentPath = window.location.pathname;
+            const basePath = currentPath.substring(0, currentPath.lastIndexOf('/'));
+            const swPath = `${basePath}/firebase-messaging-sw.js`;
+            
+            const registration = await navigator.serviceWorker.register(swPath, {
+                scope: basePath + '/'
             });
+            
             console.log('ServiceWorker registration successful with scope: ', registration.scope);
+            
+            // Update messaging to use this service worker
+            if (messaging) {
+                messaging.useServiceWorker(registration);
+            }
+            
             return registration;
         } catch (error) {
             console.error('ServiceWorker registration failed: ', error);
