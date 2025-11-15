@@ -1192,11 +1192,23 @@ function addTestNotificationButton() {
     }
 }
 
-// Check if messaging is available
-function isMessagingAvailable() {
-    return messaging !== null && typeof messaging !== 'undefined';
+// Safe access to Firebase services
+function getMessaging() {
+    return window.firebaseServices?.messaging || messaging;
 }
 
 function getFunctions() {
     return window.firebaseServices?.functions || functions;
+}
+
+// Check if messaging is available
+function isMessagingAvailable() {
+    const messagingService = getMessaging();
+    return messagingService !== null && typeof messagingService !== 'undefined';
+}
+
+// Check if functions are available
+function isFunctionsAvailable() {
+    const functionsService = getFunctions();
+    return functionsService !== null && typeof functionsService !== 'undefined';
 }
