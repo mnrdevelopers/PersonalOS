@@ -178,6 +178,50 @@
             loadSettings();
             setupMobileNavigation();
         });
+
+        // Load email preferences
+async function loadEmailPreferences() {
+    try {
+        const userDoc = await db.collection('users').doc(currentUser.uid).get();
+        const userData = userDoc.data();
+        
+        if (userData && userData.emailPreferences) {
+            const preferences = userData.emailPreferences;
+            
+            if (document.getElementById('email-notify-30-days')) {
+                document.getElementById('email-notify-30-days').checked = preferences.notify30Days !== false;
+            }
+            if (document.getElementById('email-notify-7-days')) {
+                document.getElementById('email-notify-7-days').checked = preferences.notify7Days !== false;
+            }
+            if (document.getElementById('email-notify-1-day')) {
+                document.getElementById('email-notify-1-day').checked = preferences.notify1Day !== false;
+            }
+            if (document.getElementById('email-notify-expired')) {
+                document.getElementById('email-notify-expired').checked = preferences.notifyExpired !== false;
+            }
+        }
+        
+        // Set up event listeners
+        document.getElementById('save-email-preferences').addEventListener('click', saveEmailPreferencesHandler);
+        document.getElementById('test-email-notification').addEventListener('click', testEmailNotification);
+        
+    } catch (error) {
+        console.error('Error loading email preferences:', error);
+    }
+}
+
+// Handle saving email preferences
+async function saveEmailPreferencesHandler() {
+    const preferences = {
+        notify30Days: document.getElementById('email-notify-30-days').checked,
+        notify7Days: document.getElementById('email-notify-7-days').checked,
+        notify1Day: document.getElementById('email-notify-1-day').checked,
+        notifyExpired: document.getElementById('email-notify-expired').checked
+    };
+    
+    await saveEmailPreferences(preferences);
+}
     </script>
 </body>
 </html>
