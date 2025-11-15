@@ -23,24 +23,45 @@ let isLoginMode = true;
 
 // Initialize the app
 function initApp() {
+    console.log('Initializing app...');
+    
+    // Check if Firebase is initialized
+    if (!firebase.apps.length) {
+        console.error('Firebase not initialized');
+        return;
+    }
+
     auth.onAuthStateChanged(async (user) => {
+        console.log('Auth state changed:', user ? 'User logged in' : 'No user');
+        
         if (user) {
             currentUser = user;
+            console.log('User:', user.email);
+            
             initializePageElements();
             updateUserProfile(user);
             setupDocumentsListener();
             setupNotificationsListener();
             
             // Redirect to dashboard if on login page
-            if (window.location.pathname.includes('index.html') || window.location.pathname === '/' || window.location.href.includes('index.html')) {
+            const currentPath = window.location.pathname;
+            const currentHref = window.location.href;
+            
+            if (currentPath.includes('index.html') || currentPath === '/' || currentHref.includes('index.html')) {
+                console.log('Redirecting to dashboard...');
                 window.location.href = 'dashboard.html';
             }
         } else {
+            console.log('No user, cleaning up...');
             currentUser = null;
             cleanupListeners();
             
             // Redirect to login if not on login page
-            if (!window.location.pathname.includes('index.html') && window.location.pathname !== '/' && !window.location.href.includes('index.html')) {
+            const currentPath = window.location.pathname;
+            const currentHref = window.location.href;
+            
+            if (!currentPath.includes('index.html') && currentPath !== '/' && !currentHref.includes('index.html')) {
+                console.log('Redirecting to login...');
                 window.location.href = 'index.html';
             }
         }
@@ -51,8 +72,11 @@ function initApp() {
 
 // Initialize auth functionality for login page
 function initAuth() {
+    console.log('Initializing auth...');
+    
     auth.onAuthStateChanged((user) => {
         if (user) {
+            console.log('User already logged in, redirecting to dashboard');
             window.location.href = 'dashboard.html';
         }
     });
@@ -72,9 +96,13 @@ function initializeAuthElements() {
     confirmPasswordField = getElement('confirm-password-field');
     authError = getElement('auth-error');
     authSuccess = getElement('auth-success');
+    
+    console.log('Auth elements initialized');
 }
 
 function initializePageElements() {
+    console.log('Initializing page elements...');
+    
     userEmail = getElement('user-email');
     logoutBtn = getElement('logout-btn');
     sidebarLogout = getElement('sidebar-logout');
@@ -100,11 +128,9 @@ function initializePageElements() {
     deleteModal = getElement('delete-modal');
     
     // Only get closeModalBtns if modals exist
-    // FIX: Ensure closeModalBtns is always an array, even if empty
     if (editModal || deleteModal) {
         closeModalBtns = document.querySelectorAll('.close-modal');
     } else {
-        // Initialize as an empty NodeList or Array to prevent .length error
         closeModalBtns = [];
     }
     
@@ -125,22 +151,30 @@ function initializePageElements() {
     
     // Loading
     loading = getElement('loading');
+    
+    console.log('Page elements initialized');
 }
 
 // Event Listeners Setup
 function setupAuthEventListeners() {
-    addEventListener(authForm, 'submit', handleAuthSubmit);
-    addEventListener(authSwitchLink, 'click', toggleAuthMode);
-    addEventListener(forgotPasswordLink, 'click', handleForgotPassword);
+    if (authForm) addEventListener(authForm, 'submit', handleAuthSubmit);
+    if (authSwitchLink) addEventListener(authSwitchLink, 'click', toggleAuthMode);
+    if (forgotPasswordLink) addEventListener(forgotPasswordLink, 'click', handleForgotPassword);
+    
+    console.log('Auth event listeners setup');
 }
 
 function setupEventListeners() {
+    console.log('Setting up event listeners...');
+    
     // Logout buttons
     if (logoutBtn) {
         addEventListener(logoutBtn, 'click', handleLogout);
+        console.log('Logout button listener added');
     }
     if (sidebarLogout) {
         addEventListener(sidebarLogout, 'click', handleLogout);
+        console.log('Sidebar logout listener added');
     }
     
     // Other event listeners
@@ -159,11 +193,18 @@ function setupEventListeners() {
     if (notificationBell) {
         addEventListener(notificationBell, 'click', () => navigateTo('notifications.html'));
     }
+    
+    console.log('Event listeners setup complete');
 }
 
 function setupModalEventListeners() {
-    // FIX: Check if closeModalBtns is truthy AND has a length property (meaning it's a NodeList or Array)
-    if (!closeModalBtns || closeModalBtns.length === 0) return;
+    console.log('Setting up modal event listeners...');
+    
+    // Only setup if modals exist on this page
+    if (closeModalBtns.length === 0) {
+        console.log('No modals found on this page');
+        return;
+    }
     
     // Close modals
     closeModalBtns.forEach(btn => {
@@ -181,11 +222,14 @@ function setupModalEventListeners() {
             closeAllModals();
         }
     });
+    
+    console.log('Modal event listeners setup complete');
 }
 
 function setupAddDocumentForm() {
     if (addDocumentForm) {
         addEventListener(addDocumentForm, 'submit', handleAddDocument);
+        console.log('Add document form listener added');
     }
 }
 
@@ -206,19 +250,20 @@ function toggleAuthMode(e) {
         showFields: true
     };
     
-    authTitle.textContent = config.title;
-    authSubmit.textContent = config.submit;
-    authSwitchLink.textContent = config.switchText;
-    nameField.style.display = config.showFields ? 'block' : 'none';
-    confirmPasswordField.style.display = config.showFields ? 'block' : 'none';
+    if (authTitle) authTitle.textContent = config.title;
+    if (authSubmit) authSubmit.textContent = config.submit;
+    if (authSwitchLink) authSwitchLink.textContent = config.switchText;
+    if (nameField) nameField.style.display = config.showFields ? 'block' : 'none';
+    if (confirmPasswordField) confirmPasswordField.style.display = config.showFields ? 'block' : 'none';
     
     // Clear form and messages
-    authForm.reset();
+    if (authForm) authForm.reset();
     clearMessages();
 }
 
 async function handleAuthSubmit(e) {
     e.preventDefault();
+    console.log('Auth form submitted');
     showLoading();
     
     const email = getElement('email').value;
@@ -226,17 +271,20 @@ async function handleAuthSubmit(e) {
     
     try {
         if (isLoginMode) {
+            console.log('Logging in...');
             await auth.signInWithEmailAndPassword(email, password);
             showSuccess('Login successful!');
         } else {
             const name = getElement('name').value;
             const confirmPassword = getElement('confirm-password').value;
             
+            console.log('Signing up...');
             validateSignUp(name, password, confirmPassword);
             await handleSignUp(email, password, name);
             showSuccess('Account created successfully!');
         }
     } catch (error) {
+        console.error('Auth error:', error);
         showAuthError(error.message);
     } finally {
         hideLoading();
@@ -280,18 +328,26 @@ function handleForgotPassword(e) {
 }
 
 function handleLogout() {
+    console.log('Logging out...');
     auth.signOut()
         .then(() => {
             showSuccess('Logged out successfully');
+            console.log('Logout successful');
         })
         .catch(error => {
+            console.error('Logout error:', error);
             showError('Error logging out: ' + error.message);
         });
 }
 
 // Documents Management
 function setupDocumentsListener() {
-    if (!currentUser) return;
+    if (!currentUser) {
+        console.log('No current user, skipping documents listener');
+        return;
+    }
+    
+    console.log('Setting up documents listener for user:', currentUser.uid);
     
     unsubscribeDocuments = db.collection('documents')
         .where('userId', '==', currentUser.uid)
@@ -300,6 +356,8 @@ function setupDocumentsListener() {
 }
 
 function handleDocumentsSnapshot(snapshot) {
+    console.log('Documents snapshot received:', snapshot.docs.length, 'documents');
+    
     documents = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -315,25 +373,38 @@ function handleDocumentsError(error) {
 }
 
 function updateUI() {
-    if (window.location.pathname.includes('dashboard.html') || window.location.href.includes('dashboard.html')) {
+    console.log('Updating UI for current page');
+    
+    const currentPath = window.location.pathname;
+    const currentHref = window.location.href;
+    
+    if (currentPath.includes('dashboard.html') || currentHref.includes('dashboard.html')) {
         updateDashboard();
-    } else if (window.location.pathname.includes('documents.html') || window.location.href.includes('documents.html')) {
+    } else if (currentPath.includes('documents.html') || currentHref.includes('documents.html')) {
         renderDocuments();
-    } else if (window.location.pathname.includes('add.html') || window.location.href.includes('add.html')) {
-        setupAddDocumentForm();
+    } else if (currentPath.includes('add.html') || currentHref.includes('add.html')) {
+        if (addDocumentForm && !addDocumentForm.hasEventListener) {
+            setupAddDocumentForm();
+            addDocumentForm.hasEventListener = true;
+        }
     }
 }
 
 // Dashboard Functions
 function loadDashboard() {
+    console.log('Loading dashboard...');
     if (documents.length > 0) {
         updateDashboard();
     }
 }
 
 function updateDashboard() {
-    if (!totalDocs) return;
+    if (!totalDocs) {
+        console.log('Dashboard elements not found');
+        return;
+    }
     
+    console.log('Updating dashboard stats');
     const stats = calculateDocumentStats();
     
     totalDocs.textContent = stats.total;
@@ -348,7 +419,7 @@ function calculateDocumentStats() {
     const now = new Date();
     const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
     
-    return {
+    const stats = {
         total: documents.length,
         active: documents.filter(doc => {
             const expiryDate = new Date(doc.expiryDate);
@@ -363,6 +434,9 @@ function calculateDocumentStats() {
             return expiryDate <= now;
         }).length
     };
+    
+    console.log('Document stats:', stats);
+    return stats;
 }
 
 function updateAlerts() {
@@ -418,19 +492,24 @@ function generateAlerts() {
 
 // Documents Page Functions
 function loadDocuments() {
+    console.log('Loading documents page...');
     if (documents.length > 0) {
         renderDocuments();
     }
 }
 
 function renderDocuments() {
-    if (!documentsList) return;
+    if (!documentsList) {
+        console.log('Documents list element not found');
+        return;
+    }
     
     if (documents.length === 0) {
         showEmptyState();
         return;
     }
     
+    console.log('Rendering', documents.length, 'documents');
     documentsList.innerHTML = documents.map(doc => createDocumentCard(doc)).join('');
     attachDocumentEventListeners();
 }
@@ -488,6 +567,7 @@ function attachDocumentEventListeners() {
 // Document CRUD Operations
 async function handleAddDocument(e) {
     e.preventDefault();
+    console.log('Adding new document...');
     showLoading();
     
     try {
@@ -503,6 +583,7 @@ async function handleAddDocument(e) {
         showSuccess('Document added successfully');
         navigateTo('documents.html');
     } catch (error) {
+        console.error('Error adding document:', error);
         showError('Error adding document: ' + error.message);
     } finally {
         hideLoading();
@@ -599,7 +680,12 @@ async function handleConfirmDelete() {
 
 // Notifications System
 function setupNotificationsListener() {
-    if (!currentUser) return;
+    if (!currentUser) {
+        console.log('No current user, skipping notifications listener');
+        return;
+    }
+    
+    console.log('Setting up notifications listener');
     
     unsubscribeNotifications = db.collection('notifications')
         .where('userId', '==', currentUser.uid)
@@ -614,8 +700,9 @@ function handleNotificationsSnapshot(snapshot) {
         ...doc.data()
     }));
     
+    console.log('Notifications snapshot:', notifications.length, 'notifications');
+    
     updateUnreadCount();
-    updateNotificationBadge();
     
     if (window.location.pathname.includes('notifications.html') || window.location.href.includes('notifications.html')) {
         renderNotifications();
@@ -624,10 +711,6 @@ function handleNotificationsSnapshot(snapshot) {
 
 function handleNotificationsError(error) {
     console.error('Error getting notifications: ', error);
-    // Display error to user only if on the notifications page
-    if (window.location.pathname.includes('notifications.html') || window.location.href.includes('notifications.html')) {
-        showToast('Error loading notifications. Check permissions.', 'error');
-    }
 }
 
 function updateUnreadCount() {
@@ -647,10 +730,6 @@ function updateBadge(elementId, count) {
     }
 }
 
-function updateNotificationBadge() {
-    updateUnreadCount();
-}
-
 // Reminder System
 async function checkReminders() {
     const today = new Date();
@@ -658,22 +737,19 @@ async function checkReminders() {
     
     for (const doc of documents) {
         const daysRemaining = getDaysRemaining(doc.expiryDate);
-        // Use a composite key that includes the day to ensure we only remind once per day per type
-        const alertKey = `notification_${doc.id}_${daysRemaining}_${today.toDateString()}`;
-        
-        // Check if this specific reminder (for this doc and this daysRemaining value) has already been sent today
+        const alertKey = `notification_${doc.id}_${daysRemaining}`;
         const lastAlertDate = localStorage.getItem(alertKey);
+        const todayStr = today.toDateString();
         
-        if (!lastAlertDate && shouldCreateNotification(daysRemaining)) {
+        if (lastAlertDate !== todayStr && shouldCreateNotification(daysRemaining)) {
             await createNotificationForDocument(doc, daysRemaining);
-            // Set the reminder flag in localStorage only after successful creation
-            localStorage.setItem(alertKey, 'sent');
+            localStorage.setItem(alertKey, todayStr);
         }
     }
 }
 
 function shouldCreateNotification(daysRemaining) {
-    return daysRemaining <= 0 || daysRemaining === 1 || daysRemaining === 7 || daysRemaining === 30;
+    return daysRemaining <= 0 || daysRemaining === 1 || daysRemaining <= 7 || daysRemaining === 30;
 }
 
 async function createNotificationForDocument(doc, daysRemaining) {
@@ -687,7 +763,7 @@ async function createNotificationForDocument(doc, daysRemaining) {
         type = 'expiring';
         title = '⚠️ Expires Tomorrow';
         message = `Your document "${doc.name}" expires tomorrow. Don't forget to renew it!`;
-    } else if (daysRemaining === 7) {
+    } else if (daysRemaining <= 7) {
         type = 'expiring';
         title = '🔔 Expiring Soon';
         message = `Your document "${doc.name}" expires in ${daysRemaining} days.`;
@@ -718,6 +794,7 @@ async function createNotification(type, title, message, documentId = null, actio
         };
         
         await db.collection('notifications').add(notificationData);
+        console.log('Notification created:', title);
     } catch (error) {
         console.error('Error creating notification:', error);
     }
@@ -725,6 +802,7 @@ async function createNotification(type, title, message, documentId = null, actio
 
 // Notifications Page Functions
 function loadNotifications() {
+    console.log('Loading notifications page...');
     if (notifications.length > 0) {
         renderNotifications();
     }
@@ -746,6 +824,8 @@ function setupNotificationsEvents() {
             renderNotifications(filter);
         });
     });
+    
+    console.log('Notifications events setup');
 }
 
 function renderNotifications(filter = 'all') {
@@ -846,6 +926,7 @@ async function markNotificationAsRead(notificationId) {
             read: true,
             readAt: firebase.firestore.FieldValue.serverTimestamp()
         });
+        showToast('Notification marked as read', 'success');
     } catch (error) {
         console.error('Error marking notification as read:', error);
     }
@@ -882,6 +963,7 @@ async function deleteNotification(notificationId) {
 
 // Settings Functions
 function loadSettings() {
+    console.log('Loading settings...');
     loadEmailPreferences();
     setupSettingsForm();
 }
@@ -903,6 +985,7 @@ async function loadEmailPreferences() {
         setCheckboxValue('notify-1-day', preferences.notify1Day);
         setCheckboxValue('notify-expired', preferences.notifyExpired);
         
+        console.log('Email preferences loaded');
     } catch (error) {
         console.error('Error loading email preferences:', error);
     }
@@ -912,6 +995,7 @@ function setupSettingsForm() {
     const saveButton = getElement('save-email-preferences');
     if (saveButton) {
         addEventListener(saveButton, 'click', saveEmailPreferences);
+        console.log('Settings form listener added');
     }
 }
 
@@ -961,11 +1045,17 @@ function closeAllModals() {
 }
 
 function showLoading() {
-    if (loading) loading.classList.remove('hidden');
+    if (loading) {
+        loading.classList.remove('hidden');
+        console.log('Loading shown');
+    }
 }
 
 function hideLoading() {
-    if (loading) loading.classList.add('hidden');
+    if (loading) {
+        loading.classList.add('hidden');
+        console.log('Loading hidden');
+    }
 }
 
 function showAuthError(message) {
@@ -973,6 +1063,7 @@ function showAuthError(message) {
         authError.textContent = message;
         authError.style.display = 'block';
         if (authSuccess) authSuccess.style.display = 'none';
+        console.log('Auth error:', message);
     }
 }
 
@@ -981,6 +1072,7 @@ function showAuthSuccess(message) {
         authSuccess.textContent = message;
         authSuccess.style.display = 'block';
         if (authError) authError.style.display = 'none';
+        console.log('Auth success:', message);
     }
 }
 
@@ -1001,6 +1093,7 @@ function showError(message) {
 }
 
 function showSuccess(message) {
+    console.log(message);
     showToast(message, 'success');
 }
 
@@ -1093,13 +1186,13 @@ function setupMobileNavigation() {
     if (menuToggle && sidebar) {
         function openSidebar() {
             sidebar.classList.add('active');
-            overlay.classList.add('active');
+            if (overlay) overlay.classList.add('active');
             document.body.style.overflow = 'hidden';
         }
 
         function closeSidebarFunc() {
             sidebar.classList.remove('active');
-            overlay.classList.remove('active');
+            if (overlay) overlay.classList.remove('active');
             document.body.style.overflow = '';
         }
 
@@ -1111,6 +1204,8 @@ function setupMobileNavigation() {
         document.querySelectorAll('.sidebar-menu a').forEach(link => {
             addEventListener(link, 'click', closeSidebarFunc);
         });
+        
+        console.log('Mobile navigation setup complete');
     }
 }
 
@@ -1122,6 +1217,8 @@ function updateUserProfile(user) {
     updateElementText('user-name', user.displayName || 'User');
     updateElementText('user-email', user.email);
     updateElementText('current-email', user.email);
+    
+    console.log('User profile updated');
 }
 
 function updateElementText(id, text) {
@@ -1134,15 +1231,17 @@ function cleanupListeners() {
     if (unsubscribeDocuments) {
         unsubscribeDocuments();
         unsubscribeDocuments = null;
+        console.log('Documents listener cleaned up');
     }
     
     if (unsubscribeNotifications) {
         unsubscribeNotifications();
         unsubscribeNotifications = null;
+        console.log('Notifications listener cleaned up');
     }
 }
 
-// Export for global access (if needed)
+// Export for global access
 window.ExpiryTracker = {
     initApp,
     initAuth,
@@ -1151,3 +1250,5 @@ window.ExpiryTracker = {
     loadNotifications,
     loadSettings
 };
+
+console.log('App.js loaded successfully');
