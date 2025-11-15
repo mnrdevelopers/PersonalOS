@@ -9,7 +9,7 @@ let documentToDelete = null;
 // DOM Elements
 let authForm, authTitle, authSubmit, authSwitchLink, forgotPasswordLink;
 let nameField, confirmPasswordField, authError, authSuccess;
-let userEmail, logoutBtn;
+let userEmail, logoutBtn, sidebarLogout;
 let totalDocs, activeDocs, expiringDocs, expiredDocs, alertsList;
 let documentsList, addDocumentBtn;
 let addDocumentForm, cancelAdd;
@@ -31,14 +31,16 @@ function initApp() {
             setupDocumentsListener();
             setupNotificationsListener();
             
-            if (window.location.pathname.includes('index.html') || window.location.pathname === '/') {
+            // Redirect to dashboard if on login page
+            if (window.location.pathname.includes('index.html') || window.location.pathname === '/' || window.location.href.includes('index.html')) {
                 window.location.href = 'dashboard.html';
             }
         } else {
             currentUser = null;
             cleanupListeners();
             
-            if (!window.location.pathname.includes('index.html') && window.location.pathname !== '/') {
+            // Redirect to login if not on login page
+            if (!window.location.pathname.includes('index.html') && window.location.pathname !== '/' && !window.location.href.includes('index.html')) {
                 window.location.href = 'index.html';
             }
         }
@@ -75,6 +77,7 @@ function initializeAuthElements() {
 function initializePageElements() {
     userEmail = getElement('user-email');
     logoutBtn = getElement('logout-btn');
+    sidebarLogout = getElement('sidebar-logout');
     
     // Dashboard elements
     totalDocs = getElement('total-docs');
@@ -92,10 +95,17 @@ function initializePageElements() {
     cancelAdd = getElement('cancel-add');
     settingsForm = getElement('settings-form');
     
-    // Modals
+    // Modals - only initialize if they exist on the page
     editModal = getElement('edit-modal');
     deleteModal = getElement('delete-modal');
-    closeModalBtns = document.querySelectorAll('.close-modal');
+    
+    // Only get closeModalBtns if modals exist
+    if (editModal || deleteModal) {
+        closeModalBtns = document.querySelectorAll('.close-modal');
+    } else {
+        closeModalBtns = [];
+    }
+    
     cancelEdit = getElement('cancel-edit');
     saveEdit = getElement('save-edit');
     cancelDelete = getElement('cancel-delete');
@@ -123,39 +133,58 @@ function setupAuthEventListeners() {
 }
 
 function setupEventListeners() {
-    addEventListener(logoutBtn, 'click', handleLogout);
-    addEventListener(addDocumentBtn, 'click', () => navigateTo('add.html'));
-    addEventListener(cancelAdd, 'click', () => navigateTo('documents.html'));
+    // Logout buttons
+    if (logoutBtn) {
+        addEventListener(logoutBtn, 'click', handleLogout);
+    }
+    if (sidebarLogout) {
+        addEventListener(sidebarLogout, 'click', handleLogout);
+    }
+    
+    // Other event listeners
+    if (addDocumentBtn) {
+        addEventListener(addDocumentBtn, 'click', () => navigateTo('add.html'));
+    }
+    if (cancelAdd) {
+        addEventListener(cancelAdd, 'click', () => navigateTo('documents.html'));
+    }
     
     setupModalEventListeners();
     setupMobileNavigation();
     
     // Notification bell
     const notificationBell = getElement('notification-bell');
-    addEventListener(notificationBell, 'click', () => navigateTo('notifications.html'));
+    if (notificationBell) {
+        addEventListener(notificationBell, 'click', () => navigateTo('notifications.html'));
+    }
 }
 
 function setupModalEventListeners() {
+    // Only setup if modals exist on this page
+    if (closeModalBtns.length === 0) return;
+    
     // Close modals
     closeModalBtns.forEach(btn => {
         addEventListener(btn, 'click', closeAllModals);
     });
     
-    addEventListener(cancelEdit, 'click', closeAllModals);
-    addEventListener(cancelDelete, 'click', closeAllModals);
-    addEventListener(saveEdit, 'click', handleSaveEdit);
-    addEventListener(confirmDelete, 'click', handleConfirmDelete);
+    if (cancelEdit) addEventListener(cancelEdit, 'click', closeAllModals);
+    if (cancelDelete) addEventListener(cancelDelete, 'click', closeAllModals);
+    if (saveEdit) addEventListener(saveEdit, 'click', handleSaveEdit);
+    if (confirmDelete) addEventListener(confirmDelete, 'click', handleConfirmDelete);
     
     // Close modals when clicking outside
     addEventListener(window, 'click', (e) => {
-        if (e.target === editModal || e.target === deleteModal) {
+        if ((editModal && e.target === editModal) || (deleteModal && e.target === deleteModal)) {
             closeAllModals();
         }
     });
 }
 
 function setupAddDocumentForm() {
-    addEventListener(addDocumentForm, 'submit', handleAddDocument);
+    if (addDocumentForm) {
+        addEventListener(addDocumentForm, 'submit', handleAddDocument);
+    }
 }
 
 // Authentication Functions
@@ -196,12 +225,14 @@ async function handleAuthSubmit(e) {
     try {
         if (isLoginMode) {
             await auth.signInWithEmailAndPassword(email, password);
+            showSuccess('Login successful!');
         } else {
             const name = getElement('name').value;
             const confirmPassword = getElement('confirm-password').value;
             
             validateSignUp(name, password, confirmPassword);
             await handleSignUp(email, password, name);
+            showSuccess('Account created successfully!');
         }
     } catch (error) {
         showAuthError(error.message);
@@ -213,11 +244,19 @@ async function handleAuthSubmit(e) {
 function validateSignUp(name, password, confirmPassword) {
     if (!name) throw new Error('Please enter your name');
     if (password !== confirmPassword) throw new Error('Passwords do not match');
+    if (password.length < 6) throw new Error('Password must be at least 6 characters');
 }
 
 async function handleSignUp(email, password, name) {
     const userCredential = await auth.createUserWithEmailAndPassword(email, password);
     await userCredential.user.updateProfile({ displayName: name });
+    
+    // Create user document in Firestore
+    await db.collection('users').doc(userCredential.user.uid).set({
+        name: name,
+        email: email,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
 }
 
 function handleForgotPassword(e) {
@@ -239,7 +278,13 @@ function handleForgotPassword(e) {
 }
 
 function handleLogout() {
-    auth.signOut();
+    auth.signOut()
+        .then(() => {
+            showSuccess('Logged out successfully');
+        })
+        .catch(error => {
+            showError('Error logging out: ' + error.message);
+        });
 }
 
 // Documents Management
@@ -268,11 +313,11 @@ function handleDocumentsError(error) {
 }
 
 function updateUI() {
-    if (window.location.pathname.includes('dashboard.html')) {
+    if (window.location.pathname.includes('dashboard.html') || window.location.href.includes('dashboard.html')) {
         updateDashboard();
-    } else if (window.location.pathname.includes('documents.html')) {
+    } else if (window.location.pathname.includes('documents.html') || window.location.href.includes('documents.html')) {
         renderDocuments();
-    } else if (window.location.pathname.includes('add.html')) {
+    } else if (window.location.pathname.includes('add.html') || window.location.href.includes('add.html')) {
         setupAddDocumentForm();
     }
 }
@@ -298,11 +343,23 @@ function updateDashboard() {
 }
 
 function calculateDocumentStats() {
+    const now = new Date();
+    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    
     return {
         total: documents.length,
-        active: documents.filter(doc => getDocumentStatus(doc.expiryDate) === 'active').length,
-        expiring: documents.filter(doc => getDocumentStatus(doc.expiryDate) === 'expiring').length,
-        expired: documents.filter(doc => getDocumentStatus(doc.expiryDate) === 'expired').length
+        active: documents.filter(doc => {
+            const expiryDate = new Date(doc.expiryDate);
+            return expiryDate > now;
+        }).length,
+        expiring: documents.filter(doc => {
+            const expiryDate = new Date(doc.expiryDate);
+            return expiryDate > now && expiryDate <= thirtyDaysFromNow;
+        }).length,
+        expired: documents.filter(doc => {
+            const expiryDate = new Date(doc.expiryDate);
+            return expiryDate <= now;
+        }).length
     };
 }
 
@@ -312,12 +369,12 @@ function updateAlerts() {
     const alerts = generateAlerts();
     
     if (alerts.length === 0) {
-        alertsList.innerHTML = '<p>No upcoming alerts. All documents are up to date.</p>';
+        alertsList.innerHTML = '<div class="empty-state"><i class="fas fa-bell-slash"></i><p>No upcoming alerts. All documents are up to date.</p></div>';
         return;
     }
     
     alertsList.innerHTML = alerts.map(alert => `
-        <div class="alert-item">
+        <div class="alert-item ${alert.type}">
             <span class="alert-icon ${alert.type}"></span>
             <div class="alert-content">
                 <div class="alert-title">${alert.title}</div>
@@ -329,10 +386,13 @@ function updateAlerts() {
 
 function generateAlerts() {
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const alerts = [];
     
     documents.forEach(doc => {
-        const daysRemaining = getDaysRemaining(doc.expiryDate);
+        const expiryDate = new Date(doc.expiryDate);
+        expiryDate.setHours(0, 0, 0, 0);
+        const daysRemaining = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
         
         if (daysRemaining <= 30 && daysRemaining > 0) {
             alerts.push({
@@ -376,7 +436,10 @@ function renderDocuments() {
 function showEmptyState() {
     documentsList.innerHTML = `
         <div style="grid-column: 1 / -1; text-align: center; padding: 40px;">
-            <p>No documents found. <a href="add.html" id="add-first-doc">Add your first document</a></p>
+            <div class="empty-state">
+                <i class="fas fa-file-alt"></i>
+                <p>No documents found. <a href="add.html" id="add-first-doc">Add your first document</a></p>
+            </div>
         </div>
     `;
 }
@@ -387,16 +450,18 @@ function createDocumentCard(doc) {
     
     return `
         <div class="document-card ${status}">
-            <div class="document-type">${doc.type}</div>
+            <div class="document-header">
+                <div class="document-type">${doc.type}</div>
+                <div class="document-actions">
+                    <button class="action-btn edit-doc" data-id="${doc.id}">✏️</button>
+                    <button class="action-btn delete-doc" data-id="${doc.id}">🗑️</button>
+                </div>
+            </div>
             <div class="document-name">${doc.name}</div>
             <div class="document-number">${doc.number}</div>
-            <div class="document-expiry">
+            <div class="document-footer">
                 <div>Expires: ${formatDate(doc.expiryDate)}</div>
                 <div class="days-badge ${status}">${daysRemaining > 0 ? `${daysRemaining} days` : 'Expired'}</div>
-            </div>
-            <div class="document-actions">
-                <button class="action-btn edit-doc" data-id="${doc.id}">✏️</button>
-                <button class="action-btn delete-doc" data-id="${doc.id}">🗑️</button>
             </div>
         </div>
     `;
@@ -425,7 +490,7 @@ async function handleAddDocument(e) {
     
     try {
         const docData = collectFormData();
-        const file = getElement('file-upload').files[0];
+        const file = getElement('file-upload')?.files[0];
         
         if (file) {
             await handleFileUpload(file, docData);
@@ -456,7 +521,7 @@ function collectFormData() {
 }
 
 async function handleFileUpload(file, docData) {
-    const storageRef = storage.ref();
+    const storageRef = firebase.storage().ref();
     const fileRef = storageRef.child(`documents/${currentUser.uid}/${Date.now()}_${file.name}`);
     
     const snapshot = await fileRef.put(file);
@@ -550,7 +615,7 @@ function handleNotificationsSnapshot(snapshot) {
     updateUnreadCount();
     updateNotificationBadge();
     
-    if (window.location.pathname.includes('notifications.html')) {
+    if (window.location.pathname.includes('notifications.html') || window.location.href.includes('notifications.html')) {
         renderNotifications();
     }
 }
@@ -562,7 +627,6 @@ function handleNotificationsError(error) {
 function updateUnreadCount() {
     const unreadCount = notifications.filter(notification => !notification.read).length;
     updateBadge('notification-badge', unreadCount);
-    updateBadge('sidebar-badge', unreadCount);
 }
 
 function updateBadge(elementId, count) {
@@ -574,6 +638,58 @@ function updateBadge(elementId, count) {
         badge.classList.remove('hidden');
     } else {
         badge.classList.add('hidden');
+    }
+}
+
+function updateNotificationBadge() {
+    updateUnreadCount();
+}
+
+// Reminder System
+async function checkReminders() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    for (const doc of documents) {
+        const daysRemaining = getDaysRemaining(doc.expiryDate);
+        const alertKey = `notification_${doc.id}_${daysRemaining}`;
+        const lastAlertDate = localStorage.getItem(alertKey);
+        const todayStr = today.toDateString();
+        
+        if (lastAlertDate !== todayStr && shouldCreateNotification(daysRemaining)) {
+            await createNotificationForDocument(doc, daysRemaining);
+            localStorage.setItem(alertKey, todayStr);
+        }
+    }
+}
+
+function shouldCreateNotification(daysRemaining) {
+    return daysRemaining <= 0 || daysRemaining === 1 || daysRemaining <= 7 || daysRemaining === 30;
+}
+
+async function createNotificationForDocument(doc, daysRemaining) {
+    let type, title, message;
+    
+    if (daysRemaining <= 0) {
+        type = 'expired';
+        title = '🚨 Document Expired';
+        message = `Your document "${doc.name}" has expired and requires immediate attention.`;
+    } else if (daysRemaining === 1) {
+        type = 'expiring';
+        title = '⚠️ Expires Tomorrow';
+        message = `Your document "${doc.name}" expires tomorrow. Don't forget to renew it!`;
+    } else if (daysRemaining <= 7) {
+        type = 'expiring';
+        title = '🔔 Expiring Soon';
+        message = `Your document "${doc.name}" expires in ${daysRemaining} days.`;
+    } else if (daysRemaining === 30) {
+        type = 'expiring';
+        title = '📋 Expiry Reminder';
+        message = `Your document "${doc.name}" expires in 30 days.`;
+    }
+    
+    if (type && title && message) {
+        await createNotification(type, title, message, doc.id, 'documents.html');
     }
 }
 
@@ -598,46 +714,6 @@ async function createNotification(type, title, message, documentId = null, actio
     }
 }
 
-async function markNotificationAsRead(notificationId) {
-    try {
-        await db.collection('notifications').doc(notificationId).update({
-            read: true,
-            readAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-    } catch (error) {
-        console.error('Error marking notification as read:', error);
-    }
-}
-
-async function markAllNotificationsAsRead() {
-    try {
-        const unreadNotifications = notifications.filter(n => !n.read);
-        const batch = db.batch();
-        
-        unreadNotifications.forEach(notification => {
-            const notificationRef = db.collection('notifications').doc(notification.id);
-            batch.update(notificationRef, {
-                read: true,
-                readAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-        });
-        
-        await batch.commit();
-        showToast('All notifications marked as read', 'success');
-    } catch (error) {
-        showError('Error marking notifications as read');
-    }
-}
-
-async function deleteNotification(notificationId) {
-    try {
-        await db.collection('notifications').doc(notificationId).delete();
-        showToast('Notification deleted', 'success');
-    } catch (error) {
-        showError('Error deleting notification');
-    }
-}
-
 // Notifications Page Functions
 function loadNotifications() {
     if (notifications.length > 0) {
@@ -646,8 +722,11 @@ function loadNotifications() {
 }
 
 function setupNotificationsEvents() {
-    addEventListener(getElement('back-btn'), 'click', () => window.history.back());
-    addEventListener(getElement('mark-all-read'), 'click', markAllNotificationsAsRead);
+    const backBtn = getElement('back-btn');
+    const markAllRead = getElement('mark-all-read');
+    
+    if (backBtn) addEventListener(backBtn, 'click', () => window.history.back());
+    if (markAllRead) addEventListener(markAllRead, 'click', markAllNotificationsAsRead);
     
     // Filter buttons
     document.querySelectorAll('.filter-btn').forEach(btn => {
@@ -703,8 +782,6 @@ function showEmptyNotificationsState() {
 }
 
 function createNotificationItem(notification) {
-    const documentInfo = notification.documentId ? getDocumentInfo(notification.documentId) : null;
-    
     return `
         <div class="notification-item ${notification.type} ${notification.read ? '' : 'unread'}">
             <div class="notification-header">
@@ -712,12 +789,6 @@ function createNotificationItem(notification) {
                 <span class="notification-time">${formatNotificationTime(notification.createdAt)}</span>
             </div>
             <p class="notification-message">${notification.message}</p>
-            ${documentInfo ? `
-                <div class="notification-document">
-                    <div class="notification-document-name">${documentInfo.name}</div>
-                    <div class="notification-document-details">${documentInfo.details}</div>
-                </div>
-            ` : ''}
             <div class="notification-actions">
                 ${!notification.read ? `
                     <button class="notification-action-btn primary mark-read-btn" data-id="${notification.id}">
@@ -735,16 +806,6 @@ function createNotificationItem(notification) {
             </div>
         </div>
     `;
-}
-
-function getDocumentInfo(documentId) {
-    const doc = documents.find(d => d.id === documentId);
-    if (!doc) return null;
-    
-    return {
-        name: doc.name,
-        details: `${doc.type} • Expires: ${formatDate(doc.expiryDate)}`
-    };
 }
 
 function attachNotificationEventListeners() {
@@ -770,50 +831,43 @@ function attachNotificationEventListeners() {
     });
 }
 
-// Reminder System
-async function checkReminders() {
-    const today = new Date();
-    
-    for (const doc of documents) {
-        const daysRemaining = getDaysRemaining(doc.expiryDate);
-        const alertKey = `notification_${doc.id}_${daysRemaining}`;
-        const lastAlertDate = localStorage.getItem(alertKey);
-        const todayStr = today.toDateString();
+async function markNotificationAsRead(notificationId) {
+    try {
+        await db.collection('notifications').doc(notificationId).update({
+            read: true,
+            readAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    } catch (error) {
+        console.error('Error marking notification as read:', error);
+    }
+}
+
+async function markAllNotificationsAsRead() {
+    try {
+        const unreadNotifications = notifications.filter(n => !n.read);
+        const batch = db.batch();
         
-        if (lastAlertDate !== todayStr && shouldCreateNotification(daysRemaining)) {
-            await createNotificationForDocument(doc, daysRemaining);
-            localStorage.setItem(alertKey, todayStr);
-        }
+        unreadNotifications.forEach(notification => {
+            const notificationRef = db.collection('notifications').doc(notification.id);
+            batch.update(notificationRef, {
+                read: true,
+                readAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        });
+        
+        await batch.commit();
+        showToast('All notifications marked as read', 'success');
+    } catch (error) {
+        showError('Error marking notifications as read');
     }
 }
 
-function shouldCreateNotification(daysRemaining) {
-    return daysRemaining <= 0 || daysRemaining === 1 || daysRemaining <= 7 || daysRemaining === 30;
-}
-
-async function createNotificationForDocument(doc, daysRemaining) {
-    let type, title, message;
-    
-    if (daysRemaining <= 0) {
-        type = 'expired';
-        title = '🚨 Document Expired';
-        message = `Your document "${doc.name}" has expired and requires immediate attention.`;
-    } else if (daysRemaining === 1) {
-        type = 'expiring';
-        title = '⚠️ Expires Tomorrow';
-        message = `Your document "${doc.name}" expires tomorrow. Don't forget to renew it!`;
-    } else if (daysRemaining <= 7) {
-        type = 'expiring';
-        title = '🔔 Expiring Soon';
-        message = `Your document "${doc.name}" expires in ${daysRemaining} days.`;
-    } else if (daysRemaining === 30) {
-        type = 'expiring';
-        title = '📋 Expiry Reminder';
-        message = `Your document "${doc.name}" expires in 30 days.`;
-    }
-    
-    if (type && title && message) {
-        await createNotification(type, title, message, doc.id, 'documents.html');
+async function deleteNotification(notificationId) {
+    try {
+        await db.collection('notifications').doc(notificationId).delete();
+        showToast('Notification deleted', 'success');
+    } catch (error) {
+        showError('Error deleting notification');
     }
 }
 
@@ -835,10 +889,10 @@ async function loadEmailPreferences() {
             notifyExpired: true
         };
         
-        setCheckboxValue('email-notify-30-days', preferences.notify30Days);
-        setCheckboxValue('email-notify-7-days', preferences.notify7Days);
-        setCheckboxValue('email-notify-1-day', preferences.notify1Day);
-        setCheckboxValue('email-notify-expired', preferences.notifyExpired);
+        setCheckboxValue('notify-30-days', preferences.notify30Days);
+        setCheckboxValue('notify-7-days', preferences.notify7Days);
+        setCheckboxValue('notify-1-day', preferences.notify1Day);
+        setCheckboxValue('notify-expired', preferences.notifyExpired);
         
     } catch (error) {
         console.error('Error loading email preferences:', error);
@@ -846,16 +900,18 @@ async function loadEmailPreferences() {
 }
 
 function setupSettingsForm() {
-    addEventListener(getElement('save-email-preferences'), 'click', saveEmailPreferences);
-    addEventListener(getElement('test-email-notification'), 'click', testEmailNotification);
+    const saveButton = getElement('save-email-preferences');
+    if (saveButton) {
+        addEventListener(saveButton, 'click', saveEmailPreferences);
+    }
 }
 
 async function saveEmailPreferences() {
     const preferences = {
-        notify30Days: getCheckboxValue('email-notify-30-days'),
-        notify7Days: getCheckboxValue('email-notify-7-days'),
-        notify1Day: getCheckboxValue('email-notify-1-day'),
-        notifyExpired: getCheckboxValue('email-notify-expired')
+        notify30Days: getCheckboxValue('notify-30-days'),
+        notify7Days: getCheckboxValue('notify-7-days'),
+        notify1Day: getCheckboxValue('notify-1-day'),
+        notifyExpired: getCheckboxValue('notify-expired')
     };
     
     try {
@@ -870,35 +926,13 @@ async function saveEmailPreferences() {
     }
 }
 
-async function testEmailNotification() {
-    if (!currentUser || documents.length === 0) {
-        showToast('Add a document first to test notifications', 'warning');
-        return;
-    }
-    
-    try {
-        showLoading();
-        const sendTestNotification = functions.httpsCallable('sendManualEmailNotification');
-        const result = await sendTestNotification({
-            userId: currentUser.uid,
-            docId: documents[0].id
-        });
-        
-        showToast('Test email sent! Check your inbox.', 'success');
-    } catch (error) {
-        showError('Failed to send test email');
-    } finally {
-        hideLoading();
-    }
-}
-
 // Utility Functions
 function getElement(id) {
     return document.getElementById(id);
 }
 
 function addEventListener(element, event, handler) {
-    if (element) {
+    if (element && typeof element.addEventListener === 'function') {
         element.addEventListener(event, handler);
     }
 }
@@ -928,20 +962,28 @@ function hideLoading() {
 function showAuthError(message) {
     if (authError) {
         authError.textContent = message;
-        authSuccess.textContent = '';
+        authError.style.display = 'block';
+        if (authSuccess) authSuccess.style.display = 'none';
     }
 }
 
 function showAuthSuccess(message) {
     if (authSuccess) {
         authSuccess.textContent = message;
-        authError.textContent = '';
+        authSuccess.style.display = 'block';
+        if (authError) authError.style.display = 'none';
     }
 }
 
 function clearMessages() {
-    if (authError) authError.textContent = '';
-    if (authSuccess) authSuccess.textContent = '';
+    if (authError) {
+        authError.textContent = '';
+        authError.style.display = 'none';
+    }
+    if (authSuccess) {
+        authSuccess.textContent = '';
+        authSuccess.style.display = 'none';
+    }
 }
 
 function showError(message) {
@@ -954,9 +996,30 @@ function showSuccess(message) {
 }
 
 function showToast(message, type = 'info') {
-    // Toast implementation (you can keep your existing toast system)
-    console.log(`[${type.toUpperCase()}] ${message}`);
-    // Your existing toast implementation here
+    // Simple toast implementation
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `
+        <div class="toast-content">
+            <i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'exclamation-triangle' : type === 'warning' ? 'exclamation-circle' : 'info'}"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.classList.add('show');
+    }, 100);
+    
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+        }, 300);
+    }, 3000);
 }
 
 function getDocumentStatus(expiryDate) {
@@ -1032,8 +1095,8 @@ function setupMobileNavigation() {
         }
 
         addEventListener(menuToggle, 'click', openSidebar);
-        addEventListener(closeSidebar, 'click', closeSidebarFunc);
-        addEventListener(overlay, 'click', closeSidebarFunc);
+        if (closeSidebar) addEventListener(closeSidebar, 'click', closeSidebarFunc);
+        if (overlay) addEventListener(overlay, 'click', closeSidebarFunc);
 
         // Close sidebar when clicking on a link
         document.querySelectorAll('.sidebar-menu a').forEach(link => {
