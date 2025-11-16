@@ -23,8 +23,10 @@ let isLoginMode = true;
 
 // Initialize the app
 function initApp() {
+    console.log('Initializing app...');
     auth.onAuthStateChanged(async (user) => {
         if (user) {
+            console.log('User logged in:', user.uid);
             currentUser = user;
             initializePageElements();
             updateUserProfile(user);
@@ -36,6 +38,7 @@ function initApp() {
                 window.location.href = 'dashboard.html';
             }
         } else {
+            console.log('No user logged in');
             currentUser = null;
             cleanupListeners();
             
@@ -75,6 +78,8 @@ function initializeAuthElements() {
 }
 
 function initializePageElements() {
+    console.log('Initializing page elements...');
+    
     userEmail = getElement('user-email');
     logoutBtn = getElement('logout-btn');
     sidebarLogout = getElement('sidebar-logout');
@@ -99,8 +104,12 @@ function initializePageElements() {
     editModal = getElement('edit-modal');
     deleteModal = getElement('delete-modal');
     
+    console.log('Edit modal found:', !!editModal);
+    console.log('Delete modal found:', !!deleteModal);
+    
     // Get all close buttons that exist on the page
     closeModalBtns = document.querySelectorAll('.close-modal');
+    console.log('Close buttons found:', closeModalBtns.length);
     
     // Modal action buttons - only initialize if modals exist
     if (editModal) {
@@ -114,11 +123,22 @@ function initializePageElements() {
         editIssueDate = getElement('edit-issue-date');
         editExpiryDate = getElement('edit-expiry-date');
         editNotes = getElement('edit-notes');
+        
+        console.log('Edit form elements initialized:', {
+            cancelEdit: !!cancelEdit,
+            saveEdit: !!saveEdit,
+            editDocId: !!editDocId
+        });
     }
     
     if (deleteModal) {
         cancelDelete = getElement('cancel-delete');
         confirmDelete = getElement('confirm-delete');
+        
+        console.log('Delete modal elements initialized:', {
+            cancelDelete: !!cancelDelete,
+            confirmDelete: !!confirmDelete
+        });
     }
     
     // Loading
@@ -133,6 +153,8 @@ function setupAuthEventListeners() {
 }
 
 function setupEventListeners() {
+    console.log('Setting up event listeners...');
+    
     // Enhanced logout button handling
     const logoutButtons = [
         'logout-btn',
@@ -176,22 +198,32 @@ function setupModalEventListeners() {
     
     // Cancel buttons
     if (cancelEdit) {
-        console.log('Cancel edit button found');
+        console.log('Cancel edit button found, adding listener');
         addEventListener(cancelEdit, 'click', closeAllModals);
+    } else {
+        console.log('Cancel edit button NOT found');
     }
+    
     if (cancelDelete) {
-        console.log('Cancel delete button found');
+        console.log('Cancel delete button found, adding listener');
         addEventListener(cancelDelete, 'click', closeAllModals);
+    } else {
+        console.log('Cancel delete button NOT found');
     }
     
     // Action buttons
     if (saveEdit) {
-        console.log('Save edit button found');
+        console.log('Save edit button found, adding listener');
         addEventListener(saveEdit, 'click', handleSaveEdit);
+    } else {
+        console.log('Save edit button NOT found');
     }
+    
     if (confirmDelete) {
-        console.log('Confirm delete button found');
+        console.log('Confirm delete button found, adding listener');
         addEventListener(confirmDelete, 'click', handleConfirmDelete);
+    } else {
+        console.log('Confirm delete button NOT found');
     }
     
     // Close modals when clicking outside
@@ -386,6 +418,7 @@ async function handleSavePreferences() {
 function setupDocumentsListener() {
     if (!currentUser) return;
     
+    console.log('Setting up documents listener...');
     unsubscribeDocuments = db.collection('documents')
         .where('userId', '==', currentUser.uid)
         .orderBy('expiryDate', 'asc')
@@ -393,6 +426,7 @@ function setupDocumentsListener() {
 }
 
 function handleDocumentsSnapshot(snapshot) {
+    console.log('Documents snapshot received:', snapshot.size, 'documents');
     documents = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -511,13 +545,19 @@ function generateAlerts() {
 
 // Documents Page Functions
 function loadDocuments() {
+    console.log('Loading documents, count:', documents.length);
     if (documents.length > 0) {
         renderDocuments();
     }
 }
 
 function renderDocuments() {
-    if (!documentsList) return;
+    if (!documentsList) {
+        console.error('Documents list element not found!');
+        return;
+    }
+    
+    console.log('Rendering', documents.length, 'documents');
     
     if (documents.length === 0) {
         showEmptyState();
@@ -544,14 +584,14 @@ function createDocumentCard(doc) {
     const daysRemaining = getDaysRemaining(doc.expiryDate);
     
     return `
-        <div class="document-card ${status}">
+        <div class="document-card ${status}" data-doc-id="${doc.id}">
             <div class="document-header">
                 <div class="document-type">${doc.type}</div>
                 <div class="document-actions">
-                    <button class="action-btn edit-doc" data-id="${doc.id}">
+                    <button class="action-btn edit-doc" data-id="${doc.id}" title="Edit">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button class="action-btn delete-doc" data-id="${doc.id}">
+                    <button class="action-btn delete-doc" data-id="${doc.id}" title="Delete">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
@@ -574,10 +614,17 @@ function attachDocumentEventListeners() {
     console.log(`Found ${editButtons.length} edit buttons`);
     
     editButtons.forEach(btn => {
-        btn.addEventListener('click', (e) => {
+        // Remove any existing listeners first
+        btn.replaceWith(btn.cloneNode(true));
+    });
+    
+    // Re-select after cloning
+    const freshEditButtons = document.querySelectorAll('.edit-doc');
+    freshEditButtons.forEach(btn => {
+        btn.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
-            const docId = btn.getAttribute('data-id');
+            const docId = this.getAttribute('data-id');
             console.log('Edit button clicked for document:', docId);
             openEditModal(docId);
         });
@@ -588,10 +635,17 @@ function attachDocumentEventListeners() {
     console.log(`Found ${deleteButtons.length} delete buttons`);
     
     deleteButtons.forEach(btn => {
-        btn.addEventListener('click', (e) => {
+        // Remove any existing listeners first
+        btn.replaceWith(btn.cloneNode(true));
+    });
+    
+    // Re-select after cloning
+    const freshDeleteButtons = document.querySelectorAll('.delete-doc');
+    freshDeleteButtons.forEach(btn => {
+        btn.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
-            const docId = btn.getAttribute('data-id');
+            const docId = this.getAttribute('data-id');
             console.log('Delete button clicked for document:', docId);
             openDeleteModal(docId);
         });
@@ -679,6 +733,8 @@ function populateEditForm(doc) {
     editIssueDate.value = doc.issueDate;
     editExpiryDate.value = doc.expiryDate;
     editNotes.value = doc.notes || '';
+    
+    console.log('Edit form populated with document:', doc.name);
 }
 
 async function handleSaveEdit() {
@@ -1089,6 +1145,7 @@ function showModal(modal) {
 }
 
 function closeAllModals() {
+    console.log('Closing all modals');
     if (editModal) {
         editModal.style.display = 'none';
         editModal.style.opacity = '0';
@@ -1099,12 +1156,6 @@ function closeAllModals() {
     }
     documentToDelete = null;
     document.body.style.overflow = '';
-    
-    // Reset any form validation styles
-    const forms = document.querySelectorAll('form');
-    forms.forEach(form => {
-        form.classList.remove('was-validated');
-    });
 }
 
 function showLoading() {
