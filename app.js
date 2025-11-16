@@ -6,6 +6,9 @@ let unsubscribeDocuments = null;
 let unsubscribeNotifications = null;
 let documentToEdit = null;
 
+// Delete Document Functions
+let documentToDelete = null;
+
 // DOM Elements
 let authForm, authTitle, authSubmit, authSwitchLink, forgotPasswordLink;
 let nameField, confirmPasswordField, authError, authSuccess;
@@ -562,14 +565,12 @@ function editDocument(docId) {
     window.location.href = 'add.html?edit=true';
 }
 
-// Delete Document Functions
-let documentToDelete = null;
-
 function showDeleteModal(docId) {
     documentToDelete = docId;
     const modal = getElement('delete-modal');
     if (modal) {
         modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
     }
 }
 
@@ -578,6 +579,7 @@ function hideDeleteModal() {
     const modal = getElement('delete-modal');
     if (modal) {
         modal.style.display = 'none';
+        document.body.style.overflow = '';
     }
 }
 
@@ -675,6 +677,9 @@ function showEditModal(docId) {
     if (modal) {
         modal.style.display = 'flex';
         clearEditMessages();
+        
+        // Prevent body scrolling when modal is open
+        document.body.style.overflow = 'hidden';
     }
 }
 
@@ -685,6 +690,9 @@ function hideEditModal() {
         modal.style.display = 'none';
         clearEditMessages();
         getElement('edit-document-form').reset();
+        
+        // Restore body scrolling
+        document.body.style.overflow = '';
     }
 }
 
