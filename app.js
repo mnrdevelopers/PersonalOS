@@ -95,12 +95,11 @@ function initializePageElements() {
     cancelAdd = getElement('cancel-add');
     settingsForm = getElement('settings-form');
     
-    // Modal elements - FIXED: Always initialize these
+    // Modal elements 
     editModal = getElement('edit-modal');
     deleteModal = getElement('delete-modal');
     
     // Get all close buttons that exist on the page
-    // Using querySelectorAll to catch the updated class
     closeModalBtns = document.querySelectorAll('.close-modal');
     
     // Modal action buttons - only initialize if modals exist
@@ -319,6 +318,7 @@ function handleLogout() {
 function setupDocumentsListener() {
     if (!currentUser) return;
     
+    // Set up real-time listener for user's documents
     unsubscribeDocuments = db.collection('documents')
         .where('userId', '==', currentUser.uid)
         .orderBy('expiryDate', 'asc')
@@ -326,12 +326,15 @@ function setupDocumentsListener() {
 }
 
 function handleDocumentsSnapshot(snapshot) {
+    // Map Firestore documents to local array
     documents = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
     }));
     
+    // Trigger UI updates for dashboard and documents page
     updateUI();
+    // Check for expiry reminders
     checkReminders();
 }
 
@@ -496,9 +499,11 @@ function createDocumentCard(doc) {
 }
 
 function attachDocumentEventListeners() {
+    // Event delegation is not necessary here since we re-render and attach events
+    // We target the buttons directly using their class names
     document.querySelectorAll('.edit-doc').forEach(btn => {
         addEventListener(btn, 'click', (e) => {
-            // Use closest to ensure we get the button's data-id, even if the icon is clicked
+            // Use currentTarget to ensure the event handler is reliably attached to the button element
             const docId = e.currentTarget.getAttribute('data-id');
             openEditModal(docId);
         });
@@ -506,7 +511,6 @@ function attachDocumentEventListeners() {
     
     document.querySelectorAll('.delete-doc').forEach(btn => {
         addEventListener(btn, 'click', (e) => {
-            // Use closest to ensure we get the button's data-id, even if the icon is clicked
             const docId = e.currentTarget.getAttribute('data-id');
             openDeleteModal(docId);
         });
@@ -514,6 +518,10 @@ function attachDocumentEventListeners() {
 }
 
 // Document CRUD Operations
+
+/**
+ * Handles adding a new document via the form submission.
+ */
 async function handleAddDocument(e) {
     e.preventDefault();
     showLoading();
@@ -523,8 +531,10 @@ async function handleAddDocument(e) {
         const file = getElement('file-upload')?.files[0];
         
         if (file) {
+            // Handle file upload and add document with URL
             await handleFileUpload(file, docData);
         } else {
+            // Add document without file
             await db.collection('documents').add(docData);
         }
         
@@ -537,6 +547,9 @@ async function handleAddDocument(e) {
     }
 }
 
+/**
+ * Collects form data from the Add Document form fields.
+ */
 function collectFormData() {
     return {
         type: getElement('doc-type').value,
@@ -550,6 +563,9 @@ function collectFormData() {
     };
 }
 
+/**
+ * Uploads file to Firebase Storage and adds document record to Firestore with the file URL.
+ */
 async function handleFileUpload(file, docData) {
     const storageRef = firebase.storage().ref();
     const fileRef = storageRef.child(`documents/${currentUser.uid}/${Date.now()}_${file.name}`);
@@ -561,6 +577,10 @@ async function handleFileUpload(file, docData) {
     await db.collection('documents').add(docData);
 }
 
+/**
+ * Opens the edit modal and populates it with the selected document's data.
+ * @param {string} docId - The ID of the document to edit.
+ */
 function openEditModal(docId) {
     const doc = documents.find(d => d.id === docId);
     if (!doc || !editModal) {
@@ -572,19 +592,34 @@ function openEditModal(docId) {
     showModal(editModal);
 }
 
+/**
+ * Populates the Edit Document form fields.
+ * @param {Object} doc - The document object.
+ */
 function populateEditForm(doc) {
     editDocId.value = doc.id;
     editDocType.value = doc.type;
     editDocName.value = doc.name;
     editDocNumber.value = doc.number;
+    // Firestore dates are stored as YYYY-MM-DD, which works directly with input type="date"
     editIssueDate.value = doc.issueDate;
     editExpiryDate.value = doc.expiryDate;
     editNotes.value = doc.notes || '';
 }
 
+/**
+ * Handles saving the changes from the Edit Document modal.
+ */
 async function handleSaveEdit() {
     showLoading();
     
+    const docId = editDocId.value;
+    if (!docId) {
+        showError('Error: Document ID is missing.');
+        hideLoading();
+        return;
+    }
+
     try {
         const docData = {
             type: editDocType.value,
@@ -596,7 +631,7 @@ async function handleSaveEdit() {
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         
-        await db.collection('documents').doc(editDocId.value).update(docData);
+        await db.collection('documents').doc(docId).update(docData);
         showSuccess('Document updated successfully');
         closeAllModals();
     } catch (error) {
@@ -606,22 +641,46 @@ async function handleSaveEdit() {
     }
 }
 
+/**
+ * Opens the delete confirmation modal.
+ * @param {string} docId - The ID of the document to delete.
+ */
 function openDeleteModal(docId) {
     if (!deleteModal) {
         console.error('Delete modal not available');
         return;
     }
     
-    documentToDelete = docId;
+    documentToDelete = docId; // Store the ID globally for confirmation
     showModal(deleteModal);
 }
 
+/**
+ * Handles the confirmation and execution of document deletion.
+ */
 async function handleConfirmDelete() {
-    if (!documentToDelete) return;
+    if (!documentToDelete) {
+        closeAllModals();
+        return;
+    }
     
     showLoading();
     
     try {
+        // Find the document to check for associated files before deleting the record
+        const docToDelete = documents.find(d => d.id === documentToDelete);
+        
+        if (docToDelete && docToDelete.fileUrl) {
+            // Optional: Implement logic to delete the file from storage if fileUrl exists
+            // For now, we only delete the Firestore record. Add file deletion logic here if needed.
+            /*
+            const fileRef = storage.refFromURL(docToDelete.fileUrl);
+            await fileRef.delete().catch(err => {
+                console.warn("Could not delete associated file from storage:", err);
+            });
+            */
+        }
+
         await db.collection('documents').doc(documentToDelete).delete();
         showSuccess('Document deleted successfully');
         closeAllModals();
