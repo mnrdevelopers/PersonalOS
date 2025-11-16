@@ -100,21 +100,15 @@ function initializePageElements() {
     deleteModal = getElement('delete-modal');
     
     // Get all close buttons that exist on the page
-    closeModalBtns = document.querySelectorAll('.close-modal, .close-modal-btn');
+    // Using querySelectorAll to catch the updated class
+    closeModalBtns = document.querySelectorAll('.close-modal');
     
     // Modal action buttons - only initialize if modals exist
     if (editModal) {
         cancelEdit = getElement('cancel-edit');
         saveEdit = getElement('save-edit');
-    }
-    
-    if (deleteModal) {
-        cancelDelete = getElement('cancel-delete');
-        confirmDelete = getElement('confirm-delete');
-    }
-    
-    // Edit form elements - only initialize if edit modal exists
-    if (editModal) {
+        
+        // Edit form elements
         editDocumentForm = getElement('edit-document-form');
         editDocId = getElement('edit-doc-id');
         editDocType = getElement('edit-doc-type');
@@ -123,6 +117,11 @@ function initializePageElements() {
         editIssueDate = getElement('edit-issue-date');
         editExpiryDate = getElement('edit-expiry-date');
         editNotes = getElement('edit-notes');
+    }
+    
+    if (deleteModal) {
+        cancelDelete = getElement('cancel-delete');
+        confirmDelete = getElement('confirm-delete');
     }
     
     // Loading
@@ -172,11 +171,13 @@ function setupModalEventListeners() {
     // Close modals when clicking close buttons
     if (closeModalBtns && closeModalBtns.length > 0) {
         closeModalBtns.forEach(btn => {
+            // Updated event listener logic to use the button itself as the target
             addEventListener(btn, 'click', closeAllModals);
         });
     }
     
     // Cancel buttons
+    // The closest() method ensures we get the button element regardless of where the click occurs inside it (icon/text)
     if (cancelEdit) addEventListener(cancelEdit, 'click', closeAllModals);
     if (cancelDelete) addEventListener(cancelDelete, 'click', closeAllModals);
     
@@ -481,8 +482,8 @@ function createDocumentCard(doc) {
             <div class="document-header">
                 <div class="document-type">${doc.type}</div>
                 <div class="document-actions">
-                    <button class="action-btn edit-doc" data-id="${doc.id}">✏️</button>
-                    <button class="action-btn delete-doc" data-id="${doc.id}">🗑️</button>
+                    <button class="action-btn edit-doc" data-id="${doc.id}"><i class="fas fa-edit"></i></button>
+                    <button class="action-btn delete-doc" data-id="${doc.id}"><i class="fas fa-trash-alt"></i></button>
                 </div>
             </div>
             <div class="document-name">${doc.name}</div>
@@ -498,14 +499,16 @@ function createDocumentCard(doc) {
 function attachDocumentEventListeners() {
     document.querySelectorAll('.edit-doc').forEach(btn => {
         addEventListener(btn, 'click', (e) => {
-            const docId = e.target.closest('button').getAttribute('data-id');
+            // Use closest to ensure we get the button's data-id, even if the icon is clicked
+            const docId = e.currentTarget.getAttribute('data-id');
             openEditModal(docId);
         });
     });
     
     document.querySelectorAll('.delete-doc').forEach(btn => {
         addEventListener(btn, 'click', (e) => {
-            const docId = e.target.closest('button').getAttribute('data-id');
+            // Use closest to ensure we get the button's data-id, even if the icon is clicked
+            const docId = e.currentTarget.getAttribute('data-id');
             openDeleteModal(docId);
         });
     });
@@ -939,6 +942,8 @@ function showModal(modal) {
     if (modal) {
         modal.style.display = 'flex';
         modal.classList.add('active');
+        // Prevent body scrolling when modal is open
+        document.body.style.overflow = 'hidden';
         
         // Add a small delay for animation
         setTimeout(() => {
@@ -957,6 +962,9 @@ function closeAllModals() {
         deleteModal.classList.remove('active');
     }
     documentToDelete = null;
+    
+    // Re-enable body scrolling
+    document.body.style.overflow = ''; 
     
     // Reset any form validation styles
     const forms = document.querySelectorAll('form');
