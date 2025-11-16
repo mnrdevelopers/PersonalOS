@@ -1577,3 +1577,217 @@ body {
         width: 100%;
     }
 }
+
+/* PWA Installation Button */
+.pwa-install-btn {
+    position: fixed;
+    bottom: 100px;
+    right: 20px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    color: white;
+    border: none;
+    border-radius: 50px;
+    padding: 12px 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: slideInUp 0.3s ease-out;
+}
+
+@keyframes slideInUp {
+    from {
+        transform: translateY(100px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.pwa-install-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 25px rgba(99, 102, 241, 0.4);
+}
+
+/* iOS Install Instructions */
+.ios-install-help {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(10px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.ios-install-content {
+    background: var(--surface);
+    border-radius: var(--border-radius);
+    padding: 24px;
+    text-align: center;
+    max-width: 300px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+}
+
+.ios-install-content h3 {
+    margin-bottom: 12px;
+    color: var(--text-primary);
+}
+
+.ios-install-content p {
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+    font-size: 1rem;
+}
+
+.ios-install-content .btn {
+    width: 100%;
+}
+
+/* PWA Update Notification */
+.pwa-update-notification {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--border-radius);
+    padding: 16px;
+    box-shadow: var(--shadow);
+    z-index: 10000;
+    min-width: 280px;
+    text-align: center;
+}
+
+.pwa-update-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.pwa-update-content p {
+    margin: 0;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.pwa-update-content .btn {
+    flex-shrink: 0;
+}
+
+/* PWA Toast Notifications */
+.pwa-toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--border-radius);
+    padding: 12px 16px;
+    color: var(--text-primary);
+    box-shadow: var(--shadow);
+    z-index: 10000;
+    transform: translateX(400px);
+    transition: transform 0.3s ease;
+    max-width: 300px;
+}
+
+.pwa-toast.show {
+    transform: translateX(0);
+}
+
+.pwa-toast.success {
+    border-left: 4px solid var(--success);
+}
+
+.pwa-toast.warning {
+    border-left: 4px solid var(--warning);
+}
+
+.pwa-toast.error {
+    border-left: 4px solid var(--danger);
+}
+
+/* Safe area insets for notch devices */
+@supports(padding: max(0px)) {
+    .header,
+    .bottom-nav {
+        padding-left: max(20px, env(safe-area-inset-left));
+        padding-right: max(20px, env(safe-area-inset-right));
+    }
+    
+    .bottom-nav {
+        padding-bottom: max(12px, env(safe-area-inset-bottom));
+    }
+    
+    .main-content {
+        padding-left: max(20px, env(safe-area-inset-left));
+        padding-right: max(20px, env(safe-area-inset-right));
+    }
+}
+
+/* Enhanced touch targets for mobile */
+.btn,
+.nav-item,
+.action-btn,
+.setting-item {
+    min-height: 44px;
+    min-width: 44px;
+}
+
+/* Prevent zoom on iOS input focus */
+@media (max-width: 480px) {
+    input,
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+}
+
+/* Splash screen styling */
+.app-splash {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.app-splash .logo {
+    font-size: 2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 20px;
+}
+
+.app-splash .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-left-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
