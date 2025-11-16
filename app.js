@@ -95,33 +95,35 @@ function initializePageElements() {
     cancelAdd = getElement('cancel-add');
     settingsForm = getElement('settings-form');
     
-    // Modals - only initialize if they exist on the page
+    // Modal elements - FIXED: Always initialize these
     editModal = getElement('edit-modal');
     deleteModal = getElement('delete-modal');
     
-    // Only get closeModalBtns if modals exist
-    // FIX: Ensure closeModalBtns is always an array, even if empty
-    if (editModal || deleteModal) {
-        closeModalBtns = document.querySelectorAll('.close-modal');
-    } else {
-        // Initialize as an empty NodeList or Array to prevent .length error
-        closeModalBtns = [];
+    // Get all close buttons that exist on the page
+    closeModalBtns = document.querySelectorAll('.close-modal, .close-modal-btn');
+    
+    // Modal action buttons - only initialize if modals exist
+    if (editModal) {
+        cancelEdit = getElement('cancel-edit');
+        saveEdit = getElement('save-edit');
     }
     
-    cancelEdit = getElement('cancel-edit');
-    saveEdit = getElement('save-edit');
-    cancelDelete = getElement('cancel-delete');
-    confirmDelete = getElement('confirm-delete');
+    if (deleteModal) {
+        cancelDelete = getElement('cancel-delete');
+        confirmDelete = getElement('confirm-delete');
+    }
     
-    // Edit form elements
-    editDocumentForm = getElement('edit-document-form');
-    editDocId = getElement('edit-doc-id');
-    editDocType = getElement('edit-doc-type');
-    editDocName = getElement('edit-doc-name');
-    editDocNumber = getElement('edit-doc-number');
-    editIssueDate = getElement('edit-issue-date');
-    editExpiryDate = getElement('edit-expiry-date');
-    editNotes = getElement('edit-notes');
+    // Edit form elements - only initialize if edit modal exists
+    if (editModal) {
+        editDocumentForm = getElement('edit-document-form');
+        editDocId = getElement('edit-doc-id');
+        editDocType = getElement('edit-doc-type');
+        editDocName = getElement('edit-doc-name');
+        editDocNumber = getElement('edit-doc-number');
+        editIssueDate = getElement('edit-issue-date');
+        editExpiryDate = getElement('edit-expiry-date');
+        editNotes = getElement('edit-notes');
+    }
     
     // Loading
     loading = getElement('loading');
@@ -167,22 +169,34 @@ function setupEventListeners() {
 }
 
 function setupModalEventListeners() {
-    // FIX: Check if closeModalBtns is truthy AND has a length property (meaning it's a NodeList or Array)
-    if (!closeModalBtns || closeModalBtns.length === 0) return;
+    // Close modals when clicking close buttons
+    if (closeModalBtns && closeModalBtns.length > 0) {
+        closeModalBtns.forEach(btn => {
+            addEventListener(btn, 'click', closeAllModals);
+        });
+    }
     
-    // Close modals
-    closeModalBtns.forEach(btn => {
-        addEventListener(btn, 'click', closeAllModals);
-    });
-    
+    // Cancel buttons
     if (cancelEdit) addEventListener(cancelEdit, 'click', closeAllModals);
     if (cancelDelete) addEventListener(cancelDelete, 'click', closeAllModals);
+    
+    // Action buttons
     if (saveEdit) addEventListener(saveEdit, 'click', handleSaveEdit);
     if (confirmDelete) addEventListener(confirmDelete, 'click', handleConfirmDelete);
     
     // Close modals when clicking outside
     addEventListener(window, 'click', (e) => {
-        if ((editModal && e.target === editModal) || (deleteModal && e.target === deleteModal)) {
+        if (editModal && e.target === editModal) {
+            closeAllModals();
+        }
+        if (deleteModal && e.target === deleteModal) {
+            closeAllModals();
+        }
+    });
+    
+    // Close modals with Escape key
+    addEventListener(document, 'keydown', (e) => {
+        if (e.key === 'Escape') {
             closeAllModals();
         }
     });
@@ -547,7 +561,10 @@ async function handleFileUpload(file, docData) {
 
 function openEditModal(docId) {
     const doc = documents.find(d => d.id === docId);
-    if (!doc) return;
+    if (!doc || !editModal) {
+        console.error('Document not found or edit modal not available');
+        return;
+    }
     
     populateEditForm(doc);
     showModal(editModal);
@@ -588,6 +605,11 @@ async function handleSaveEdit() {
 }
 
 function openDeleteModal(docId) {
+    if (!deleteModal) {
+        console.error('Delete modal not available');
+        return;
+    }
+    
     documentToDelete = docId;
     showModal(deleteModal);
 }
@@ -914,13 +936,33 @@ function navigateTo(url) {
 }
 
 function showModal(modal) {
-    if (modal) modal.style.display = 'flex';
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.classList.add('active');
+        
+        // Add a small delay for animation
+        setTimeout(() => {
+            modal.style.opacity = '1';
+        }, 10);
+    }
 }
 
 function closeAllModals() {
-    if (editModal) editModal.style.display = 'none';
-    if (deleteModal) deleteModal.style.display = 'none';
+    if (editModal) {
+        editModal.style.display = 'none';
+        editModal.classList.remove('active');
+    }
+    if (deleteModal) {
+        deleteModal.style.display = 'none';
+        deleteModal.classList.remove('active');
+    }
     documentToDelete = null;
+    
+    // Reset any form validation styles
+    const forms = document.querySelectorAll('form');
+    forms.forEach(form => {
+        form.classList.remove('was-validated');
+    });
 }
 
 function showLoading() {
