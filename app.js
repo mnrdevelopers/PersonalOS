@@ -660,20 +660,16 @@ function createDocumentCard(doc) {
     `;
 }
 
-// Document CRUD Operations - Only Add functionality remains
+// Document CRUD Operations
 async function handleAddDocument(e) {
     e.preventDefault();
     showLoading();
     
     try {
         const docData = collectFormData();
-        const file = getElement('file-upload')?.files[0];
         
-        if (file) {
-            await handleFileUpload(file, docData);
-        } else {
-            await db.collection('documents').add(docData);
-        }
+        // Save document to Firestore without file upload
+        await db.collection('documents').add(docData);
         
         showSuccess('Document added successfully');
         navigateTo('documents.html');
@@ -695,17 +691,6 @@ function collectFormData() {
         userId: currentUser.uid,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
-}
-
-async function handleFileUpload(file, docData) {
-    const storageRef = firebase.storage().ref();
-    const fileRef = storageRef.child(`documents/${currentUser.uid}/${Date.now()}_${file.name}`);
-    
-    const snapshot = await fileRef.put(file);
-    const url = await snapshot.ref.getDownloadURL();
-    
-    docData.fileUrl = url;
-    await db.collection('documents').add(docData);
 }
 
 // Notifications System
