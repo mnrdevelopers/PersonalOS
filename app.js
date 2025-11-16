@@ -170,16 +170,15 @@ function setupModalEventListeners() {
     // Close modals when clicking close buttons
     if (closeModalBtns && closeModalBtns.length > 0) {
         closeModalBtns.forEach(btn => {
-            // Use currentTarget to ensure the click listener is bound to the element with the class
             addEventListener(btn, 'click', closeAllModals);
         });
     }
     
-    // NOTE: CRUD button listeners are commented out below as per request
-    // if (cancelEdit) addEventListener(cancelEdit, 'click', closeAllModals);
-    // if (cancelDelete) addEventListener(cancelDelete, 'click', closeAllModals);
-    // if (saveEdit) addEventListener(saveEdit, 'click', handleSaveEdit);
-    // if (confirmDelete) addEventListener(confirmDelete, 'click', handleConfirmDelete);
+    // RESTORE CRUD button listeners
+    if (cancelEdit) addEventListener(cancelEdit, 'click', closeAllModals);
+    if (cancelDelete) addEventListener(cancelDelete, 'click', closeAllModals);
+    if (saveEdit) addEventListener(saveEdit, 'click', handleSaveEdit);
+    if (confirmDelete) addEventListener(confirmDelete, 'click', handleConfirmDelete);
     
     // Close modals when clicking outside
     addEventListener(window, 'click', (e) => {
@@ -200,14 +199,9 @@ function setupModalEventListeners() {
 }
 
 function setupAddDocumentForm() {
-    // Original listener: addEventListener(addDocumentForm, 'submit', handleAddDocument);
-    // Removed to prevent new document creation.
+    // RESTORE add document form submission listener
     if (addDocumentForm) {
-        // Optional: prevent form submission entirely if the form exists on the page
-        addEventListener(addDocumentForm, 'submit', (e) => {
-            e.preventDefault();
-            showError('Document creation is currently disabled.');
-        });
+        addEventListener(addDocumentForm, 'submit', handleAddDocument);
     }
 }
 
@@ -322,7 +316,7 @@ function handleLogout() {
 function setupDocumentsListener() {
     if (!currentUser) return;
     
-    // Set up real-time listener for user's documents (READ operation is kept)
+    // Set up real-time listener for user's documents
     unsubscribeDocuments = db.collection('documents')
         .where('userId', '==', currentUser.uid)
         .orderBy('expiryDate', 'asc')
@@ -465,8 +459,7 @@ function renderDocuments() {
     }
     
     documentsList.innerHTML = documents.map(doc => createDocumentCard(doc)).join('');
-    // No need to attach CRUD event listeners since the buttons are removed
-    // attachDocumentEventListeners();
+    attachDocumentEventListeners();
 }
 
 function showEmptyState() {
@@ -488,10 +481,10 @@ function createDocumentCard(doc) {
         <div class="document-card ${status}">
             <div class="document-header">
                 <div class="document-type">${doc.type}</div>
-                <!-- Removed CRUD buttons from document card -->
+                <!-- RESTORED CRUD buttons from document card -->
                 <div class="document-actions">
-                    <!-- <button class="action-btn edit-doc" data-id="${doc.id}"><i class="fas fa-edit"></i></button> -->
-                    <!-- <button class="action-btn delete-doc" data-id="${doc.id}"><i class="fas fa-trash-alt"></i></button> -->
+                    <button class="action-btn edit-doc" data-id="${doc.id}"><i class="fas fa-edit"></i></button>
+                    <button class="action-btn delete-doc" data-id="${doc.id}"><i class="fas fa-trash-alt"></i></button>
                 </div>
             </div>
             <div class="document-name">${doc.name}</div>
@@ -505,8 +498,7 @@ function createDocumentCard(doc) {
 }
 
 function attachDocumentEventListeners() {
-    // Removed all CRUD event listeners
-    /*
+    // RESTORED all CRUD event listeners
     document.querySelectorAll('.edit-doc').forEach(btn => {
         addEventListener(btn, 'click', (e) => {
             const docId = e.currentTarget.getAttribute('data-id');
@@ -520,13 +512,11 @@ function attachDocumentEventListeners() {
             openDeleteModal(docId);
         });
     });
-    */
 }
 
 // Document CRUD Operations
 
-// --- CREATION OPERATIONS REMOVED ---
-/*
+// --- CREATION OPERATIONS RESTORED ---
 async function handleAddDocument(e) {
     e.preventDefault();
     showLoading();
@@ -573,12 +563,10 @@ async function handleFileUpload(file, docData) {
     docData.fileUrl = url;
     await db.collection('documents').add(docData);
 }
-*/
-// --- END CREATION OPERATIONS REMOVED ---
+// --- END CREATION OPERATIONS RESTORED ---
 
 
-// --- UPDATE OPERATIONS REMOVED ---
-/*
+// --- UPDATE OPERATIONS RESTORED ---
 function openEditModal(docId) {
     const doc = documents.find(d => d.id === docId);
     if (!doc || !editModal) {
@@ -630,12 +618,10 @@ async function handleSaveEdit() {
         hideLoading();
     }
 }
-*/
-// --- END UPDATE OPERATIONS REMOVED ---
+// --- END UPDATE OPERATIONS RESTORED ---
 
 
-// --- DELETION OPERATIONS REMOVED ---
-/*
+// --- DELETION OPERATIONS RESTORED ---
 function openDeleteModal(docId) {
     if (!deleteModal) {
         console.error('Delete modal not available');
@@ -672,8 +658,7 @@ async function handleConfirmDelete() {
         hideLoading();
     }
 }
-*/
-// --- END DELETION OPERATIONS REMOVED ---
+// --- END DELETION OPERATIONS RESTORED ---
 
 
 // Notifications System
@@ -904,7 +889,7 @@ function attachNotificationEventListeners() {
         });
     });
     
-    // NOTE: Keeping delete notification function but removing document delete
+    // NOTE: Keeping delete notification function 
     document.querySelectorAll('.delete-btn').forEach(btn => {
         addEventListener(btn, 'click', (e) => {
             const notificationId = e.target.getAttribute('data-id');
