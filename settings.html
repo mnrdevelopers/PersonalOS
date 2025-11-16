@@ -131,7 +131,7 @@
                             <div class="setting-description" id="current-email">user@example.com</div>
                         </div>
                     </div>
-                    <div class="setting-item">
+                    <div class="setting-item clickable" id="change-password-btn">
                         <div class="setting-content">
                             <div class="setting-title">Change Password</div>
                             <div class="setting-description">Update your account password</div>
@@ -163,6 +163,46 @@
         </div>
     </main>
 
+    <!-- Change Password Modal -->
+    <div id="change-password-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Change Password</h3>
+                <button class="close-modal" id="close-password-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="change-password-form">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="current-password" class="form-label">Current Password</label>
+                        <input type="password" id="current-password" class="form-control" placeholder="Enter current password" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="new-password" class="form-label">New Password</label>
+                        <input type="password" id="new-password" class="form-control" placeholder="Enter new password" required minlength="6">
+                        <div class="password-requirements">
+                            <small>Password must be at least 6 characters long</small>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirm-new-password" class="form-label">Confirm New Password</label>
+                        <input type="password" id="confirm-new-password" class="form-control" placeholder="Confirm new password" required>
+                    </div>
+                    <div id="password-error" class="error-message" style="display: none;"></div>
+                    <div id="password-success" class="success-message" style="display: none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" id="cancel-password-change">Cancel</button>
+                    <button type="submit" class="btn" id="submit-password-change">
+                        <i class="fas fa-key"></i>
+                        Change Password
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Bottom Navigation -->
     <nav class="bottom-nav">
         <a href="dashboard.html" class="nav-item">
@@ -190,6 +230,7 @@
             initApp();
             loadSettings();
             setupMobileNavigation();
+            setupPasswordChangeModal();
         });
     </script>
 </body>
