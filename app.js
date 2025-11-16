@@ -4,6 +4,7 @@ let documents = [];
 let notifications = [];
 let unsubscribeDocuments = null;
 let unsubscribeNotifications = null;
+let documentToEdit = null;
 
 // DOM Elements
 let authForm, authTitle, authSubmit, authSwitchLink, forgotPasswordLink;
@@ -136,18 +137,7 @@ function setupEventListeners() {
 
 function setupAddDocumentForm() {
     if (addDocumentForm) {
-        // Check if we're in edit mode
-        const urlParams = new URLSearchParams(window.location.search);
-        const isEditMode = urlParams.get('edit') === 'true';
-        
-        if (isEditMode) {
-            const editingDoc = sessionStorage.getItem('editingDocument');
-            if (editingDoc) {
-                populateEditForm(JSON.parse(editingDoc));
-            }
-        }
-        
-        addEventListener(addDocumentForm, 'submit', isEditMode ? handleEditDocument : handleAddDocument);
+        addEventListener(addDocumentForm, 'submit', handleAddDocument);
     }
 }
 
@@ -181,8 +171,7 @@ async function handleEditDocument(e) {
     showLoading();
     
     try {
-        const docId = addDocumentForm.getAttribute('data-editing-id');
-        const docData = collectFormData();
+        const docData = collectEditFormData();
         
         // Remove userId and createdAt from update data (these shouldn't change)
         delete docData.userId;
@@ -191,19 +180,44 @@ async function handleEditDocument(e) {
         // Add updatedAt timestamp
         docData.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
         
-        await db.collection('documents').doc(docId).update(docData);
+        await db.collection('documents').doc(documentToEdit).update(docData);
         
-        showSuccess('Document updated successfully');
+        showEditSuccess('Document updated successfully!');
         
-        // Clear the stored editing document
-        sessionStorage.removeItem('editingDocument');
+        // Update local documents array and re-render after a short delay
+        setTimeout(() => {
+            // Refresh the documents list
+            const updatedDocIndex = documents.findIndex(doc => doc.id === documentToEdit);
+            if (updatedDocIndex !== -1) {
+                documents[updatedDocIndex] = {
+                    ...documents[updatedDocIndex],
+                    ...docData
+                };
+                renderDocuments();
+            }
+            
+            hideEditModal();
+            showToast('Document updated successfully!', 'success');
+        }, 1500);
         
-        navigateTo('documents.html');
     } catch (error) {
-        showError('Error updating document: ' + error.message);
+        showEditError('Error updating document: ' + error.message);
     } finally {
         hideLoading();
     }
+}
+
+function collectEditFormData() {
+    return {
+        type: getElement('edit-doc-type').value,
+        name: getElement('edit-doc-name').value,
+        number: getElement('edit-doc-number').value,
+        issueDate: getElement('edit-issue-date').value,
+        expiryDate: getElement('edit-expiry-date').value,
+        notes: getElement('edit-notes').value,
+        userId: currentUser.uid,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp() // This will be ignored in update
+    };
 }
 
 // Authentication Functions
@@ -522,7 +536,7 @@ function attachDocumentEventListeners() {
     document.querySelectorAll('.edit-doc').forEach(btn => {
         addEventListener(btn, 'click', (e) => {
             const docId = e.currentTarget.getAttribute('data-doc-id');
-            editDocument(docId);
+            showEditModal(docId);
         });
     });
     
@@ -590,13 +604,13 @@ async function deleteDocument(docId) {
 }
 
 function setupDocumentModals() {
+    // Delete modal setup (existing code)
     const deleteModal = getElement('delete-modal');
     const closeDeleteModal = getElement('close-delete-modal');
     const cancelDelete = getElement('cancel-delete');
     const confirmDelete = getElement('confirm-delete');
     
     if (deleteModal) {
-        // Close modal when clicking outside
         addEventListener(deleteModal, 'click', (e) => {
             if (e.target === deleteModal) {
                 hideDeleteModal();
@@ -618,6 +632,109 @@ function setupDocumentModals() {
                 deleteDocument(documentToDelete);
             }
         });
+    }
+
+    // Edit modal setup (new code)
+    const editModal = getElement('edit-document-modal');
+    const closeEditModal = getElement('close-edit-modal');
+    const cancelEdit = getElement('cancel-edit');
+    const editDocumentForm = getElement('edit-document-form');
+    
+    if (editModal) {
+        addEventListener(editModal, 'click', (e) => {
+            if (e.target === editModal) {
+                hideEditModal();
+            }
+        });
+    }
+    
+    if (closeEditModal) {
+        addEventListener(closeEditModal, 'click', hideEditModal);
+    }
+    
+    if (cancelEdit) {
+        addEventListener(cancelEdit, 'click', hideEditModal);
+    }
+    
+    if (editDocumentForm) {
+        addEventListener(editDocumentForm, 'submit', handleEditDocument);
+    }
+}
+
+function showEditModal(docId) {
+    const doc = documents.find(d => d.id === docId);
+    if (!doc) {
+        showError('Document not found');
+        return;
+    }
+    
+    documentToEdit = docId;
+    populateEditForm(doc);
+    
+    const modal = getElement('edit-document-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+        clearEditMessages();
+    }
+}
+
+function hideEditModal() {
+    documentToEdit = null;
+    const modal = getElement('edit-document-modal');
+    if (modal) {
+        modal.style.display = 'none';
+        clearEditMessages();
+        getElement('edit-document-form').reset();
+    }
+}
+
+function populateEditForm(doc) {
+    getElement('edit-doc-type').value = doc.type;
+    getElement('edit-doc-name').value = doc.name;
+    getElement('edit-doc-number').value = doc.number;
+    getElement('edit-issue-date').value = doc.issueDate;
+    getElement('edit-expiry-date').value = doc.expiryDate;
+    getElement('edit-notes').value = doc.notes || '';
+}
+
+function clearEditMessages() {
+    const errorElement = getElement('edit-error');
+    const successElement = getElement('edit-success');
+    
+    if (errorElement) {
+        errorElement.style.display = 'none';
+        errorElement.textContent = '';
+    }
+    
+    if (successElement) {
+        successElement.style.display = 'none';
+        successElement.textContent = '';
+    }
+}
+
+function showEditError(message) {
+    const errorElement = getElement('edit-error');
+    if (errorElement) {
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+    }
+    
+    const successElement = getElement('edit-success');
+    if (successElement) {
+        successElement.style.display = 'none';
+    }
+}
+
+function showEditSuccess(message) {
+    const successElement = getElement('edit-success');
+    if (successElement) {
+        successElement.textContent = message;
+        successElement.style.display = 'block';
+    }
+    
+    const errorElement = getElement('edit-error');
+    if (errorElement) {
+        errorElement.style.display = 'none';
     }
 }
 
