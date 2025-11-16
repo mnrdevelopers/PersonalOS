@@ -1526,3 +1526,29 @@ window.ExpiryTracker = {
     loadNotifications,
     loadSettings
 };
+
+// PWA-specific enhancements
+
+// Handle app visibility changes
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        // App came to foreground - refresh data if needed
+        if (currentUser) {
+            checkReminders();
+        }
+    }
+});
+
+// Handle online/offline status
+window.addEventListener('online', () => {
+    showToast('Back online', 'success');
+    // Sync any pending operations
+    if (currentUser) {
+        setupDocumentsListener();
+        setupNotificationsListener();
+    }
+});
+
+window.addEventListener('offline', () => {
+    showToast('You are offline', 'warning');
+});
