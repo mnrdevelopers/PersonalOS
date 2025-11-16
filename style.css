@@ -1342,3 +1342,72 @@ body {
 .auth-switch a:hover {
     text-decoration: underline;
 }
+
+/* Clickable Setting Items */
+.setting-item.clickable {
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.setting-item.clickable:hover {
+    background: var(--surface-light);
+    transform: translateX(4px);
+}
+
+/* Password Requirements */
+.password-requirements {
+    margin-top: 8px;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.password-requirements small {
+    color: var(--text-muted);
+}
+
+/* Modal Form Styles */
+.modal-body .form-group {
+    margin-bottom: 16px;
+}
+
+.modal-body .form-label {
+    font-weight: 500;
+    margin-bottom: 6px;
+}
+
+/* Error and Success Messages in Modal */
+.modal-body .error-message,
+.modal-body .success-message {
+    margin: 16px 0;
+    padding: 12px;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.9rem;
+}
+
+.modal-body .error-message {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid var(--danger);
+    color: var(--danger);
+}
+
+.modal-body .success-message {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid var(--success);
+    color: var(--success);
+}
+
+/* Responsive Modal */
+@media (max-width: 480px) {
+    .modal-content {
+        margin: 20px;
+        padding: 20px;
+    }
+    
+    .modal-footer {
+        flex-direction: column;
+    }
+    
+    .modal-footer .btn {
+        width: 100%;
+    }
+}
