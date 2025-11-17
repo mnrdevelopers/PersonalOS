@@ -73,6 +73,40 @@ function initializeAuthElements() {
     confirmPasswordField = getElement('confirm-password-field');
     authError = getElement('auth-error');
     authSuccess = getElement('auth-success');
+    
+    // Wrap password fields with toggle containers
+    wrapPasswordFields();
+    setupPasswordToggles();
+}
+
+function wrapPasswordFields() {
+    const passwordInputs = [
+        { id: 'password', placeholder: 'Enter your password' },
+        { id: 'confirm-password', placeholder: 'Confirm your password' }
+    ];
+    
+    passwordInputs.forEach(({ id, placeholder }) => {
+        const input = getElement(id);
+        if (input) {
+            const container = document.createElement('div');
+            container.className = 'password-input-container';
+            
+            // Clone and replace to preserve attributes
+            const newInput = input.cloneNode(true);
+            newInput.placeholder = placeholder;
+            
+            const toggleBtn = document.createElement('button');
+            toggleBtn.type = 'button';
+            toggleBtn.className = 'password-toggle';
+            toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
+            toggleBtn.setAttribute('title', 'Show password');
+            
+            container.appendChild(newInput);
+            container.appendChild(toggleBtn);
+            
+            input.parentNode.replaceChild(container, input);
+        }
+    });
 }
 
 function initializePageElements() {
@@ -223,6 +257,132 @@ function collectEditFormData() {
     };
 }
 
+// Password Toggle Functionality
+function setupPasswordToggles() {
+    document.querySelectorAll('.password-input-container').forEach(container => {
+        const input = container.querySelector('input[type="password"], input[type="text"]');
+        const toggle = container.querySelector('.password-toggle');
+        
+        if (input && toggle) {
+            toggle.addEventListener('click', () => {
+                const isPassword = input.type === 'password';
+                input.type = isPassword ? 'text' : 'password';
+                toggle.innerHTML = isPassword ? 
+                    '<i class="fas fa-eye-slash"></i>' : 
+                    '<i class="fas fa-eye"></i>';
+                toggle.setAttribute('title', isPassword ? 'Hide password' : 'Show password');
+            });
+        }
+    });
+}
+
+// Enhanced Loading Functions
+function showButtonLoading(button) {
+    if (!button) return;
+    
+    button.disabled = true;
+    button.classList.add('loading');
+    button.setAttribute('data-original-text', button.innerHTML);
+    button.innerHTML = '';
+}
+
+function hideButtonLoading(button) {
+    if (!button) return;
+    
+    button.disabled = false;
+    button.classList.remove('loading');
+    const originalText = button.getAttribute('data-original-text');
+    if (originalText) {
+        button.innerHTML = originalText;
+    }
+}
+
+// Enhanced Validation Functions
+function showFieldValidation(fieldId, message, type = 'error') {
+    const field = getElement(fieldId);
+    if (!field) return;
+    
+    // Remove existing validation message
+    const existingMessage = field.parentNode.querySelector('.validation-message');
+    if (existingMessage) {
+        existingMessage.remove();
+    }
+    
+    // Add validation classes to input
+    field.classList.remove('error', 'success');
+    if (type !== 'info') {
+        field.classList.add(type);
+    }
+    
+    // Create and append validation message
+    if (message) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `validation-message ${type}`;
+        
+        const icon = type === 'success' ? 'fa-check-circle' : 
+                    type === 'warning' ? 'fa-exclamation-triangle' : 
+                    type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
+        
+        messageDiv.innerHTML = `<i class="fas ${icon}"></i> ${message}`;
+        field.parentNode.appendChild(messageDiv);
+    }
+}
+
+function clearFieldValidation(fieldId) {
+    const field = getElement(fieldId);
+    if (!field) return;
+    
+    field.classList.remove('error', 'success');
+    const existingMessage = field.parentNode.querySelector('.validation-message');
+    if (existingMessage) {
+        existingMessage.remove();
+    }
+}
+
+// Real-time Password Validation
+function setupRealTimeValidation() {
+    const passwordInput = getElement('password');
+    const confirmPasswordInput = getElement('confirm-password');
+    
+    if (passwordInput) {
+        addEventListener(passwordInput, 'input', () => {
+            validatePasswordStrength(passwordInput.value);
+        });
+    }
+    
+    if (confirmPasswordInput) {
+        addEventListener(confirmPasswordInput, 'input', () => {
+            validatePasswordMatch();
+        });
+    }
+}
+
+function validatePasswordStrength(password) {
+    const strengthIndicator = getElement('password-strength');
+    
+    if (!strengthIndicator) return;
+    
+    let strength = 'weak';
+    let message = 'Weak password';
+    
+    if (password.length >= 8) {
+        if (/[A-Z]/.test(password) && /[0-9]/.test(password) && /[^A-Za-z0-9]/.test(password)) {
+            strength = 'strong';
+            message = 'Strong password';
+        } else if (password.length >= 8 && (/[A-Z]/.test(password) || /[0-9]/.test(password))) {
+            strength = 'medium';
+            message = 'Medium strength password';
+        }
+    }
+    
+    const strengthBar = strengthIndicator.querySelector('.strength-bar');
+    if (strengthBar) {
+        strengthBar.className = `strength-bar strength-${strength}`;
+    }
+    
+    showFieldValidation('password', message, strength === 'strong' ? 'success' : strength === 'medium' ? 'warning' : 'error');
+}
+
 // Authentication Functions
 function toggleAuthMode(e) {
     e.preventDefault();
@@ -246,41 +406,163 @@ function toggleAuthMode(e) {
     nameField.style.display = config.showFields ? 'block' : 'none';
     confirmPasswordField.style.display = config.showFields ? 'block' : 'none';
     
+    // Add/remove password strength indicator
+    const passwordField = getElement('password').parentNode;
+    if (config.showFields && !getElement('password-strength')) {
+        const strengthDiv = document.createElement('div');
+        strengthDiv.id = 'password-strength';
+        strengthDiv.className = 'password-strength';
+        strengthDiv.innerHTML = '<div class="strength-bar strength-weak"></div>';
+        passwordField.appendChild(strengthDiv);
+    } else if (!config.showFields && getElement('password-strength')) {
+        getElement('password-strength').remove();
+    }
+    
     // Clear form and messages
     authForm.reset();
     clearMessages();
+    clearFieldValidation('email');
+    clearFieldValidation('password');
+    clearFieldValidation('confirm-password');
+    clearFieldValidation('name');
+    
+    // Setup real-time validation for signup mode
+    if (config.showFields) {
+        setupRealTimeValidation();
+    }
 }
 
+// Enhanced Authentication Functions
 async function handleAuthSubmit(e) {
     e.preventDefault();
-    showLoading();
+    
+    const submitButton = e.target.querySelector('button[type="submit"]');
+    showButtonLoading(submitButton);
+    clearMessages();
     
     const email = getElement('email').value;
     const password = getElement('password').value;
     
     try {
+        // Clear previous validations
+        clearFieldValidation('email');
+        clearFieldValidation('password');
+        
+        // Basic validation
+        if (!email) {
+            throw new Error('Please enter your email address');
+        }
+        
+        if (!password) {
+            throw new Error('Please enter your password');
+        }
+        
         if (isLoginMode) {
             await auth.signInWithEmailAndPassword(email, password);
-            showSuccess('Login successful!');
+            showAuthSuccess('Login successful! Redirecting...');
         } else {
             const name = getElement('name').value;
             const confirmPassword = getElement('confirm-password').value;
             
+            // Enhanced signup validation
             validateSignUp(name, password, confirmPassword);
             await handleSignUp(email, password, name);
-            showSuccess('Account created successfully!');
+            showAuthSuccess('Account created successfully! Redirecting...');
         }
     } catch (error) {
-        showAuthError(error.message);
+        handleAuthError(error);
     } finally {
-        hideLoading();
+        hideButtonLoading(submitButton);
+    }
+}
+
+function handleAuthError(error) {
+    console.error('Auth error:', error);
+    
+    // Handle specific Firebase auth errors with user-friendly messages
+    let errorMessage = error.message;
+    
+    switch (error.code) {
+        case 'auth/invalid-email':
+            errorMessage = 'Please enter a valid email address';
+            showFieldValidation('email', errorMessage, 'error');
+            break;
+            
+        case 'auth/user-disabled':
+            errorMessage = 'This account has been disabled. Please contact support.';
+            break;
+            
+        case 'auth/user-not-found':
+            errorMessage = 'No account found with this email address';
+            showFieldValidation('email', errorMessage, 'error');
+            break;
+            
+        case 'auth/wrong-password':
+            errorMessage = 'Incorrect password. Please try again.';
+            showFieldValidation('password', errorMessage, 'error');
+            break;
+            
+        case 'auth/email-already-in-use':
+            errorMessage = 'An account with this email already exists';
+            showFieldValidation('email', errorMessage, 'error');
+            break;
+            
+        case 'auth/weak-password':
+            errorMessage = 'Password is too weak. Please choose a stronger password.';
+            showFieldValidation('password', errorMessage, 'error');
+            break;
+            
+        case 'auth/network-request-failed':
+            errorMessage = 'Network error. Please check your internet connection.';
+            break;
+            
+        case 'auth/too-many-requests':
+            errorMessage = 'Too many failed attempts. Please try again later.';
+            break;
+            
+        default:
+            // For generic errors, show in the general error area
+            showAuthError(errorMessage);
+            break;
+    }
+    
+    // Only show in general area if not field-specific
+    if (!error.code || !['auth/invalid-email', 'auth/user-not-found', 'auth/wrong-password', 'auth/email-already-in-use', 'auth/weak-password'].includes(error.code)) {
+        showAuthError(errorMessage);
     }
 }
 
 function validateSignUp(name, password, confirmPassword) {
-    if (!name) throw new Error('Please enter your name');
-    if (password !== confirmPassword) throw new Error('Passwords do not match');
-    if (password.length < 6) throw new Error('Password must be at least 6 characters');
+    // Clear previous validations
+    clearFieldValidation('name');
+    clearFieldValidation('password');
+    clearFieldValidation('confirm-password');
+    
+    let hasError = false;
+    
+    if (!name || name.trim().length < 2) {
+        showFieldValidation('name', 'Please enter your full name (min 2 characters)', 'error');
+        hasError = true;
+    }
+    
+    if (password.length < 6) {
+        showFieldValidation('password', 'Password must be at least 6 characters', 'error');
+        hasError = true;
+    }
+    
+    if (password !== confirmPassword) {
+        showFieldValidation('confirm-password', 'Passwords do not match', 'error');
+        hasError = true;
+    }
+    
+    if (hasError) {
+        throw new Error('Please fix the validation errors above');
+    }
+    
+    // Show success for valid fields
+    if (name && name.trim().length >= 2) {
+        showFieldValidation('name', 'Name looks good!', 'success');
+    }
 }
 
 async function handleSignUp(email, password, name) {
@@ -1234,19 +1516,21 @@ function showPasswordSuccess(message) {
 }
 
 function validatePasswordMatch() {
-    const newPassword = getElement('new-password').value;
-    const confirmPassword = getElement('confirm-new-password').value;
-    const errorElement = getElement('password-error');
+    const password = getElement('password')?.value;
+    const confirmPassword = getElement('confirm-password')?.value;
     
-    if (confirmPassword && newPassword !== confirmPassword) {
-        showPasswordError('Passwords do not match');
-        return false;
-    } else if (confirmPassword && newPassword === confirmPassword) {
-        clearPasswordMessages();
+    if (!confirmPassword) {
+        clearFieldValidation('confirm-password');
         return true;
     }
     
-    return true;
+    if (password === confirmPassword) {
+        showFieldValidation('confirm-password', 'Passwords match', 'success');
+        return true;
+    } else {
+        showFieldValidation('confirm-password', 'Passwords do not match', 'error');
+        return false;
+    }
 }
 
 async function handlePasswordChange(e) {
