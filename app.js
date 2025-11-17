@@ -23,7 +23,10 @@ let loading;
 let isLoginMode = true;
 
 // Initialize the app
-function initApp() {
+async function initApp() {
+    // Initialize Firebase Remote Config first
+    await initRemoteConfig();
+    
     auth.onAuthStateChanged(async (user) => {
         if (user) {
             currentUser = user;
@@ -31,6 +34,9 @@ function initApp() {
             updateUserProfile(user);
             setupDocumentsListener();
             setupNotificationsListener();
+            
+            // Initialize OneSignal after user is authenticated
+            await oneSignalManager.init();
             
             // Redirect to dashboard if on login page
             if (window.location.pathname.includes('index.html') || window.location.pathname === '/' || window.location.href.includes('index.html')) {
@@ -48,6 +54,16 @@ function initApp() {
     });
 
     setupEventListeners();
+}
+
+// Add new function to initialize Remote Config
+async function initRemoteConfig() {
+    try {
+        await remoteConfig.fetchAndActivate();
+        console.log('Remote Config initialized');
+    } catch (error) {
+        console.error('Error initializing Remote Config:', error);
+    }
 }
 
 // Initialize auth functionality for login page
@@ -1209,7 +1225,22 @@ async function createNotificationForDocument(doc, daysRemaining) {
     }
     
     if (type && title && message) {
+        // Create in-app notification
         await createNotification(type, title, message, doc.id, 'documents.html');
+        
+        // Send push notification via OneSignal
+        if (oneSignalManager.initialized) {
+            await oneSignalManager.sendPushNotification(
+                currentUser.uid, 
+                title, 
+                message, 
+                { 
+                    documentId: doc.id,
+                    type: type,
+                    actionUrl: 'documents.html'
+                }
+            );
+        }
     }
 }
 
