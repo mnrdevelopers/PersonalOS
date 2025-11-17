@@ -61,4 +61,5 @@
       "purpose": "any maskable"
     }
   ]
+  "gcm_sender_id": "482941778795" // This is the default GCM sender ID
 }
