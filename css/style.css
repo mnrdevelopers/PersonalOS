@@ -112,10 +112,10 @@ body {
 /* Sidebar */
 .sidebar {
     position: fixed;
-    top: calc(56px + env(safe-area-inset-top));
+    top: calc(50px + env(safe-area-inset-top));
     left: 0;
     width: var(--sidebar-width);
-    height: calc(100vh - 56px);
+    height: calc(100vh - 50px);
     background: var(--card-bg);
     border-right: 1px solid var(--border-color);
     padding: 20px 0;
@@ -660,4 +660,5 @@ body {
         border: 1px solid #000 !important;
         box-shadow: none !important;
     }
+
 }
