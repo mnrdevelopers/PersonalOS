@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#4f46e5">
     <title>PersonalOS - Login</title>
     
     <!-- Bootstrap 5 -->
@@ -19,6 +20,8 @@
     <!-- Styles -->
     <link rel="stylesheet" href="css/auth.css">
     <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/3094/3094845.png">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3094/3094845.png">
+    <link rel="manifest" href="manifest.json">
     
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -144,6 +147,16 @@
     
     <!-- App Scripts -->
     <script src="js/firebase-config.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            firebase.auth().onAuthStateChanged(function(user) {
+                if (user) {
+                    window.location.href = 'dashboard.html';
+                }
+            });
+        });
+    </script>
     <script src="js/auth.js"></script>
+    <script src="js/pwa.js"></script>
 </body>
 </html>
