@@ -89,6 +89,39 @@ body {
     font-size: 0.9rem;
 }
 
+/* Animated Hamburger */
+.hamburger-lines {
+    width: 30px;
+    height: 24px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.hamburger-lines span {
+    display: block;
+    height: 3px;
+    width: 100%;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.8);
+    transition: all 0.3s ease-in-out;
+}
+
+.navbar-toggler[aria-expanded="true"] .hamburger-lines span:nth-child(1) {
+    transform: rotate(45deg);
+    transform-origin: 10% 10%;
+}
+
+.navbar-toggler[aria-expanded="true"] .hamburger-lines span:nth-child(2) {
+    opacity: 0;
+}
+
+.navbar-toggler[aria-expanded="true"] .hamburger-lines span:nth-child(3) {
+    transform: rotate(-45deg);
+    transform-origin: 10% 90%;
+}
+
 /* Sidebar Overlay for mobile */
 .sidebar-overlay {
     position: fixed;
@@ -112,10 +145,10 @@ body {
 /* Sidebar */
 .sidebar {
     position: fixed;
-    top: calc(50px + env(safe-area-inset-top));
+    top: calc(48px + env(safe-area-inset-top));
     left: 0;
     width: var(--sidebar-width);
-    height: calc(100vh - 50px);
+    height: calc(100vh - 48px);
     background: var(--card-bg);
     border-right: 1px solid var(--border-color);
     padding: 20px 0;
@@ -660,5 +693,4 @@ body {
         border: 1px solid #000 !important;
         box-shadow: none !important;
     }
-
 }
