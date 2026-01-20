@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <meta name="theme-color" content="#4f46e5">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3094/3094845.png">
@@ -14,9 +14,15 @@
     <script src="js/firebase-config.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            const loader = document.getElementById('initial-loader');
             firebase.auth().onAuthStateChanged(function(user) {
                 if (user) {
-                    window.location.href = 'dashboard.html';
+                    window.location.replace('dashboard.html');
+                } else {
+                    if (loader) {
+                        loader.style.opacity = '0';
+                        setTimeout(() => loader.style.display = 'none', 300);
+                    }
                 }
             });
         });
@@ -25,210 +31,968 @@
         :root {
             --primary: #4f46e5;
             --primary-dark: #4338ca;
+            --primary-light: #818cf8;
             --text-main: #1f2937;
             --text-light: #6b7280;
+            --text-lighter: #9ca3af;
             --bg-light: #f3f4f6;
             --white: #ffffff;
+            --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --card-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            --hero-overlay: linear-gradient(135deg, rgba(79, 70, 229, 0.92) 0%, rgba(67, 56, 202, 0.88) 100%);
+            --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+            --safe-area-inset-top: env(safe-area-inset-top, 0px);
         }
         
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            -webkit-text-size-adjust: 100%;
         }
 
         body {
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            line-height: 1.6;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+            line-height: 1.5;
             color: var(--text-main);
             background-color: var(--white);
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         .container {
-            max-width: 1200px;
+            width: 100%;
+            max-width: 1280px;
             margin: 0 auto;
             padding: 0 20px;
         }
 
-        /* Header */
+        /* Header - Mobile Optimized */
         header {
-            padding: 20px 0;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            position: sticky;
-            top: 0;
+            padding: 16px 0;
+            position: fixed;
+            top: var(--safe-area-inset-top);
+            width: 100%;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            z-index: 1000;
+            border-bottom: 1px solid rgba(229, 231, 235, 0.5);
+            transition: all 0.3s ease;
+            touch-action: manipulation;
+        }
+
+        header.scrolled {
             background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            padding: 12px 0;
         }
 
         nav {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            min-height: 44px;
         }
 
         .logo {
             font-size: 1.5rem;
-            font-weight: 700;
+            font-weight: 800;
             color: var(--primary);
             text-decoration: none;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.5px;
         }
 
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        /* Buttons - Touch Friendly */
         .btn {
             display: inline-block;
-            padding: 10px 24px;
-            background-color: var(--primary);
+            padding: 12px 24px;
+            background: var(--gradient);
             color: var(--white);
             text-decoration: none;
-            border-radius: 6px;
+            border-radius: 12px;
             font-weight: 600;
-            transition: background-color 0.3s;
+            font-size: 16px;
+            transition: all 0.3s ease;
             border: none;
             cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+            min-height: 48px;
+            min-width: 48px;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
         }
 
-        .btn:hover {
-            background-color: var(--primary-dark);
+        .btn:active {
+            transform: scale(0.98);
         }
 
-        /* Hero Section */
+        .btn-outline {
+            background: transparent;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            box-shadow: none;
+        }
+
+        .btn-outline:active {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Mobile Menu Button */
+        .mobile-menu-btn {
+            display: none;
+            flex-direction: column;
+            justify-content: space-between;
+            width: 30px;
+            height: 24px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            z-index: 1001;
+        }
+
+        .mobile-menu-btn span {
+            width: 100%;
+            height: 3px;
+            background: var(--primary);
+            border-radius: 3px;
+            transition: all 0.3s ease;
+        }
+
+        /* Hero Section - Mobile Optimized */
         .hero {
-            padding: 100px 0;
+            padding: 140px 0 80px;
+            position: relative;
+            overflow: hidden;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            margin-top: calc(60px + var(--safe-area-inset-top));
+        }
+
+        .hero-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('img/hero.png');
+            background-size: cover;
+            background-position: center;
+            background-attachment: scroll; /* Changed for mobile */
+            z-index: 1;
+        }
+
+        @media (min-width: 1024px) {
+            .hero-bg {
+                background-attachment: fixed;
+            }
+        }
+
+        .hero-bg:after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--hero-overlay);
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            margin: 0 auto;
             text-align: center;
-            background: linear-gradient(to bottom, #fff, var(--bg-light));
+            padding: 30px 25px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 24px;
+            box-shadow: var(--card-shadow);
+            border: 1px solid rgba(255, 255, 255, 0.3);
         }
 
         .hero h1 {
-            font-size: 3.5rem;
+            font-size: 2.5rem;
             margin-bottom: 20px;
             line-height: 1.2;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 800;
+            letter-spacing: -1px;
         }
 
         .hero p {
-            font-size: 1.25rem;
+            font-size: 1.1rem;
             color: var(--text-light);
-            max-width: 600px;
-            margin: 0 auto 40px;
+            margin: 0 auto 30px;
+            max-width: 100%;
+            line-height: 1.6;
         }
 
-        /* Features Grid */
+        .hero-badges {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 30px;
+        }
+
+        .badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 50px;
+            font-size: 0.85rem;
+            color: var(--text-main);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            white-space: nowrap;
+            min-height: 36px;
+        }
+
+        .badge i {
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        /* Features Grid - Mobile Optimized */
         .features {
             padding: 80px 0;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            position: relative;
         }
 
         .section-title {
             text-align: center;
             margin-bottom: 60px;
+            position: relative;
+        }
+
+        .section-title h2 {
+            font-size: 2rem;
+            margin-bottom: 15px;
+            color: var(--text-main);
+            position: relative;
+            display: inline-block;
+            font-weight: 800;
+        }
+
+        .section-title h2:after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50px;
+            height: 4px;
+            background: var(--gradient);
+            border-radius: 2px;
+        }
+
+        .section-title p {
+            color: var(--text-light);
+            font-size: 1rem;
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 0 20px;
         }
 
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: 1fr;
             gap: 30px;
+            width: 100%;
         }
 
         .card {
-            padding: 30px;
-            border-radius: 12px;
+            padding: 30px 25px;
+            border-radius: 20px;
             background: var(--white);
-            border: 1px solid #e5e7eb;
-            transition: transform 0.3s, box-shadow 0.3s;
+            box-shadow: var(--card-shadow);
+            transition: all 0.3s ease;
+            border: 1px solid rgba(229, 231, 235, 0.5);
+            position: relative;
+            overflow: hidden;
+            width: 100%;
         }
 
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+        .card:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: var(--gradient);
         }
 
         .card h3 {
             margin-bottom: 15px;
             color: var(--text-main);
             font-size: 1.25rem;
+            font-weight: 700;
         }
 
         .card p {
             color: var(--text-light);
             font-size: 0.95rem;
+            line-height: 1.6;
         }
 
         .icon {
-            font-size: 2rem;
+            font-size: 2.5rem;
             margin-bottom: 20px;
-            display: block;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--gradient);
+            border-radius: 16px;
+            color: white;
+            font-weight: bold;
+            width: 70px;
+            height: 70px;
         }
 
-        /* Footer */
+        /* Footer - Mobile Optimized */
         footer {
-            background-color: var(--text-main);
+            background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
             color: var(--white);
-            padding: 40px 0;
+            padding: 60px 0 40px;
             text-align: center;
+            position: relative;
+            overflow: hidden;
+            padding-bottom: calc(40px + var(--safe-area-inset-bottom));
+        }
+
+        footer:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: var(--gradient);
+        }
+
+        .footer-content {
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .footer-logo {
+            font-size: 1.75rem;
+            font-weight: 800;
+            margin-bottom: 20px;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            display: inline-block;
+        }
+
+        footer p {
+            color: var(--text-lighter);
+            margin-bottom: 30px;
+            font-size: 1rem;
+            line-height: 1.6;
+            padding: 0 20px;
+        }
+
+        .copyright {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-lighter);
+            font-size: 0.85rem;
+            padding: 20px 20px 0;
+        }
+
+        /* Install Prompt - Mobile Friendly */
+        #ios-install-prompt {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: var(--white);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            z-index: 1000;
+            max-width: 400px;
+            margin: 0 auto;
+            display: none;
+            animation: slideUp 0.5s ease;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+
+        #ios-install-prompt p {
+            margin-bottom: 15px;
+            color: var(--text-main);
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        #close-ios-install-prompt {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* Tablet Styles */
+        @media (min-width: 768px) {
+            .container {
+                padding: 0 30px;
+            }
+            
+            .hero h1 {
+                font-size: 3.25rem;
+            }
+            
+            .hero p {
+                font-size: 1.25rem;
+                max-width: 600px;
+            }
+            
+            .section-title h2 {
+                font-size: 2.5rem;
+            }
+            
+            .grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 30px;
+            }
+            
+            .hero-content {
+                padding: 40px 35px;
+                max-width: 90%;
+            }
+            
+            .btn {
+                padding: 14px 28px;
+                font-size: 17px;
+            }
+            
+            .badge {
+                padding: 10px 20px;
+                font-size: 0.9rem;
+            }
+        }
+
+        /* Desktop Styles */
+        @media (min-width: 1024px) {
+            .container {
+                padding: 0 40px;
+            }
+            
+            .hero h1 {
+                font-size: 4rem;
+            }
+            
+            .hero p {
+                font-size: 1.35rem;
+            }
+            
+            .section-title h2 {
+                font-size: 3rem;
+            }
+            
+            .grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 40px;
+            }
+            
+            .hero-content {
+                padding: 50px;
+                max-width: 800px;
+            }
+            
+            .features {
+                padding: 120px 0;
+            }
+            
+            .section-title {
+                margin-bottom: 80px;
+            }
+            
+            .card {
+                padding: 40px 35px;
+            }
+            
+            .card:hover {
+                transform: translateY(-10px) scale(1.02);
+                box-shadow: 0 30px 60px rgba(0,0,0,0.12);
+            }
+        }
+
+        /* Large Desktop */
+        @media (min-width: 1440px) {
+            .container {
+                max-width: 1400px;
+            }
+        }
+
+        /* Small Mobile Optimization */
+        @media (max-width: 360px) {
+            .container {
+                padding: 0 15px;
+            }
+            
+            .hero h1 {
+                font-size: 2rem;
+            }
+            
+            .hero p {
+                font-size: 1rem;
+            }
+            
+            .btn {
+                padding: 12px 20px;
+                font-size: 15px;
+            }
+            
+            .hero-badges {
+                gap: 8px;
+            }
+            
+            .badge {
+                padding: 6px 12px;
+                font-size: 0.8rem;
+            }
+            
+            .card {
+                padding: 25px 20px;
+            }
+        }
+
+        /* Landscape Mode Optimization */
+        @media (max-height: 600px) and (orientation: landscape) {
+            .hero {
+                min-height: auto;
+                padding: 120px 0 60px;
+            }
+            
+            .hero-content {
+                padding: 20px 25px;
+            }
+            
+            .hero h1 {
+                font-size: 2rem;
+                margin-bottom: 10px;
+            }
+            
+            .hero p {
+                font-size: 1rem;
+                margin-bottom: 20px;
+            }
+        }
+
+        /* Dark Mode Support */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --text-main: #f3f4f6;
+                --text-light: #d1d5db;
+                --text-lighter: #9ca3af;
+                --white: #111827;
+                --bg-light: #1f2937;
+            }
+            
+            body {
+                background-color: #111827;
+            }
+            
+            .card {
+                background: #1f2937;
+                border-color: #374151;
+            }
+            
+            .hero-content {
+                background: rgba(17, 24, 39, 0.95);
+            }
+            
+            .badge {
+                background: rgba(31, 41, 55, 0.9);
+                color: var(--text-main);
+            }
+            
+            header {
+                background: rgba(17, 24, 39, 0.98);
+            }
+            
+            header.scrolled {
+                background: rgba(17, 24, 39, 0.95);
+            }
+        }
+
+        /* Accessibility Improvements */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* Hide scrollbar for Chrome, Safari and Opera */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Hide scrollbar for IE, Edge and Firefox */
+        .hide-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+
+        /* Loading Animation */
+        .loading {
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .loaded {
+            opacity: 1;
+        }
+
+        /* Initial Loader */
+        #initial-loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--white);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.3s ease;
+        }
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(79, 70, 229, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
-    <header>
+    <div id="initial-loader">
+        <div class="loading-spinner"></div>
+    </div>
+    <header id="main-header">
         <div class="container">
             <nav>
                 <a href="#" class="logo">PersonalOS</a>
-                <a href="auth.html" class="btn">Sign In</a>
-                <button id="install-btn" class="btn" style="display: none;">Install</button>
+                <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <div class="nav-buttons" id="nav-buttons">
+                    <a href="auth.html?mode=signin" class="btn-outline btn">Sign In</a>
+                    <a href="auth.html?mode=signup" class="btn">Get Started</a>
+                    <button id="install-btn" class="btn-outline btn" style="display: none;" aria-label="Install app">Install App</button>
+                </div>
             </nav>
         </div>
     </header>
 
-    <section class="hero">
-        <div class="container">
-            <h1>Your Life Operating System</h1>
-            <p>The all-in-one platform to manage your habits, finances, goals, and memories. Secure, private, and built for you.</p>
-            <a href="auth.html" class="btn">Get Started for Free</a>
-        </div>
-    </section>
-
-    <section class="features">
-        <div class="container">
-            <h2 class="section-title">Everything You Need</h2>
-            <div class="grid">
-                <div class="card">
-                    <span class="icon">📊</span>
-                    <h3>Habit Tracking</h3>
-                    <p>Build better routines with daily habit logs and streak tracking.</p>
-                </div>
-                <div class="card">
-                    <span class="icon">💰</span>
-                    <h3>Finance & Loans</h3>
-                    <p>Track transactions, manage loans, and monitor repayment schedules.</p>
-                </div>
-                <div class="card">
-                    <span class="icon">🎯</span>
-                    <h3>Goals & Milestones</h3>
-                    <p>Set ambitious goals and break them down into actionable steps.</p>
-                </div>
-                <div class="card">
-                    <span class="icon">🧠</span>
-                    <h3>Memories</h3>
-                    <p>Securely store your most cherished moments and thoughts.</p>
-                </div>
-                <div class="card">
-                    <span class="icon">🎬</span>
-                    <h3>Entertainment</h3>
-                    <p>Keep a watchlist of movies, books, and games you want to experience.</p>
-                </div>
-                <div class="card">
-                    <span class="icon">⏰</span>
-                    <h3>Reminders & Expiry</h3>
-                    <p>Never miss a deadline or let a document expire unnoticed.</p>
+    <main>
+        <section class="hero">
+            <div class="hero-bg"></div>
+            <div class="container">
+                <div class="hero-content">
+                    <h1>Your Life Operating System</h1>
+                    <p>The ultimate platform to organize your habits, finances, goals, and memories. Secure, private, and beautifully designed for modern life.</p>
+                    <a href="auth.html?mode=signup" class="btn" aria-label="Get started with PersonalOS">Start Your Journey →</a>
+                    
+                    <div class="hero-badges">
+                        <div class="badge">
+                            <i>✓</i> 100% Private
+                        </div>
+                        <div class="badge">
+                            <i>✓</i> Works Offline
+                        </div>
+                        <div class="badge">
+                            <i>✓</i> No Ads
+                        </div>
+                        <div class="badge">
+                            <i>✓</i> Free Forever
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-    </section>
+        </section>
+
+        <section class="features">
+            <div class="container">
+                <div class="section-title">
+                    <h2>Everything You Need</h2>
+                    <p>A comprehensive suite of tools designed to help you live your best life, all in one place.</p>
+                </div>
+                <div class="grid">
+                    <div class="card">
+                        <span class="icon" role="img" aria-label="Habit Tracking">📊</span>
+                        <h3>Habit Tracking</h3>
+                        <p>Build better routines with intelligent habit tracking, streak monitoring, and personalized insights.</p>
+                    </div>
+                    <div class="card">
+                        <span class="icon" role="img" aria-label="Finance">💰</span>
+                        <h3>Finance & Loans</h3>
+                        <p>Track transactions, manage multiple loans, visualize spending patterns with bank-level security.</p>
+                    </div>
+                    <div class="card">
+                        <span class="icon" role="img" aria-label="Goals">🎯</span>
+                        <h3>Goals & Milestones</h3>
+                        <p>Set ambitious goals and break them down into achievable milestones with beautiful visualizations.</p>
+                    </div>
+                    <div class="card">
+                        <span class="icon" role="img" aria-label="Memories">🧠</span>
+                        <h3>Memories & Reflections</h3>
+                        <p>Securely store your cherished memories and important moments in an encrypted digital journal.</p>
+                    </div>
+                    <div class="card">
+                        <span class="icon" role="img" aria-label="Entertainment">🎬</span>
+                        <h3>Entertainment Library</h3>
+                        <p>Curate watchlists for movies, books, podcasts, and games. Track what you've experienced.</p>
+                    </div>
+                    <div class="card">
+                        <span class="icon" role="img" aria-label="Reminders">⏰</span>
+                        <h3>Smart Reminders</h3>
+                        <p>Never miss important deadlines. Get intelligent reminders for document expirations and renewals.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
 
     <footer>
         <div class="container">
-            <p>&copy; 2026 PersonalOS. All rights reserved.</p>
+            <div class="footer-content">
+                <div class="footer-logo">PersonalOS</div>
+                <p>Transform how you organize your life. Join thousands who have found clarity, control, and purpose with our platform.</p>
+                <a href="auth.html?mode=signup" class="btn">Start Free Today</a>
+                <div class="copyright">
+                    &copy; 2026 PersonalOS. All rights reserved. Made with ❤️ for organized minds.
+                </div>
+            </div>
         </div>
     </footer>
+
+    <div id="ios-install-prompt" role="dialog" aria-labelledby="ios-install-title">
+        <p id="ios-install-title">To install this app on your iOS device, tap the Share button and then 'Add to Home Screen'.</p>
+        <button id="close-ios-install-prompt" class="btn">Got it!</button>
+    </div>
+
     <script src="js/pwa.js"></script>
+    <script>
+        // Mobile menu toggle
+        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        const navButtons = document.getElementById('nav-buttons');
+        
+        if (mobileMenuBtn) {
+            mobileMenuBtn.addEventListener('click', function() {
+                navButtons.classList.toggle('show');
+                this.classList.toggle('active');
+            });
+        }
+
+        // Header scroll effect
+        window.addEventListener('scroll', function() {
+            const header = document.getElementById('main-header');
+            if (window.scrollY > 50) {
+                header.classList.add('scrolled');
+            } else {
+                header.classList.remove('scrolled');
+            }
+        });
+
+        // Touch-friendly smooth scroll
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('href');
+                if (targetId === '#') return;
+                
+                const target = document.querySelector(targetId);
+                if (target) {
+                    window.scrollTo({
+                        top: target.offsetTop - 80,
+                        behavior: 'smooth'
+                    });
+                    
+                    // Close mobile menu if open
+                    if (navButtons.classList.contains('show')) {
+                        navButtons.classList.remove('show');
+                        mobileMenuBtn.classList.remove('active');
+                    }
+                }
+            });
+        });
+
+        // Feature cards animation on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        // Add animation classes to cards
+        document.querySelectorAll('.card').forEach(card => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+            observer.observe(card);
+        });
+
+        // Load images lazily
+        document.addEventListener('DOMContentLoaded', function() {
+            const heroBg = document.querySelector('.hero-bg');
+            if (heroBg) {
+                const img = new Image();
+                img.src = 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80';
+                img.onload = function() {
+                    heroBg.style.backgroundImage = `url('${this.src}')`;
+                    document.body.classList.add('loaded');
+                };
+            }
+
+            // Handle iOS safe area
+            document.documentElement.style.setProperty('--safe-area-inset-top', 'env(safe-area-inset-top)');
+            document.documentElement.style.setProperty('--safe-area-inset-bottom', 'env(safe-area-inset-bottom)');
+        });
+
+        // Prevent zoom on double-tap (mobile)
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function(event) {
+            const now = (new Date()).getTime();
+            if (now - lastTouchEnd <= 300) {
+                event.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
+
+        // Add mobile-specific classes
+        if ('ontouchstart' in window || navigator.maxTouchPoints) {
+            document.body.classList.add('touch-device');
+        } else {
+            document.body.classList.add('no-touch-device');
+        }
+
+        // Handle orientation change
+        let vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
+
+        window.addEventListener('resize', () => {
+            let vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        });
+
+        // Add CSS for mobile menu
+        const style = document.createElement('style');
+        style.textContent = `
+            @media (max-width: 767px) {
+                .nav-buttons {
+                    position: fixed;
+                    top: 0;
+                    right: -100%;
+                    width: 80%;
+                    max-width: 300px;
+                    height: 100vh;
+                    background: white;
+                    flex-direction: column;
+                    justify-content: flex-start;
+                    padding-top: 80px;
+                    padding-left: 30px;
+                    box-shadow: -10px 0 30px rgba(0,0,0,0.1);
+                    transition: right 0.3s ease;
+                    z-index: 1000;
+                }
+                
+                .nav-buttons.show {
+                    right: 0;
+                }
+                
+                .mobile-menu-btn {
+                    display: flex;
+                }
+                
+                .mobile-menu-btn.active span:nth-child(1) {
+                    transform: rotate(45deg) translate(6px, 6px);
+                }
+                
+                .mobile-menu-btn.active span:nth-child(2) {
+                    opacity: 0;
+                }
+                
+                .mobile-menu-btn.active span:nth-child(3) {
+                    transform: rotate(-45deg) translate(8px, -8px);
+                }
+                
+                .nav-buttons .btn {
+                    width: 100%;
+                    max-width: 200px;
+                    margin-bottom: 15px;
+                }
+                
+                @media (prefers-color-scheme: dark) {
+                    .nav-buttons {
+                        background: #1f2937;
+                    }
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
 </body>
 </html>
-
