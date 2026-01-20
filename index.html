@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4f46e5">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3094/3094845.png">
     <title>PersonalOS - Your Life, Organized</title>
+    <link rel="stylesheet" href="css/pwa.css">
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
@@ -168,6 +172,7 @@
             <nav>
                 <a href="#" class="logo">PersonalOS</a>
                 <a href="auth.html" class="btn">Sign In</a>
+                <button id="install-btn" class="btn" style="display: none;">Install</button>
             </nav>
         </div>
     </header>
@@ -220,8 +225,15 @@
 
     <footer>
         <div class="container">
-            <p>&copy; 2024 PersonalOS. All rights reserved.</p>
+            <p>&copy; 2026 PersonalOS. All rights reserved.</p>
         </div>
     </footer>
+
+    <div id="ios-install-prompt">
+        <p>To install this app on your iOS device, tap the Share button and then 'Add to Home Screen'.</p>
+        <button id="close-ios-install-prompt">Close</button>
+    </div>
+
+    <script src="js/pwa.js"></script>
 </body>
 </html>
