@@ -343,7 +343,7 @@ window.editTransaction = async function(id) {
         if (data.type === 'income') document.getElementById('type-income').checked = true;
         else document.getElementById('type-expense').checked = true;
         
-        const modal = new bootstrap.Modal(document.getElementById('addTransactionModal'));
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addTransactionModal'));
         modal.show();
     } catch (e) { console.error(e); }
 };
@@ -430,7 +430,7 @@ window.exportFinanceCSV = async function() {
 };
 
 window.openCategoriesModal = function() {
-    const modal = new bootstrap.Modal(document.getElementById('categoriesModal'));
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('categoriesModal'));
     modal.show();
     loadCategories('income');
 };
