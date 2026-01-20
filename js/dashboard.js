@@ -1192,6 +1192,11 @@ class Dashboard {
             this.loadRecentTransactions();
             this.updateFinanceChart();
             
+            // Reload finance table if active
+            if (this.currentSection === 'finance' && typeof window.loadFinanceData === 'function') {
+                window.loadFinanceData();
+            }
+            
             this.showNotification(id ? 'Transaction updated successfully!' : 'Transaction added successfully!', 'success');
             
         } catch (error) {
