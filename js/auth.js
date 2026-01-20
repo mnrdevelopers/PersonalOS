@@ -337,7 +337,7 @@ class AuthManager {
         auth.onAuthStateChanged(user => {
             if (user && window.location.pathname.includes('auth.html')) {
                 // User is already logged in, redirect to dashboard
-                window.location.href = 'dashboard.html';
+                window.location.replace('dashboard.html');
             }
         });
     }
