@@ -1,0 +1,90 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper: Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper: Check if the existing document belongs to the user
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Helper: Check if the new document is being created with the correct userId
+    function isOwnerCreate() {
+      return isAuthenticated() && request.resource.data.userId == request.auth.uid;
+    }
+
+    // Users collection: Document ID must match Auth UID
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Transactions
+    match /transactions/{docId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwnerCreate();
+    }
+
+    // Habits
+    match /habits/{docId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwnerCreate();
+    }
+
+    // Habit Logs
+    match /habit_logs/{docId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwnerCreate();
+    }
+
+    // Reminders
+    match /reminders/{docId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwnerCreate();
+    }
+
+    // Memories
+    match /memories/{docId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwnerCreate();
+    }
+
+    // Goals
+    match /goals/{docId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwnerCreate();
+    }
+
+    // Entertainment
+    match /entertainment/{docId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwnerCreate();
+    }
+
+    // Loans & Repayments
+    match /loans/{docId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwnerCreate();
+      
+      match /repayments/{repaymentId} {
+        allow read, update, delete: if isOwner(resource.data.userId);
+        allow create: if isOwnerCreate();
+      }
+    }
+
+    // Categories
+    match /categories/{docId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwnerCreate();
+    }
+
+    // Expiry Docs (New Section)
+    match /expiry_docs/{docId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwnerCreate();
+    }
+  }
+}

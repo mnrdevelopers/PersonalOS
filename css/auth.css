@@ -1,0 +1,251 @@
+:root {
+    --primary-color: #1F2937;
+    --secondary-color: #2563EB;
+    --success-color: #16A34A;
+    --danger-color: #DC2626;
+    --warning-color: #F59E0B;
+    --info-color: #2563EB;
+    --light-color: #F9FAFB;
+    --dark-color: #111827;
+    --sidebar-width: 250px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    padding: 20px;
+    -webkit-tap-highlight-color: transparent;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+.auth-container {
+    max-width: 400px;
+    width: 100%;
+    margin: 0 auto;
+    animation: fadeIn 0.5s ease-in;
+}
+
+.logo-container h1 {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 700;
+    color: white;
+    font-size: 2.5rem;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.logo-container p {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 1.1rem;
+}
+
+.auth-card {
+    background: rgba(255, 255, 255, 0.85);
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    animation: slideUp 0.5s ease-out;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.auth-card h2 {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    color: var(--dark-color);
+}
+
+.form-label {
+    font-weight: 500;
+    color: var(--dark-color);
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+}
+
+.form-control {
+    padding: 14px 15px;
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    transition: all 0.3s;
+    font-size: 1rem;
+    -webkit-appearance: none;
+}
+
+.form-control:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.25rem rgba(67, 97, 238, 0.2);
+}
+
+.form-control::placeholder {
+    color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.input-group .btn {
+    border: 2px solid #e9ecef;
+    border-left: none;
+    background: white;
+}
+
+.input-group .btn:hover {
+    background: #f8f9fa;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    border: none;
+    padding: 14px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(67, 97, 238, 0.3);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+}
+
+.form-check-input:checked {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.alert {
+    border-radius: 12px;
+    border: none;
+    padding: 15px;
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.alert-success {
+    background-color: rgba(76, 201, 240, 0.1);
+    color: #4cc9f0;
+    border: 1px solid rgba(76, 201, 240, 0.2);
+}
+
+.alert-danger {
+    background-color: rgba(247, 37, 133, 0.1);
+    color: #f72585;
+    border: 1px solid rgba(247, 37, 133, 0.2);
+}
+
+/* iPhone specific optimizations */
+@media (max-width: 428px) {
+    body {
+        padding: 15px;
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    
+    .auth-container {
+        max-width: 100%;
+    }
+    
+    .auth-card {
+        padding: 25px 20px;
+    }
+    
+    .logo-container h1 {
+        font-size: 2rem;
+    }
+    
+    .logo-container p {
+        font-size: 1rem;
+    }
+    
+    .form-control {
+        padding: 12px;
+    }
+    
+    .btn-primary {
+        padding: 12px;
+    }
+}
+
+/* Prevent zoom on focus for iOS */
+@media screen and (max-width: 768px) {
+    input, select, textarea {
+        font-size: 16px !important;
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .auth-card {
+        background: rgba(30, 30, 30, 0.85);
+        color: #ffffff;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    .auth-card h2 {
+        color: #ffffff;
+    }
+    
+    .form-label {
+        color: #e0e0e0;
+    }
+    
+    .form-control {
+        background-color: #2d2d2d;
+        border-color: #444;
+        color: #ffffff;
+    }
+    
+    .form-control:focus {
+        background-color: #2d2d2d;
+        color: #ffffff;
+    }
+    
+    .input-group .btn {
+        background-color: #2d2d2d;
+        border-color: #444;
+        color: #ffffff;
+    }
+    
+    .text-muted {
+        color: #aaa !important;
+    }
+}
