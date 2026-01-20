@@ -1,6 +1,6 @@
 {
-  "name": "Productivity Pro",
-  "short_name": "ProdPro",
+  "name": "PersonalOS",
+  "short_name": "LifeOS",
   "description": "Your all-in-one productivity companion",
   "start_url": "/",
   "display": "standalone",
@@ -74,4 +74,5 @@
       "icons": [{ "src": "icons/habit-icon.png", "sizes": "96x96" }]
     }
   ]
+
 }
