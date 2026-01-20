@@ -1,4 +1,4 @@
-const CACHE_NAME = 'personalos-v2';
+const CACHE_NAME = 'personalos-v3';
 const ASSETS_TO_CACHE = [
   '/',
   '/auth.html',
@@ -69,3 +69,4 @@ self.addEventListener('fetch', (event) => {
       })
   );
 });
+
