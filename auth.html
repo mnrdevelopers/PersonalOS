@@ -151,7 +151,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             firebase.auth().onAuthStateChanged(function(user) {
                 if (user) {
-                    window.location.href = 'dashboard.html';
+                    window.location.replace('dashboard.html');
                 }
             });
         });
