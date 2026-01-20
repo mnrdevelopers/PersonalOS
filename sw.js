@@ -1,4 +1,4 @@
-const CACHE_NAME = 'productivity-pro-v3';
+const CACHE_NAME = 'productivity-pro-v4';
 const urlsToCache = [
   '/',
   '/auth.html',
@@ -66,4 +66,5 @@ self.addEventListener('activate', event => {
       );
     })
   );
+
 });
