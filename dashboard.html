@@ -34,7 +34,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-remote-config-compat.js"></script>
 </head>
 <body>
-    <!-- Main Navigation -->
+     <!-- Main Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
         <div class="container-fluid">
             <a class="navbar-brand fw-bold" href="#">
@@ -409,6 +409,24 @@
                 <!-- Content will be loaded dynamically -->
             </section>
         </main>
+    </div>
+
+    <!-- Floating Action Button (Mobile) -->
+    <div class="fab-container d-lg-none">
+        <div class="fab-options">
+            <button class="btn btn-success fab-option" data-action="add-habit" title="New Habit">
+                <i class="fas fa-check"></i>
+            </button>
+            <button class="btn btn-danger fab-option" data-action="add-expense" title="Add Expense">
+                <i class="fas fa-minus"></i>
+            </button>
+            <button class="btn btn-primary fab-option" data-action="add-income" title="Add Income">
+                <i class="fas fa-plus"></i>
+            </button>
+        </div>
+        <button class="btn btn-primary fab-main" id="fab-main-btn" aria-label="Quick Add">
+            <i class="fas fa-plus"></i>
+        </button>
     </div>
 
     <!-- Modals -->
