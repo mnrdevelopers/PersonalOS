@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#4f46e5">
     <title>Dashboard - PersonalOS</title>
     
     <!-- Bootstrap 5 -->
@@ -22,6 +23,7 @@
     <!-- App Styles -->
     <link rel="stylesheet" href="css/style.css">
     <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/3094/3094845.png">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3094/3094845.png">
     <link rel="manifest" href="manifest.json">
     
     <!-- Firebase SDK -->
@@ -675,6 +677,15 @@
     
     <!-- App Scripts -->
     <script src="js/firebase-config.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            firebase.auth().onAuthStateChanged(function(user) {
+                if (!user) {
+                    window.location.href = 'index.html';
+                }
+            });
+        });
+    </script>
     <script src="js/dashboard.js"></script>
     <script src="js/finance.js"></script>
     <script src="js/habits.js"></script>
@@ -688,5 +699,6 @@
     <script src="js/transactions.js"></script>
     <script src="js/loans.js"></script>
     <script src="js/expiry.js"></script>
+    <script src="js/pwa.js"></script>
 </body>
 </html>
