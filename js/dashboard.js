@@ -131,6 +131,33 @@ class Dashboard {
         document.querySelectorAll('.sidebar .nav-link').forEach(link => {
             link.addEventListener('click', closeSidebar);
         });
+
+        // FAB Logic
+        const fabBtn = document.getElementById('fab-main-btn');
+        const fabContainer = document.querySelector('.fab-container');
+        
+        if (fabBtn && fabContainer) {
+            fabBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                fabContainer.classList.toggle('active');
+            });
+
+            // Close FAB when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!fabContainer.contains(e.target) && fabContainer.classList.contains('active')) {
+                    fabContainer.classList.remove('active');
+                }
+            });
+            
+            // Handle FAB options
+            fabContainer.querySelectorAll('.fab-option').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const action = e.currentTarget.dataset.action;
+                    this.handleQuickAction(action);
+                    fabContainer.classList.remove('active');
+                });
+            });
+        }
     }
 
     bindModalEvents() {
@@ -1049,7 +1076,7 @@ class Dashboard {
     showTransactionModal(type = 'income') {
         // Load categories first
         this.loadTransactionCategories().then(() => {
-            const modal = new bootstrap.Modal(document.getElementById('addTransactionModal'));
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addTransactionModal'));
             
             // Set default values
             document.getElementById('type-income').checked = type === 'income';
@@ -1155,7 +1182,7 @@ class Dashboard {
             }
             
             // Close modal
-            bootstrap.Modal.getInstance(document.getElementById('addTransactionModal')).hide();
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('addTransactionModal')).hide();
             
             // Reset form
             document.getElementById('transaction-form').reset();
@@ -1174,7 +1201,7 @@ class Dashboard {
     }
 
     showHabitModal() {
-        const modal = new bootstrap.Modal(document.getElementById('addHabitModal'));
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addHabitModal'));
         
         // Setup color picker
         this.setupColorPicker();
@@ -1286,7 +1313,7 @@ class Dashboard {
             }
             
             // Close modal
-            bootstrap.Modal.getInstance(document.getElementById('addHabitModal')).hide();
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('addHabitModal')).hide();
             
             // Reset form
             document.getElementById('habit-form').reset();
@@ -1305,7 +1332,7 @@ class Dashboard {
     }
 
     showReminderModal() {
-        const modal = new bootstrap.Modal(document.getElementById('addReminderModal'));
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addReminderModal'));
         
         // Set default values
         document.getElementById('reminder-id').value = '';
@@ -1355,7 +1382,7 @@ class Dashboard {
             }
             
             // Close modal
-            bootstrap.Modal.getInstance(document.getElementById('addReminderModal')).hide();
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('addReminderModal')).hide();
             
             // Reset form
             document.getElementById('reminder-form').reset();
@@ -1400,7 +1427,7 @@ class Dashboard {
     }
 
     showMemoryModal() {
-        const modal = new bootstrap.Modal(document.getElementById('addMemoryModal'));
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addMemoryModal'));
         
         // Set default values
         document.getElementById('memory-id').value = '';
@@ -1478,7 +1505,7 @@ class Dashboard {
             }
             
             // Close modal
-            bootstrap.Modal.getInstance(document.getElementById('addMemoryModal')).hide();
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('addMemoryModal')).hide();
             
             // Reset form
             document.getElementById('memory-form').reset();
@@ -1631,7 +1658,7 @@ class Dashboard {
     }
 
     showLogoutConfirmation() {
-        const modal = new bootstrap.Modal(document.getElementById('logoutConfirmModal'));
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('logoutConfirmModal'));
         modal.show();
     }
 
