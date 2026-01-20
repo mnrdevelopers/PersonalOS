@@ -76,6 +76,12 @@ class Dashboard {
             this.logout();
         });
 
+        // Mobile Logout
+        document.getElementById('mobile-logout-btn')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.logout();
+        });
+
         // Chart period change
         document.getElementById('chart-period')?.addEventListener('change', () => {
             this.updateFinanceChart();
@@ -1633,11 +1639,39 @@ class Dashboard {
                 navigator.serviceWorker.register('/sw.js')
                     .then(registration => {
                         console.log('ServiceWorker registration successful');
+                        
+                        // Check for updates
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    this.showUpdateNotification();
+                                }
+                            });
+                        });
                     })
                     .catch(error => {
                         console.log('ServiceWorker registration failed:', error);
                     });
+                
+                // Handle controller change (when new SW takes over via skipWaiting)
+                let refreshing;
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    if (refreshing) return;
+                    if (navigator.serviceWorker.controller) {
+                        this.showUpdateNotification();
+                    }
+                });
             });
+        }
+    }
+
+    showUpdateNotification() {
+        const toastElement = document.getElementById('update-toast');
+        if (toastElement && !toastElement.classList.contains('show')) {
+            const toast = new bootstrap.Toast(toastElement);
+            toast.show();
+            document.getElementById('reload-app-btn')?.addEventListener('click', () => window.location.reload());
         }
     }
 }
