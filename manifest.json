@@ -2,7 +2,7 @@
   "name": "PersonalOS",
   "short_name": "LifeOS",
   "description": "Your all-in-one productivity companion",
-  "start_url": "/",
+  "start_url": "/PersonalOS/dashboard.html?pwa=true",
   "display": "standalone",
   "background_color": "#f5f7fb",
   "theme_color": "#4361ee",
@@ -76,3 +76,4 @@
   ]
 
 }
+
