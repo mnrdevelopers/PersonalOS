@@ -73,13 +73,13 @@ class Dashboard {
         // Logout
         document.getElementById('logout-btn')?.addEventListener('click', (e) => {
             e.preventDefault();
-            this.logout();
+            this.showLogoutConfirmation();
         });
 
         // Mobile Logout
         document.getElementById('mobile-logout-btn')?.addEventListener('click', (e) => {
             e.preventDefault();
-            this.logout();
+            this.showLogoutConfirmation();
         });
 
         // Chart period change
@@ -115,11 +115,14 @@ class Dashboard {
         
         const closeSidebar = () => {
             document.body.classList.remove('sidebar-open');
+            if(hamburger) hamburger.setAttribute('aria-expanded', 'false');
         };
 
         if (hamburger && overlay) {
             hamburger.addEventListener('click', () => {
                 document.body.classList.toggle('sidebar-open');
+                const isExpanded = hamburger.getAttribute('aria-expanded') === 'true';
+                hamburger.setAttribute('aria-expanded', !isExpanded);
             });
 
             overlay.addEventListener('click', closeSidebar);
@@ -161,6 +164,11 @@ class Dashboard {
             radio.addEventListener('change', (e) => {
                 this.updateHabitModalUI(e.target.value);
             });
+        });
+
+        // Logout Confirm
+        document.getElementById('confirm-logout-btn')?.addEventListener('click', () => {
+            this.logout();
         });
     }
 
@@ -1620,6 +1628,11 @@ class Dashboard {
         await this.initializeDashboard();
         this.showNotification('Dashboard refreshed!', 'success');
         this.hideLoading();
+    }
+
+    showLogoutConfirmation() {
+        const modal = new bootstrap.Modal(document.getElementById('logoutConfirmModal'));
+        modal.show();
     }
 
     async logout() {
