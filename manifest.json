@@ -2,7 +2,7 @@
     "name": "PersonalOS",
     "short_name": "PersonalOS",
     "description": "Your Life Operating System",
-    "start_url": "/index.html",
+    "start_url": "/PersonalOS/index.html",
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#4f46e5",
@@ -65,3 +65,4 @@
         }
     ]
 }
+
