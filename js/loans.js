@@ -10,27 +10,35 @@ window.loadLoansSection = async function() {
         
         <!-- Stats Row -->
         <div class="row g-3 mb-4">
-            <div class="col-md-4">
+            <div class="col-6 col-md-3">
                 <div class="card bg-light h-100 border-danger shadow-sm">
-                    <div class="card-body">
-                        <h6 class="card-title text-danger" id="loan-stat-title-1">Total Borrowed</h6>
+                    <div class="card-body p-3">
+                        <h6 class="card-title text-danger small" id="loan-stat-title-1">Total Borrowed</h6>
                         <h4 class="mb-0" id="loan-stat-borrowed">₹0.00</h4>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-6 col-md-3">
                 <div class="card bg-light h-100 border-success shadow-sm">
-                    <div class="card-body">
-                        <h6 class="card-title text-success" id="loan-stat-title-2">Total Lent</h6>
+                    <div class="card-body p-3">
+                        <h6 class="card-title text-success small" id="loan-stat-title-2">Total Lent</h6>
                         <h4 class="mb-0" id="loan-stat-lent">₹0.00</h4>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-6 col-md-3">
                 <div class="card bg-light h-100 border-primary shadow-sm">
-                    <div class="card-body">
-                        <h6 class="card-title text-primary" id="loan-stat-title-3">Net Position</h6>
+                    <div class="card-body p-3">
+                        <h6 class="card-title text-primary small" id="loan-stat-title-3">Net Position</h6>
                         <h4 class="mb-0" id="loan-stat-net">₹0.00</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card bg-light h-100 border-warning shadow-sm">
+                    <div class="card-body p-3">
+                        <h6 class="card-title text-dark small">Monthly EMI</h6>
+                        <h4 class="mb-0" id="loan-stat-emi">₹0.00</h4>
                     </div>
                 </div>
             </div>
@@ -358,6 +366,7 @@ window.loadLoansGrid = async function(status = 'active') {
     // Calculate Stats
     let totalBorrowed = 0;
     let totalLent = 0;
+    let totalEmi = 0;
 
     snapshot.forEach(doc => {
         const data = doc.data();
@@ -366,6 +375,9 @@ window.loadLoansGrid = async function(status = 'active') {
         
         if (data.type === 'borrowed' || data.type === 'emi') {
             totalBorrowed += amount;
+            if (status === 'active' && data.emiAmount && amount > 0) {
+                totalEmi += data.emiAmount;
+            }
         } else if (data.type === 'lent') {
             totalLent += amount;
         }
@@ -374,6 +386,7 @@ window.loadLoansGrid = async function(status = 'active') {
     if(document.getElementById('loan-stat-borrowed')) document.getElementById('loan-stat-borrowed').textContent = `₹${totalBorrowed.toFixed(2)}`;
     if(document.getElementById('loan-stat-lent')) document.getElementById('loan-stat-lent').textContent = `₹${totalLent.toFixed(2)}`;
     if(document.getElementById('loan-stat-net')) document.getElementById('loan-stat-net').textContent = `₹${(totalLent - totalBorrowed).toFixed(2)}`;
+    if(document.getElementById('loan-stat-emi')) document.getElementById('loan-stat-emi').textContent = `₹${totalEmi.toFixed(2)}`;
     
     // Update titles based on status
     document.getElementById('loan-stat-title-1').textContent = status === 'active' ? 'Outstanding Debt' : 'Total Repaid Debt';
