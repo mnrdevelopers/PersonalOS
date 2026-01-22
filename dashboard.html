@@ -41,6 +41,15 @@
                 <i class="fas fa-chart-line me-2"></i>PersonalOS
             </a>
             <div class="d-flex align-items-center">
+                <button class="btn btn-link text-white text-decoration-none me-2 p-2 position-relative" id="notifications-btn" aria-label="Notifications">
+                    <i class="fas fa-bell fa-lg"></i>
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" id="notification-badge">
+                        0
+                    </span>
+                </button>
+                <button class="btn btn-link text-white text-decoration-none me-2 p-2" id="calculator-btn" aria-label="Calculator">
+                    <i class="fas fa-calculator fa-lg"></i>
+                </button>
                 <div id="current-time" class="text-white me-3 d-none d-md-block"></div>
                 <button class="btn btn-link text-white text-decoration-none d-lg-none me-2 p-2" id="mobile-logout-btn" aria-label="Logout">
                     <i class="fas fa-sign-out-alt fa-lg"></i>
@@ -259,6 +268,18 @@
                                 <small class="text-muted">
                                     Assets (Lent): <span id="total-asset" class="text-success">₹0</span>
                                 </small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-lg-4 col-md-6">
+                        <div class="stat-card">
+                            <div class="stat-icon bg-warning text-dark">
+                                <i class="fas fa-calendar-check"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h3 id="total-monthly-emi">₹0</h3>
+                                <p>Monthly EMI</p>
+                                <small class="text-muted">Upcoming payments</small>
                             </div>
                         </div>
                     </div>
@@ -627,6 +648,39 @@
         </div>
     </div>
 
+    <!-- View Task Modal -->
+    <div class="modal fade" id="viewTaskModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Task Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <h4 id="view-task-title" class="mb-0"></h4>
+                        <span id="view-task-priority" class="badge"></span>
+                    </div>
+                    <div class="mb-3">
+                        <span id="view-task-status" class="badge me-2"></span>
+                        <small class="text-muted">
+                            <i class="far fa-calendar me-1"></i> <span id="view-task-date"></span>
+                            <i class="far fa-clock ms-2 me-1"></i> <span id="view-task-time"></span>
+                        </small>
+                    </div>
+                    <div class="p-3 bg-light rounded">
+                        <h6 class="text-muted mb-2">Description</h6>
+                        <p id="view-task-desc" class="mb-0" style="white-space: pre-wrap;"></p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="view-task-edit-btn">Edit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Add Memory Modal -->
     <div class="modal fade" id="addMemoryModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
@@ -666,6 +720,68 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-primary" id="save-memory">Save Memory</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calculator Modal -->
+    <div class="modal fade" id="calculatorModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-calculator me-2"></i>Calculator</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-2">
+                    <div class="calculator">
+                        <input type="text" class="form-control mb-2 text-end fs-4" id="calc-display" readonly value="0">
+                        <div class="row g-1">
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="clear">C</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="backspace"><i class="fas fa-backspace"></i></button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="operator" data-value="%">%</button></div>
+                            <div class="col-3"><button class="btn btn-warning w-100 calc-btn" data-action="operator" data-value="/">÷</button></div>
+                            
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number" data-value="7">7</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number" data-value="8">8</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number" data-value="9">9</button></div>
+                            <div class="col-3"><button class="btn btn-warning w-100 calc-btn" data-action="operator" data-value="*">×</button></div>
+                            
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number" data-value="4">4</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number" data-value="5">5</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number" data-value="6">6</button></div>
+                            <div class="col-3"><button class="btn btn-warning w-100 calc-btn" data-action="operator" data-value="-">-</button></div>
+                            
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number" data-value="1">1</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number" data-value="2">2</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number" data-value="3">3</button></div>
+                            <div class="col-3"><button class="btn btn-warning w-100 calc-btn" data-action="operator" data-value="+">+</button></div>
+                            
+                            <div class="col-6"><button class="btn btn-light w-100 calc-btn" data-action="number" data-value="0">0</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="decimal" data-value=".">.</button></div>
+                            <div class="col-3"><button class="btn btn-primary w-100 calc-btn" data-action="calculate">=</button></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notifications Modal -->
+    <div class="modal fade" id="notificationsModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-bell me-2"></i>Notifications</h5>
+                    <div class="ms-auto">
+                        <button class="btn btn-sm btn-link text-decoration-none" id="mark-all-read">Mark all read</button>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div id="notifications-list" class="list-group list-group-flush">
+                        <!-- Notifications will be loaded here -->
+                    </div>
                 </div>
             </div>
         </div>
