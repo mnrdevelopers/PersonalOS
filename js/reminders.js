@@ -71,6 +71,9 @@ async function loadTasks(status) {
             </div>
             <div class="d-flex align-items-center">
                 <span class="badge bg-${priorityColor} me-3">${task.priority}</span>
+                <button class="btn btn-sm btn-outline-info me-1" onclick="viewTask('${doc.id}')" title="View Details">
+                    <i class="fas fa-eye"></i>
+                </button>
                 <button class="btn btn-sm btn-outline-primary me-1" onclick="editReminder('${doc.id}')">
                     <i class="fas fa-edit"></i>
                 </button>
@@ -113,4 +116,33 @@ window.deleteTask = async function(id) {
         loadTasks(status);
         if(window.dashboard) window.dashboard.updateStats();
     }
+};
+
+window.viewTask = async function(id) {
+    try {
+        const doc = await db.collection('reminders').doc(id).get();
+        if (!doc.exists) return;
+        const data = doc.data();
+        
+        document.getElementById('view-task-title').textContent = data.title;
+        document.getElementById('view-task-desc').textContent = data.description || 'No description provided.';
+        document.getElementById('view-task-date').textContent = new Date(data.dueDate).toLocaleDateString();
+        document.getElementById('view-task-time').textContent = data.time || 'All day';
+        
+        const priorityBadge = document.getElementById('view-task-priority');
+        priorityBadge.textContent = data.priority.toUpperCase();
+        priorityBadge.className = `badge bg-${data.priority === 'high' ? 'danger' : (data.priority === 'medium' ? 'warning' : 'success')}`;
+        
+        const statusBadge = document.getElementById('view-task-status');
+        statusBadge.textContent = data.completed ? 'Completed' : 'Pending';
+        statusBadge.className = `badge bg-${data.completed ? 'success' : 'secondary'} me-2`;
+
+        document.getElementById('view-task-edit-btn').onclick = () => {
+            bootstrap.Modal.getInstance(document.getElementById('viewTaskModal')).hide();
+            editReminder(id);
+        };
+
+        const modal = new bootstrap.Modal(document.getElementById('viewTaskModal'));
+        modal.show();
+    } catch (e) { console.error(e); }
 };
