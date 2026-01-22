@@ -158,6 +158,21 @@ class Dashboard {
                 });
             });
         }
+
+        // Calculator
+        document.getElementById('calculator-btn')?.addEventListener('click', () => {
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('calculatorModal'));
+            modal.show();
+        });
+        this.initCalculator();
+
+        // Notifications
+        document.getElementById('notifications-btn')?.addEventListener('click', () => {
+            this.showNotificationsModal();
+        });
+        document.getElementById('mark-all-read')?.addEventListener('click', () => {
+            this.markAllNotificationsRead();
+        });
     }
 
     bindModalEvents() {
@@ -196,6 +211,87 @@ class Dashboard {
         // Logout Confirm
         document.getElementById('confirm-logout-btn')?.addEventListener('click', () => {
             this.logout();
+        });
+    }
+
+    initCalculator() {
+        const display = document.getElementById('calc-display');
+        if (!display) return;
+        
+        let currentInput = '0';
+        let previousInput = '';
+        let operator = null;
+        let shouldResetDisplay = false;
+
+        const updateDisplay = () => {
+            display.value = currentInput;
+        };
+
+        const calculate = () => {
+            let result;
+            const prev = parseFloat(previousInput);
+            const current = parseFloat(currentInput);
+            
+            if (isNaN(prev) || isNaN(current)) return;
+            
+            switch(operator) {
+                case '+': result = prev + current; break;
+                case '-': result = prev - current; break;
+                case '*': result = prev * current; break;
+                case '/': result = prev / current; break;
+                case '%': result = prev % current; break;
+                default: return;
+            }
+            
+            currentInput = parseFloat(result.toFixed(8)).toString();
+            shouldResetDisplay = true;
+        };
+
+        document.querySelectorAll('.calc-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const action = btn.dataset.action;
+                const value = btn.dataset.value;
+
+                if (action === 'number') {
+                    if (currentInput === '0' || shouldResetDisplay) {
+                        currentInput = value;
+                        shouldResetDisplay = false;
+                    } else {
+                        currentInput += value;
+                    }
+                } else if (action === 'decimal') {
+                    if (shouldResetDisplay) {
+                        currentInput = '0.';
+                        shouldResetDisplay = false;
+                    } else if (!currentInput.includes('.')) {
+                        currentInput += '.';
+                    }
+                } else if (action === 'operator') {
+                    if (operator !== null && !shouldResetDisplay) {
+                        calculate();
+                    }
+                    previousInput = currentInput;
+                    operator = value;
+                    shouldResetDisplay = true;
+                } else if (action === 'calculate') {
+                    if (operator !== null) {
+                        calculate();
+                        operator = null;
+                    }
+                } else if (action === 'clear') {
+                    currentInput = '0';
+                    previousInput = '';
+                    operator = null;
+                    shouldResetDisplay = false;
+                } else if (action === 'backspace') {
+                    if (currentInput.length > 1) {
+                        currentInput = currentInput.slice(0, -1);
+                    } else {
+                        currentInput = '0';
+                    }
+                }
+                updateDisplay();
+            });
         });
     }
 
@@ -319,6 +415,7 @@ class Dashboard {
             this.updateFinanceChart(),
             this.loadHabitStreaks()
         ]);
+        this.setupNotificationListener();
         
         // Update current date
         const now = new Date();
@@ -330,6 +427,127 @@ class Dashboard {
                 month: 'long',
                 day: 'numeric'
             });
+        }
+    }
+
+    setupNotificationListener() {
+        if (!this.currentUser) return;
+        
+        // Listen for unread notifications count
+        db.collection('notifications')
+            .where('userId', '==', this.currentUser.uid)
+            .where('read', '==', false)
+            .onSnapshot(snapshot => {
+                const count = snapshot.size;
+                const badge = document.getElementById('notification-badge');
+                if (badge) {
+                    badge.textContent = count > 9 ? '9+' : count;
+                    if (count > 0) badge.classList.remove('d-none');
+                    else badge.classList.add('d-none');
+                }
+            }, error => console.log("Notification listener error:", error));
+    }
+
+    async showNotificationsModal() {
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('notificationsModal'));
+        modal.show();
+        await this.loadNotifications();
+    }
+
+    async loadNotifications() {
+        const container = document.getElementById('notifications-list');
+        if (!container) return;
+
+        container.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div></div>';
+
+        try {
+            const snapshot = await db.collection('notifications')
+                .where('userId', '==', this.currentUser.uid)
+                .orderBy('createdAt', 'desc')
+                .limit(20)
+                .get();
+
+            container.innerHTML = '';
+
+            if (snapshot.empty) {
+                container.innerHTML = `
+                    <div class="text-center py-5 text-muted">
+                        <i class="far fa-bell-slash fa-2x mb-2"></i>
+                        <p class="mb-0">No notifications</p>
+                    </div>`;
+                return;
+            }
+
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const item = document.createElement('div');
+                item.className = `list-group-item list-group-item-action p-3 ${!data.read ? 'bg-light' : ''}`;
+                item.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="me-3">
+                            <div class="d-flex align-items-center mb-1">
+                                ${!data.read ? '<span class="badge bg-primary rounded-circle p-1 me-2" style="width: 8px; height: 8px;"> </span>' : ''}
+                                <h6 class="mb-0">${data.title}</h6>
+                            </div>
+                            <p class="mb-1 small text-muted">${data.message}</p>
+                            <small class="text-muted" style="font-size: 0.75rem;">${data.createdAt ? new Date(data.createdAt.toDate()).toLocaleString() : ''}</small>
+                        </div>
+                        <div class="dropdown">
+                            <button class="btn btn-link text-muted p-0" data-bs-toggle="dropdown">
+                                <i class="fas fa-ellipsis-v"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                ${!data.read ? `<li><a class="dropdown-item" href="#" onclick="window.dashboard.markNotificationRead('${doc.id}')"><i class="fas fa-check me-2"></i>Mark as read</a></li>` : ''}
+                                <li><a class="dropdown-item text-danger" href="#" onclick="window.dashboard.deleteNotification('${doc.id}')"><i class="fas fa-trash me-2"></i>Delete</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        } catch (error) {
+            console.error("Error loading notifications:", error);
+            container.innerHTML = '<div class="text-center py-3 text-danger">Error loading notifications</div>';
+        }
+    }
+
+    async markNotificationRead(id) {
+        try {
+            await db.collection('notifications').doc(id).update({ read: true });
+            this.loadNotifications(); // Refresh list
+        } catch (error) {
+            console.error("Error marking read:", error);
+        }
+    }
+
+    async deleteNotification(id) {
+        try {
+            await db.collection('notifications').doc(id).delete();
+            this.loadNotifications(); // Refresh list
+        } catch (error) {
+            console.error("Error deleting notification:", error);
+        }
+    }
+
+    async markAllNotificationsRead() {
+        try {
+            const batch = db.batch();
+            const snapshot = await db.collection('notifications')
+                .where('userId', '==', this.currentUser.uid)
+                .where('read', '==', false)
+                .get();
+            
+            if (snapshot.empty) return;
+
+            snapshot.forEach(doc => {
+                batch.update(doc.ref, { read: true });
+            });
+
+            await batch.commit();
+            this.loadNotifications();
+            this.showNotification('All notifications marked as read', 'success');
+        } catch (error) {
+            console.error("Error marking all read:", error);
         }
     }
 
@@ -440,16 +658,21 @@ class Dashboard {
                 
             let totalLiability = 0;
             let totalAsset = 0;
+            let totalMonthlyEmi = 0;
             
             loansSnapshot.forEach(doc => {
                 const data = doc.data();
                 const remaining = data.totalAmount - (data.paidAmount || 0);
-                if (data.type === 'borrowed' || data.type === 'emi') totalLiability += remaining;
+                if (data.type === 'borrowed' || data.type === 'emi') {
+                    totalLiability += remaining;
+                    if (data.emiAmount && remaining > 0) totalMonthlyEmi += data.emiAmount;
+                }
                 else if (data.type === 'lent') totalAsset += remaining;
             });
             
             if(document.getElementById('total-liability')) document.getElementById('total-liability').textContent = `₹${totalLiability.toFixed(0)}`;
             if(document.getElementById('total-asset')) document.getElementById('total-asset').textContent = `₹${totalAsset.toFixed(0)}`;
+            if(document.getElementById('total-monthly-emi')) document.getElementById('total-monthly-emi').textContent = `₹${totalMonthlyEmi.toFixed(0)}`;
 
         } catch (error) {
             console.error('Error updating stats:', error);
@@ -1381,9 +1604,11 @@ class Dashboard {
             if (id) {
                 reminder.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
                 await db.collection('reminders').doc(id).update(reminder);
+                reminder.id = id;
             } else {
                 reminder.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-                await db.collection('reminders').add(reminder);
+                const docRef = await db.collection('reminders').add(reminder);
+                reminder.id = docRef.id;
             }
             
             // Close modal
@@ -1399,7 +1624,7 @@ class Dashboard {
             this.showNotification(id ? 'Task updated successfully!' : 'Task added successfully!', 'success');
             
             // Schedule notification if enabled
-            if (sendNotification && 'Notification' in window && Notification.permission === 'granted') {
+            if (sendNotification) {
                 this.scheduleNotification(reminder);
             }
             
@@ -1427,6 +1652,17 @@ class Dashboard {
                         icon: '/icons/icon-192.png'
                     });
                 }
+                
+                // Create in-app notification
+                db.collection('notifications').add({
+                    userId: this.currentUser.uid,
+                    title: 'Task Due',
+                    message: `${reminder.title} is due now!`,
+                    read: false,
+                    type: 'reminder',
+                    relatedId: reminder.id || null,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
             }, timeUntilDue);
         }
     }
