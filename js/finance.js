@@ -11,6 +11,9 @@ window.loadFinanceSection = async function() {
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h2>Income & Expenses</h2>
             <div>
+                <button class="btn btn-outline-danger btn-sm me-2" onclick="exportFinancePDF()">
+                    <i class="fas fa-file-pdf me-2"></i>Export PDF
+                </button>
                 <button class="btn btn-outline-success btn-sm me-2" onclick="exportFinanceCSV()">
                     <i class="fas fa-file-csv me-2"></i>Export CSV
                 </button>
@@ -508,6 +511,99 @@ window.addCategory = async function() {
     } catch (error) {
         console.error("Error adding category:", error);
         alert("Failed to add category");
+    }
+};
+
+window.exportFinancePDF = async function() {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    if (!window.jspdf) {
+        if (window.dashboard) window.dashboard.showNotification('PDF library not loaded', 'danger');
+        return;
+    }
+
+    if (window.dashboard) window.dashboard.showLoading();
+
+    try {
+        let query = db.collection('transactions')
+            .where('userId', '==', user.uid)
+            .orderBy('date', 'desc')
+            .orderBy('createdAt', 'desc');
+
+        if (currentFinanceFilter !== 'all') {
+            query = query.where('type', '==', currentFinanceFilter);
+        }
+
+        const startDate = document.getElementById('finance-start-date')?.value;
+        const endDate = document.getElementById('finance-end-date')?.value;
+        if (startDate) {
+            query = query.where('date', '>=', startDate);
+        }
+        if (endDate) {
+            query = query.where('date', '<=', endDate);
+        }
+
+        const snapshot = await query.get();
+        
+        if (snapshot.empty) {
+             if (window.dashboard) window.dashboard.showNotification('No data to export', 'warning');
+             if (window.dashboard) window.dashboard.hideLoading();
+             return;
+        }
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        doc.text("Income & Expenses Report", 14, 15);
+        doc.setFontSize(10);
+        doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 22);
+        if (startDate || endDate) {
+             doc.text(`Period: ${startDate || 'Start'} to ${endDate || 'End'}`, 14, 27);
+        }
+
+        const tableColumn = ["Date", "Type", "Category", "Description", "Mode", "Amount"];
+        const tableRows = [];
+
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const row = [
+                new Date(data.date).toLocaleDateString(),
+                data.type,
+                data.category || '',
+                data.description || '',
+                data.paymentMode || 'cash',
+                data.amount.toFixed(2)
+            ];
+            tableRows.push(row);
+        });
+
+        doc.autoTable({
+            head: [tableColumn],
+            body: tableRows,
+            startY: startDate || endDate ? 32 : 25,
+            theme: 'grid',
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: [79, 70, 229] },
+            didParseCell: function(data) {
+                if (data.section === 'body' && data.column.index === 1) {
+                    if (data.cell.raw === 'income') {
+                        data.cell.styles.textColor = [25, 135, 84];
+                    } else {
+                        data.cell.styles.textColor = [220, 53, 69];
+                    }
+                }
+            }
+        });
+
+        doc.save(`finance_export_${currentFinanceFilter}_${new Date().toISOString().split('T')[0]}.pdf`);
+
+        if (window.dashboard) window.dashboard.showNotification('PDF Export successful!', 'success');
+    } catch (error) {
+        console.error("Error exporting PDF:", error);
+        if (window.dashboard) window.dashboard.showNotification('Export failed', 'danger');
+    } finally {
+        if (window.dashboard) window.dashboard.hideLoading();
     }
 };
 
