@@ -71,16 +71,16 @@ window.loadLoansSection = async function() {
                             <div class="mb-3">
                                 <label class="form-label">Type</label>
                                 <div class="btn-group w-100" role="group">
-                                    <input type="radio" class="btn-check" name="loan-type" id="type-borrowed" value="borrowed" checked>
+                                    <input type="radio" class="btn-check" name="loan-type" id="type-borrowed" value="borrowed" checked onchange="updateLoanModalUI(this.value)">
                                     <label class="btn btn-outline-danger" for="type-borrowed">I Borrowed (Liability)</label>
-                                    <input type="radio" class="btn-check" name="loan-type" id="type-lent" value="lent">
+                                    <input type="radio" class="btn-check" name="loan-type" id="type-lent" value="lent" onchange="updateLoanModalUI(this.value)">
                                     <label class="btn btn-outline-success" for="type-lent">I Lent (Asset)</label>
-                                    <input type="radio" class="btn-check" name="loan-type" id="type-emi" value="emi">
+                                    <input type="radio" class="btn-check" name="loan-type" id="type-emi" value="emi" onchange="updateLoanModalUI(this.value)">
                                     <label class="btn btn-outline-warning" for="type-emi">Product EMI</label>
                                 </div>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label">Person / Institution Name</label>
+                                <label class="form-label" id="label-loan-name">Person / Institution Name</label>
                                 <input type="text" class="form-control" id="loan-name" placeholder="e.g. HDFC Bank or Friend Name" required>
                             </div>
                             <div class="mb-3">
@@ -123,7 +123,7 @@ window.loadLoansSection = async function() {
                             </div>
                             <div class="form-check mb-3">
                                 <input class="form-check-input" type="checkbox" id="loan-link-ledger" checked>
-                                <label class="form-check-label" for="loan-link-ledger">
+                                <label class="form-check-label" for="loan-link-ledger" id="label-link-ledger">
                                     Add record to Transaction Ledger
                                 </label>
                             </div>
@@ -244,11 +244,41 @@ window.loadLoansSection = async function() {
     await loadLoansGrid('active');
 };
 
+window.updateLoanModalUI = function(type) {
+    const nameLabel = document.getElementById('label-loan-name');
+    const ledgerCheck = document.getElementById('loan-link-ledger');
+    const ledgerLabel = document.getElementById('label-link-ledger');
+    const emiInput = document.getElementById('loan-emi');
+    
+    if (type === 'emi') {
+        if(nameLabel) nameLabel.textContent = 'Product Name / Financier';
+        if(ledgerCheck) {
+            ledgerCheck.checked = false;
+            ledgerCheck.disabled = true;
+        }
+        if(ledgerLabel) ledgerLabel.textContent = 'Link to Ledger (Disabled for EMI creation)';
+        if(emiInput) emiInput.placeholder = 'Required';
+    } else {
+        if(nameLabel) nameLabel.textContent = 'Person / Institution Name';
+        if(ledgerCheck) {
+            ledgerCheck.disabled = false;
+            if (!document.getElementById('loan-id').value) ledgerCheck.checked = true;
+        }
+        if(ledgerLabel) ledgerLabel.textContent = 'Add record to Transaction Ledger';
+        if(emiInput) emiInput.placeholder = 'Optional';
+    }
+};
+
 window.showAddLoanModal = function() {
     const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addLoanModal'));
     document.getElementById('loan-form').reset();
     document.getElementById('loan-id').value = '';
     document.getElementById('loan-start-date').value = new Date().toISOString().split('T')[0];
+    
+    // Reset UI
+    document.getElementById('type-borrowed').checked = true;
+    updateLoanModalUI('borrowed');
+    
     modal.show();
 };
 
@@ -273,6 +303,11 @@ window.saveLoan = async function() {
 
     if (!name || !amount || !startDate) {
         alert('Please fill in required fields');
+        return;
+    }
+    
+    if (type === 'emi' && emi <= 0) {
+        alert('Please enter EMI amount for Product EMI type');
         return;
     }
 
@@ -495,7 +530,10 @@ window.editLoan = async function(id) {
         
         // Set radio button
         const typeRadio = document.querySelector(`input[name="loan-type"][value="${data.type}"]`);
-        if (typeRadio) typeRadio.checked = true;
+        if (typeRadio) {
+            typeRadio.checked = true;
+            updateLoanModalUI(data.type);
+        }
         
         // Disable link ledger for edits to avoid duplicate transactions
         const ledgerCheck = document.getElementById('loan-link-ledger');
