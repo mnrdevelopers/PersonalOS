@@ -10,6 +10,9 @@ window.loadTransactionsSection = async function() {
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h2>Transaction Ledger</h2>
             <div>
+                <button class="btn btn-outline-danger btn-sm me-2" onclick="exportLedgerPDF()">
+                    <i class="fas fa-file-pdf me-2"></i>Export PDF
+                </button>
                 <button class="btn btn-outline-success btn-sm" onclick="exportLedgerCSV()">
                     <i class="fas fa-file-csv me-2"></i>Export CSV
                 </button>
@@ -315,4 +318,50 @@ window.exportLedgerCSV = function() {
     document.body.removeChild(link);
 
     if (window.dashboard) window.dashboard.showNotification('Export successful!', 'success');
+};
+
+window.exportLedgerPDF = function() {
+    if (ledgerFilteredEntries.length === 0) {
+        if (window.dashboard) window.dashboard.showNotification('No data to export', 'warning');
+        return;
+    }
+    
+    if (!window.jspdf) {
+        if (window.dashboard) window.dashboard.showNotification('PDF library not loaded', 'danger');
+        return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    doc.text("Transaction Ledger", 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 22);
+    
+    const tableColumn = ["Date", "Description", "Mode", "Credit", "Debit", "Balance"];
+    const tableRows = [];
+
+    ledgerFilteredEntries.forEach(entry => {
+        const row = [
+            new Date(entry.date).toLocaleDateString(),
+            entry.description,
+            entry.mode,
+            entry.credit > 0 ? entry.credit.toFixed(2) : '-',
+            entry.debit > 0 ? entry.debit.toFixed(2) : '-',
+            entry.balance.toFixed(2)
+        ];
+        tableRows.push(row);
+    });
+
+    doc.autoTable({
+        head: [tableColumn],
+        body: tableRows,
+        startY: 25,
+        theme: 'grid',
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [79, 70, 229] }
+    });
+
+    doc.save(`ledger_export_${new Date().toISOString().split('T')[0]}.pdf`);
+    if (window.dashboard) window.dashboard.showNotification('PDF Export successful!', 'success');
 };
