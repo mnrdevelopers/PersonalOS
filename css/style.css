@@ -74,13 +74,33 @@ body {
 
 /* Navbar */
 .navbar {
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     z-index: 1030;
-    padding-top: env(safe-area-inset-top);
-    /* Premium Glassmorphism Override */
-    background-color: rgba(67, 97, 238, 0.9) !important;
+    padding-top: calc(0.5rem + env(safe-area-inset-top));
+    padding-bottom: 0.5rem;
+    /* Premium Gradient & Glassmorphism */
+    background: linear-gradient(135deg, rgba(67, 97, 238, 0.95) 0%, rgba(58, 12, 163, 0.95) 100%) !important;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+}
+
+.navbar-brand {
+    font-size: 1.4rem;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    letter-spacing: -0.5px;
+}
+
+.navbar .btn-link {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.navbar .btn-link:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
 #current-time {
@@ -810,4 +830,183 @@ body {
     font-size: 0.65rem;
     padding: 0.25em 0.6em;
     border: 2px solid var(--primary-color); /* Match navbar color for cutout effect */
+}
+
+/* Premium Dashboard Styles */
+.gradient-text {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.premium-card-1 {
+    background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);
+}
+
+.premium-card-2 {
+    background: linear-gradient(135deg, #f72585 0%, #7209b7 100%);
+}
+
+.premium-card-3 {
+    background: linear-gradient(135deg, #4cc9f0 0%, #4361ee 100%);
+}
+
+.decorative-circle {
+    position: absolute;
+    top: -20px;
+    right: -20px;
+    width: 150px;
+    height: 150px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.backdrop-blur {
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+}
+
+.stat-mini-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.stat-mini-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-md) !important;
+}
+
+/* Animations */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-up {
+    animation: fadeInUp 0.6s ease-out forwards;
+    opacity: 0;
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.8s ease-out forwards;
+    opacity: 0;
+}
+
+/* Dark mode adjustments for new elements */
+[data-theme="dark"] .stat-mini-card {
+    background-color: #1e1e1e !important;
+    color: #fff;
+}
+[data-theme="dark"] .btn-light {
+    background-color: #2d2d2d;
+    color: #fff;
+    border-color: #444;
+}
+
+/* Mobile Dashboard Redesign */
+@media (max-width: 991.98px) {
+    body.is-dashboard {
+        padding-top: 0 !important;
+    }
+
+    body.is-dashboard .navbar {
+        background: transparent !important;
+        box-shadow: none !important;
+        border-bottom: none !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        position: absolute !important;
+        width: 100%;
+    }
+
+    .main-content {
+        padding: 0 !important;
+    }
+
+    #dashboard-section {
+        padding-top: 0;
+    }
+
+    .mobile-hero {
+        height: 340px;
+        background: linear-gradient(135deg, #4361ee, #3a0ca3);
+        position: relative;
+        border-bottom-left-radius: 40px;
+        border-bottom-right-radius: 40px;
+        display: flex;
+        align-items: flex-end;
+        padding: 30px 25px 70px;
+        color: white;
+        margin-bottom: 0;
+        overflow: hidden;
+    }
+    
+    .mobile-hero::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background-image: url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80');
+        background-size: cover;
+        background-position: center;
+        opacity: 0.2;
+        mix-blend-mode: overlay;
+    }
+    
+    .mobile-hero-content {
+        position: relative;
+        z-index: 2;
+        width: 100%;
+    }
+
+    .mobile-quick-nav {
+        display: flex;
+        gap: 15px;
+        padding: 0 25px;
+        margin-top: -50px;
+        position: relative;
+        z-index: 10;
+        overflow-x: auto;
+        padding-bottom: 10px;
+        scrollbar-width: none;
+    }
+    
+    .mobile-quick-nav::-webkit-scrollbar {
+        display: none;
+    }
+
+    .nav-card {
+        min-width: 85px;
+        background: var(--card-bg);
+        border-radius: 24px;
+        padding: 15px 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+        border: 1px solid rgba(255,255,255,0.1);
+        transition: transform 0.2s;
+    }
+    
+    .nav-card:active {
+        transform: scale(0.95);
+    }
+
+    .icon-circle {
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        margin-bottom: 8px;
+    }
+    
+    /* Adjust stats container padding on mobile */
+    #dashboard-section > .row {
+        padding: 0 20px;
+    }
 }
