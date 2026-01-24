@@ -39,8 +39,11 @@
 </head>
 <body>
      <!-- Main Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
         <div class="container-fluid">
+            <button class="btn btn-link text-white d-none me-2 p-0" id="nav-back-btn" aria-label="Back">
+                <i class="fas fa-arrow-left fa-lg"></i>
+            </button>
             <a class="navbar-brand fw-bold" href="#">
                 <i class="fas fa-chart-line me-2"></i>PersonalOS
             </a>
@@ -196,111 +199,167 @@
         <main class="main-content">
             <!-- Dashboard Section -->
             <section id="dashboard-section" class="content-section">
-                <div class="section-header">
-                    <h1>Dashboard</h1>
-                    <div class="header-actions">
-                        <span id="current-date" class="date-display"></span>
-                        <button class="btn btn-outline-primary btn-sm" id="refresh-dashboard">
-                            <i class="fas fa-sync-alt"></i>
+                <!-- Mobile Hero Section (Visible only on mobile) -->
+                <div class="mobile-hero d-lg-none">
+                    <div class="mobile-hero-content">
+                        <h1 class="display-5 fw-bold mb-1" id="mobile-welcome-message">Hello!</h1>
+                        <p class="opacity-90 mb-0 fs-6" id="mobile-date-display"></p>
+                    </div>
+                </div>
+
+                <!-- Mobile Quick Nav (Visible only on mobile) -->
+                <div class="mobile-quick-nav d-lg-none mb-4">
+                    <div class="nav-card" onclick="window.switchSection('finance')">
+                        <div class="icon-circle bg-primary bg-opacity-10 text-primary"><i class="fas fa-wallet"></i></div>
+                        <span>Finance</span>
+                    </div>
+                    <div class="nav-card" onclick="window.switchSection('habits')">
+                        <div class="icon-circle bg-success bg-opacity-10 text-success"><i class="fas fa-check-circle"></i></div>
+                        <span>Habits</span>
+                    </div>
+                    <div class="nav-card" onclick="window.switchSection('reminders')">
+                        <div class="icon-circle bg-warning bg-opacity-10 text-warning"><i class="fas fa-bell"></i></div>
+                        <span>Tasks</span>
+                    </div>
+                    <div class="nav-card" onclick="window.handleQuickAction('add-income')">
+                        <div class="icon-circle bg-info bg-opacity-10 text-info"><i class="fas fa-plus"></i></div>
+                        <span>Add</span>
+                    </div>
+                </div>
+
+                <!-- Welcome Header -->
+                <div class="welcome-header mb-4 animate-fade-in d-none d-lg-block">
+                    <div class="d-flex justify-content-between align-items-end">
+                        <div>
+                            <h1 class="display-6 fw-bold gradient-text mb-0" id="welcome-message">Welcome back!</h1>
+                            <p class="text-muted mb-0" id="current-date-full"></p>
+                        </div>
+                        <button class="btn btn-light btn-icon shadow-sm rounded-circle" id="refresh-dashboard" style="width: 40px; height: 40px;">
+                            <i class="fas fa-sync-alt text-primary"></i>
                         </button>
                     </div>
                 </div>
 
-                <!-- Stats Cards -->
-                <div class="row g-3 mb-4">
-                    <div class="col-xl-3 col-lg-4 col-md-6">
-                        <div class="stat-card">
-                            <div class="stat-icon bg-primary">
-                                <i class="fas fa-wallet"></i>
-                            </div>
-                            <div class="stat-content">
-                                <h3 id="today-balance">₹0.00</h3>
-                                <p>Today's Balance</p>
-                                <small class="text-muted">
-                                    <span id="income-today">₹0</span> income • 
-                                    <span id="expense-today">₹0</span> expense
-                                </small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-xl-3 col-lg-4 col-md-6">
-                        <div class="stat-card">
-                            <div class="stat-icon bg-success">
-                                <i class="fas fa-check-circle"></i>
-                            </div>
-                            <div class="stat-content">
-                                <h3 id="active-habits">0</h3>
-                                <p>Active Habits</p>
-                                <small class="text-muted">
-                                    <span id="completed-today">0</span> completed today
-                                </small>
-                                <div id="money-saved-container" class="small text-success fw-bold mt-1 d-none">Saved: <span id="total-money-saved">₹0</span></div>
+                <!-- Main Stats Overview (Premium Cards) -->
+                <div class="row g-4 mb-5">
+                    <!-- Balance Card -->
+                    <div class="col-lg-4 col-md-6 animate-slide-up" style="animation-delay: 0.1s;">
+                        <div class="card border-0 shadow-lg h-100 overflow-hidden premium-card-1 rounded-4">
+                            <div class="card-body p-4 text-white position-relative">
+                                <div class="d-flex justify-content-between align-items-start z-1 position-relative">
+                                    <div>
+                                        <p class="mb-1 opacity-75 fw-medium">Total Balance</p>
+                                        <h2 class="display-6 fw-bold mb-0" id="today-balance">₹0.00</h2>
+                                    </div>
+                                    <div class="icon-box bg-white bg-opacity-25 rounded-circle p-3 backdrop-blur">
+                                        <i class="fas fa-wallet fa-lg"></i>
+                                    </div>
+                                </div>
+                                <div class="mt-4 z-1 position-relative">
+                                    <div class="d-flex justify-content-between small">
+                                        <span><i class="fas fa-arrow-down me-1"></i>Income</span>
+                                        <span class="fw-bold" id="income-today">₹0</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between small mt-1">
+                                        <span><i class="fas fa-arrow-up me-1"></i>Expense</span>
+                                        <span class="fw-bold" id="expense-today">₹0</span>
+                                    </div>
+                                </div>
+                                <div class="decorative-circle"></div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-xl-3 col-lg-4 col-md-6">
-                        <div class="stat-card">
-                            <div class="stat-icon bg-warning">
-                                <i class="fas fa-tasks"></i>
-                            </div>
-                            <div class="stat-content">
-                                <h3 id="pending-tasks">0</h3>
-                                <p>Pending Tasks</p>
-                                <small class="text-muted">
-                                    <span id="due-today">0</span> due today
-                                </small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-xl-3 col-lg-4 col-md-6">
-                        <div class="stat-card">
-                            <div class="stat-icon bg-info">
-                                <i class="fas fa-images"></i>
-                            </div>
-                            <div class="stat-content">
-                                <h3 id="total-memories">0</h3>
-                                <p>Memories</p>
-                                <small class="text-muted">
-                                    <span id="memories-this-month">0</span> this month
-                                </small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-xl-3 col-lg-4 col-md-6">
-                        <div class="stat-card">
-                            <div class="stat-icon bg-danger">
-                                <i class="fas fa-hand-holding-usd"></i>
-                            </div>
-                            <div class="stat-content">
-                                <h3 id="total-liability">₹0</h3>
-                                <p>Active Debts</p>
-                                <small class="text-muted">
-                                    Assets (Lent): <span id="total-asset" class="text-success">₹0</span>
-                                </small>
+
+                    <!-- Habits Card -->
+                    <div class="col-lg-4 col-md-6 animate-slide-up" style="animation-delay: 0.2s;">
+                        <div class="card border-0 shadow-lg h-100 overflow-hidden premium-card-2 rounded-4">
+                            <div class="card-body p-4 text-white position-relative">
+                                <div class="d-flex justify-content-between align-items-start z-1 position-relative">
+                                    <div>
+                                        <p class="mb-1 opacity-75 fw-medium">Habits Active</p>
+                                        <h2 class="display-6 fw-bold mb-0" id="active-habits">0</h2>
+                                    </div>
+                                    <div class="icon-box bg-white bg-opacity-25 rounded-circle p-3 backdrop-blur">
+                                        <i class="fas fa-fire fa-lg"></i>
+                                    </div>
+                                </div>
+                                <div class="mt-4 z-1 position-relative">
+                                    <div class="progress bg-black bg-opacity-25 rounded-pill" style="height: 6px;">
+                                        <div class="progress-bar bg-white rounded-pill" role="progressbar" style="width: 0%" id="habits-progress"></div>
+                                    </div>
+                                    <div class="d-flex justify-content-between small mt-2">
+                                        <span>Completed Today</span>
+                                        <span class="fw-bold"><span id="completed-today">0</span></span>
+                                    </div>
+                                    <div id="money-saved-container" class="small fw-bold mt-1 d-none text-white-50">Saved: <span id="total-money-saved">₹0</span></div>
+                                </div>
+                                <div class="decorative-circle"></div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-xl-3 col-lg-4 col-md-6">
-                        <div class="stat-card">
-                            <div class="stat-icon bg-warning text-dark">
-                                <i class="fas fa-calendar-check"></i>
-                            </div>
-                            <div class="stat-content">
-                                <h3 id="total-monthly-emi">₹0</h3>
-                                <p>Monthly EMI</p>
-                                <small class="text-muted">Upcoming payments</small>
+
+                    <!-- Tasks Card -->
+                    <div class="col-lg-4 col-md-12 animate-slide-up" style="animation-delay: 0.3s;">
+                        <div class="card border-0 shadow-lg h-100 overflow-hidden premium-card-3 rounded-4">
+                            <div class="card-body p-4 text-white position-relative">
+                                <div class="d-flex justify-content-between align-items-start z-1 position-relative">
+                                    <div>
+                                        <p class="mb-1 opacity-75 fw-medium">Pending Tasks</p>
+                                        <h2 class="display-6 fw-bold mb-0" id="pending-tasks">0</h2>
+                                    </div>
+                                    <div class="icon-box bg-white bg-opacity-25 rounded-circle p-3 backdrop-blur">
+                                        <i class="fas fa-check-double fa-lg"></i>
+                                    </div>
+                                </div>
+                                <div class="mt-4 z-1 position-relative">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <span class="badge bg-white text-dark bg-opacity-90 px-3 py-2 rounded-pill shadow-sm">
+                                            <span id="due-today">0</span> Due Today
+                                        </span>
+                                        <button class="btn btn-sm btn-link text-white text-decoration-none p-0 fw-medium" onclick="window.switchSection('reminders')">View All <i class="fas fa-arrow-right ms-1"></i></button>
+                                    </div>
+                                </div>
+                                <div class="decorative-circle"></div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-xl-3 col-lg-4 col-md-6">
-                        <div class="stat-card">
-                            <div class="stat-icon bg-secondary">
-                                <i class="fas fa-tachometer-alt"></i>
+                </div>
+
+                <!-- Secondary Stats Grid -->
+                <div class="row g-4 mb-5 animate-fade-in" style="animation-delay: 0.4s;">
+                    <div class="col-6 col-md-3">
+                        <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-info">
+                            <div class="text-muted small mb-1 fw-medium">Memories</div>
+                            <div class="d-flex align-items-center justify-content-between">
+                                <h4 class="mb-0 fw-bold" id="total-memories">0</h4>
+                                <i class="fas fa-camera text-info opacity-50"></i>
                             </div>
-                            <div class="stat-content">
-                                <h3 id="total-distance-month">0 km</h3>
-                                <p>Distance (Month)</p>
-                                <small class="text-muted">Logged this month</small>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-danger">
+                            <div class="text-muted small mb-1 fw-medium">Liabilities</div>
+                            <div class="d-flex align-items-center justify-content-between">
+                                <h4 class="mb-0 fw-bold" id="total-liability">₹0</h4>
+                                <i class="fas fa-hand-holding-usd text-danger opacity-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-warning">
+                            <div class="text-muted small mb-1 fw-medium">Monthly EMI</div>
+                            <div class="d-flex align-items-center justify-content-between">
+                                <h4 class="mb-0 fw-bold" id="total-monthly-emi">₹0</h4>
+                                <i class="fas fa-calendar-check text-warning opacity-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-secondary">
+                            <div class="text-muted small mb-1 fw-medium">Travel (Mo)</div>
+                            <div class="d-flex align-items-center justify-content-between">
+                                <h4 class="mb-0 fw-bold" id="total-distance-month">0 km</h4>
+                                <i class="fas fa-route text-secondary opacity-50"></i>
                             </div>
                         </div>
                     </div>
@@ -308,28 +367,28 @@
 
                 <!-- Charts Row -->
                 <div class="row g-3 mb-4">
-                    <div class="col-lg-8">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5>Financial Overview</h5>
-                                <select class="form-select form-select-sm" id="chart-period" style="width: auto;">
+                    <div class="col-lg-8 animate-slide-up" style="animation-delay: 0.5s;">
+                        <div class="card border-0 shadow-sm rounded-4 h-100">
+                            <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+                                <h5 class="fw-bold mb-0">Financial Flow</h5>
+                                <select class="form-select form-select-sm border-0 bg-light rounded-pill px-3" id="chart-period" style="width: auto;">
                                     <option value="week">This Week</option>
                                     <option value="month">This Month</option>
                                     <option value="year">This Year</option>
                                 </select>
                             </div>
-                            <div class="card-body">
+                            <div class="card-body px-4 pb-4">
                                 <canvas id="financeChart" height="250"></canvas>
                             </div>
                         </div>
                     </div>
-                    <div class="col-lg-4">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5>Habit Streaks</h5>
+                    <div class="col-lg-4 animate-slide-up" style="animation-delay: 0.6s;">
+                        <div class="card border-0 shadow-sm rounded-4 h-100">
+                            <div class="card-header bg-transparent border-0 pt-4 px-4">
+                                <h5 class="fw-bold mb-0">Habit Streaks 🔥</h5>
                             </div>
-                            <div class="card-body">
-                                <div id="habit-streaks">
+                            <div class="card-body px-4 pb-4">
+                                <div id="habit-streaks" class="d-flex flex-column gap-3">
                                     <!-- Habit streaks will be loaded here -->
                                 </div>
                             </div>
@@ -337,53 +396,30 @@
                     </div>
                 </div>
 
-                <!-- Recent Activity -->
-                <div class="row g-3">
-                    <div class="col-lg-6">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5>Recent Transactions</h5>
-                                <button class="btn btn-sm btn-outline-primary" onclick="window.switchSection('finance')">
-                                    View All
-                                </button>
+                <!-- Recent Activity & Tasks -->
+                <div class="row g-4">
+                    <div class="col-lg-6 animate-slide-up" style="animation-delay: 0.7s;">
+                        <div class="card border-0 shadow-sm rounded-4 h-100">
+                            <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+                                <h5 class="fw-bold mb-0">Recent Transactions</h5>
+                                <button class="btn btn-sm btn-light rounded-pill px-3 fw-medium" onclick="window.switchSection('finance')">View All</button>
                             </div>
-                            <div class="card-body">
-                                <div id="recent-transactions">
+                            <div class="card-body px-4 pb-4">
+                                <div id="recent-transactions" class="d-flex flex-column gap-3">
                                     <!-- Transactions will be loaded here -->
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-lg-6">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5>Today's Habits</h5>
-                                <button class="btn btn-sm btn-outline-success" onclick="window.switchSection('habits')">
-                                    View All
-                                </button>
+                    <div class="col-lg-6 animate-slide-up" style="animation-delay: 0.8s;">
+                        <div class="card border-0 shadow-sm rounded-4 h-100">
+                            <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+                                <h5 class="fw-bold mb-0">Today's Focus</h5>
+                                <button class="btn btn-sm btn-light rounded-pill px-3 fw-medium" onclick="window.switchSection('habits')">View All</button>
                             </div>
-                            <div class="card-body">
-                                <div id="todays-habits">
+                            <div class="card-body px-4 pb-4">
+                                <div id="todays-habits" class="d-flex flex-column gap-3">
                                     <!-- Habits will be loaded here -->
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Upcoming Tasks -->
-                <div class="row mt-4">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5>Upcoming Tasks</h5>
-                                <button class="btn btn-sm btn-outline-warning" onclick="window.switchSection('reminders')">
-                                    View All
-                                </button>
-                            </div>
-                            <div class="card-body">
-                                <div id="upcoming-tasks">
-                                    <!-- Tasks will be loaded here -->
                                 </div>
                             </div>
                         </div>
