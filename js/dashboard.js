@@ -662,6 +662,32 @@ class Dashboard {
             if(document.getElementById('total-asset')) document.getElementById('total-asset').textContent = `₹${totalAsset.toFixed(0)}`;
             if(document.getElementById('total-monthly-emi')) document.getElementById('total-monthly-emi').textContent = `₹${totalMonthlyEmi.toFixed(0)}`;
 
+            // Vehicle Distance Stats (This Month)
+            const vehicleLogsSnapshot = await db.collection('vehicle_logs')
+                .where('userId', '==', this.currentUser.uid)
+                .where('date', '>=', startOfMonth)
+                .get();
+
+            const vehicleOdometer = {};
+            vehicleLogsSnapshot.forEach(doc => {
+                const data = doc.data();
+                if (!vehicleOdometer[data.vehicleId]) {
+                    vehicleOdometer[data.vehicleId] = { min: data.odometer, max: data.odometer };
+                } else {
+                    vehicleOdometer[data.vehicleId].min = Math.min(vehicleOdometer[data.vehicleId].min, data.odometer);
+                    vehicleOdometer[data.vehicleId].max = Math.max(vehicleOdometer[data.vehicleId].max, data.odometer);
+                }
+            });
+
+            let totalDistance = 0;
+            Object.values(vehicleOdometer).forEach(v => {
+                totalDistance += (v.max - v.min);
+            });
+
+            if (document.getElementById('total-distance-month')) {
+                document.getElementById('total-distance-month').textContent = `${totalDistance} km`;
+            }
+
         } catch (error) {
             console.error('Error updating stats:', error);
             this.showNotification('Error updating dashboard stats', 'danger');
