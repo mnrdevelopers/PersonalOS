@@ -36,6 +36,11 @@
     box-sizing: border-box;
 }
 
+html {
+    overflow-x: hidden;
+    overscroll-behavior: none;
+}
+
 body {
     font-family: 'Inter', sans-serif;
     background-color: var(--bg-color);
@@ -44,7 +49,8 @@ body {
     padding-top: calc(56px + env(safe-area-inset-top));
     padding-bottom: calc(70px + env(safe-area-inset-bottom));
     transition: var(--transition);
-    overscroll-behavior-y: none; /* Prevents iOS bounce effect */
+    overscroll-behavior: none; /* Prevents iOS bounce effect */
+    overflow-x: hidden; /* Prevents horizontal scroll */
     -webkit-font-smoothing: antialiased; /* Premium font rendering */
 }
 
@@ -962,11 +968,11 @@ body {
 
     .mobile-quick-nav {
         display: flex;
-        gap: 10px;
+        gap: 15px;
         padding: 0 25px;
         margin-top: -50px;
         position: relative;
-        z-index: auto;
+        z-index: 10;
         overflow-x: auto;
         padding-bottom: 10px;
         scrollbar-width: none;
@@ -1006,9 +1012,19 @@ body {
     }
     
     /* Adjust stats container padding on mobile */
-    #dashboard-section > .row {
+    .content-section > .row {
+        padding: 0 20px;
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    /* Add padding to non-dashboard sections */
+    .content-section:not(#dashboard-section) {
         padding: 0 20px;
     }
+
+    /* Remove double padding for rows in non-dashboard sections */
+    .content-section:not(#dashboard-section) > .row {
+        padding: 0;
+    }
 }
-
-
