@@ -532,6 +532,14 @@ window.addCategory = async function() {
         
         nameInput.value = '';
         loadCategories(currentCategoryType);
+
+        // Refresh dashboard transaction dropdown if available
+        if (window.dashboard && window.dashboard.loadTransactionCategories) {
+            await window.dashboard.loadTransactionCategories();
+            // Auto-select the new category
+            const catSelect = document.getElementById('transaction-category');
+            if (catSelect) catSelect.value = name;
+        }
     } catch (error) {
         console.error("Error adding category:", error);
         alert("Failed to add category");
