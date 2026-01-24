@@ -736,6 +736,7 @@ window.loadMaintenanceSchedule = async function() {
         const vehicleUsage = {}; // km per day
         for (const vId of Object.keys(vehicles)) {
             const logsSnap = await db.collection('vehicle_logs')
+                .where('userId', '==', user.uid)
                 .where('vehicleId', '==', vId)
                 .orderBy('date', 'asc')
                 .get();
