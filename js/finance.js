@@ -9,43 +9,61 @@ window.loadFinanceSection = async function() {
     const container = document.getElementById('finance-section');
     container.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h2>Income & Expenses</h2>
+            <h2 class="fw-bold gradient-text mb-0">Income & Expenses</h2>
             <div>
-                <button class="btn btn-outline-danger btn-sm me-2" onclick="exportFinancePDF()">
+                <button class="btn btn-outline-danger me-2" onclick="exportFinancePDF()">
                     <i class="fas fa-file-pdf me-2"></i>Export PDF
                 </button>
-                <button class="btn btn-outline-success btn-sm me-2" onclick="exportFinanceCSV()">
+                <button class="btn btn-outline-success me-2" onclick="exportFinanceCSV()">
                     <i class="fas fa-file-csv me-2"></i>Export CSV
                 </button>
-                <button class="btn btn-outline-primary btn-sm" onclick="openCategoriesModal()">
+                <button class="btn btn-outline-primary" onclick="openCategoriesModal()">
                     <i class="fas fa-tags me-2"></i>Categories
                 </button>
             </div>
         </div>
 
         <!-- Stats Row -->
-        <div class="row g-3 mb-4">
-            <div class="col-md-4">
-                <div class="card bg-success text-white h-100 shadow-sm">
-                    <div class="card-body">
-                        <h6 class="card-title opacity-75">Total Income</h6>
-                        <h3 class="mb-0" id="stats-income">₹0.00</h3>
+        <div class="row g-4 mb-4">
+            <div class="col-md-4 animate-slide-up" style="animation-delay: 0.1s;">
+                <div class="card border-0 shadow-lg h-100 overflow-hidden premium-card-income rounded-4">
+                    <div class="card-body p-4 text-white position-relative">
+                        <div class="d-flex justify-content-between align-items-start z-1 position-relative">
+                            <div>
+                                <p class="mb-1 opacity-75 fw-medium">Total Income</p>
+                                <h2 class="display-6 fw-bold mb-0" id="stats-income">₹0.00</h2>
+                            </div>
+                            <div class="icon-box bg-white bg-opacity-25 rounded-circle p-3 backdrop-blur"><i class="fas fa-arrow-down fa-lg"></i></div>
+                        </div>
+                        <div class="decorative-circle"></div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card bg-danger text-white h-100 shadow-sm">
-                    <div class="card-body">
-                        <h6 class="card-title opacity-75">Total Expense</h6>
-                        <h3 class="mb-0" id="stats-expense">₹0.00</h3>
+            <div class="col-md-4 animate-slide-up" style="animation-delay: 0.2s;">
+                <div class="card border-0 shadow-lg h-100 overflow-hidden premium-card-expense rounded-4">
+                    <div class="card-body p-4 text-white position-relative">
+                        <div class="d-flex justify-content-between align-items-start z-1 position-relative">
+                            <div>
+                                <p class="mb-1 opacity-75 fw-medium">Total Expense</p>
+                                <h2 class="display-6 fw-bold mb-0" id="stats-expense">₹0.00</h2>
+                            </div>
+                            <div class="icon-box bg-white bg-opacity-25 rounded-circle p-3 backdrop-blur"><i class="fas fa-arrow-up fa-lg"></i></div>
+                        </div>
+                        <div class="decorative-circle"></div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card bg-primary text-white h-100 shadow-sm">
-                    <div class="card-body">
-                        <h6 class="card-title opacity-75">Balance</h6>
-                        <h3 class="mb-0" id="stats-balance">₹0.00</h3>
+            <div class="col-md-4 animate-slide-up" style="animation-delay: 0.3s;">
+                <div class="card border-0 shadow-lg h-100 overflow-hidden premium-card-balance rounded-4">
+                    <div class="card-body p-4 text-white position-relative">
+                        <div class="d-flex justify-content-between align-items-start z-1 position-relative">
+                            <div>
+                                <p class="mb-1 opacity-75 fw-medium">Net Balance</p>
+                                <h2 class="display-6 fw-bold mb-0" id="stats-balance">₹0.00</h2>
+                            </div>
+                            <div class="icon-box bg-white bg-opacity-25 rounded-circle p-3 backdrop-blur"><i class="fas fa-wallet fa-lg"></i></div>
+                        </div>
+                        <div class="decorative-circle"></div>
                     </div>
                 </div>
             </div>
@@ -53,42 +71,46 @@ window.loadFinanceSection = async function() {
 
         <div class="row g-2 mb-4">
             <div class="col-md-4">
-                <div class="input-group input-group-sm">
-                    <span class="input-group-text"><i class="fas fa-search"></i></span>
-                    <input type="text" class="form-control" id="finance-search" placeholder="Search transactions..." onkeyup="searchFinance(this.value)">
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0 rounded-start-pill ps-3"><i class="fas fa-search text-muted"></i></span>
+                    <input type="text" class="form-control border-start-0 rounded-end-pill" id="finance-search" placeholder="Search transactions..." onkeyup="searchFinance(this.value)">
                 </div>
             </div>
             <div class="col-md-5">
-                <div class="input-group input-group-sm">
-                    <span class="input-group-text">Date</span>
+                <div class="input-group">
+                    <span class="input-group-text bg-white rounded-start-pill">Date</span>
                     <input type="date" class="form-control" id="finance-start-date" onchange="filterFinanceDate()">
                     <span class="input-group-text">to</span>
                     <input type="date" class="form-control" id="finance-end-date" onchange="filterFinanceDate()">
-                    <button class="btn btn-outline-secondary" type="button" onclick="clearFinanceDate()" title="Clear Dates">
+                    <button class="btn btn-outline-secondary rounded-end-pill" type="button" onclick="clearFinanceDate()" title="Clear Dates">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
             </div>
             <div class="col-md-3 text-md-end">
-                <div class="btn-group btn-group-sm w-100">
-                    <button class="btn btn-outline-secondary btn-sm active" id="filter-all">All</button>
-                    <button class="btn btn-outline-secondary btn-sm" id="filter-income">Income</button>
-                    <button class="btn btn-outline-secondary btn-sm" id="filter-expense">Expense</button>
+                <div class="btn-group w-100" role="group">
+                    <input type="radio" class="btn-check" name="finance-filter" id="filter-all" autocomplete="off" checked>
+                    <label class="btn btn-outline-primary" for="filter-all">All</label>
+
+                    <input type="radio" class="btn-check" name="finance-filter" id="filter-income" autocomplete="off">
+                    <label class="btn btn-outline-success" for="filter-income">Income</label>
+
+                    <input type="radio" class="btn-check" name="finance-filter" id="filter-expense" autocomplete="off">
+                    <label class="btn btn-outline-danger" for="filter-expense">Expense</label>
                 </div>
             </div>
         </div>
-        <div class="card">
-            <div class="card-body">
+        <div class="card table-card animate-slide-up" style="animation-delay: 0.4s;">
+            <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle">
+                    <table class="table table-hover align-middle mb-0">
                         <thead>
                             <tr>
-                                <th>Date</th>
-                                <th>Category</th>
-                                <th>Description</th>
-                                <th>Mode</th>
-                                <th class="text-end">Amount</th>
-                                <th class="text-end">Actions</th>
+                                <th class="ps-4">Date</th>
+                                <th>Category & Desc</th>
+                                <th>Payment Mode</th>
+                                <th class="text-end pe-4">Amount</th>
+                                <th class="text-end pe-4">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="finance-table-body">
@@ -98,7 +120,7 @@ window.loadFinanceSection = async function() {
                 </div>
                 
                 <!-- Pagination -->
-                <div class="d-flex justify-content-between align-items-center mt-3 border-top pt-3">
+                <div class="d-flex justify-content-between align-items-center p-3 border-top bg-light">
                     <span class="text-muted small" id="finance-page-info">Page 1</span>
                     <div class="btn-group">
                         <button class="btn btn-outline-secondary btn-sm" id="btn-finance-prev" onclick="changeFinancePage(-1)" disabled>
@@ -242,12 +264,14 @@ async function loadFinanceData(filter = null) {
             
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td>${new Date(data.date).toLocaleDateString()}</td>
-                <td><span class="badge bg-secondary">${data.category}</span></td>
-                <td>${data.description || '-'}</td>
-                <td><span class="badge ${modeBadge}">${modeText}</span></td>
-                <td class="text-end ${colorClass} fw-bold">${sign}₹${data.amount.toFixed(2)}</td>
-                <td class="text-end">
+                <td class="ps-4 text-muted fw-medium">${new Date(data.date).toLocaleDateString()}</td>
+                <td>
+                    <div class="fw-bold text-dark">${data.category}</div>
+                    <div class="small text-muted">${data.description || ''}</div>
+                </td>
+                <td><span class="badge ${modeBadge} rounded-pill px-3">${modeText}</span></td>
+                <td class="text-end ${colorClass} fw-bold pe-4 fs-6">${sign}₹${data.amount.toFixed(2)}</td>
+                <td class="text-end pe-4">
                     <button class="btn btn-sm btn-outline-primary me-1" onclick="editTransaction('${data.id}')">
                         <i class="fas fa-edit"></i>
                     </button>
