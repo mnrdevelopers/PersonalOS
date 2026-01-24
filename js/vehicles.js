@@ -4,8 +4,7 @@ window.loadVehiclesSection = async function() {
     const container = document.getElementById('vehicles-section');
     container.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2>Vehicle Tracker</h2>
-            <div>
+            <h2 >
                 <button class="btn btn-outline-primary me-2" onclick="showAddVehicleModal()">
                     <i class="fas fa-car me-2"></i>Add Vehicle
                 </button>
@@ -19,11 +18,11 @@ window.loadVehiclesSection = async function() {
         </div>
 
         <!-- Stats Row -->
-        <div class="row g-3 mb-4" id="vehicle-stats">
+        <div class="row g-4 mb-5 animate-fade-in" id="vehicle-stats">
             <div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>
         </div>
 
-        <ul class="nav nav-tabs mb-4">
+        <ul class="nav nav-pills mb-4 gap-2">
             <li class="nav-item">
                 <a class="nav-link active" href="javascript:void(0)" onclick="switchVehicleTab('logs', this)">Logs & History</a>
             </li>
@@ -596,34 +595,38 @@ window.loadVehicleStats = async function() {
     const container = document.getElementById('vehicle-stats');
     container.innerHTML = `
         <div class="col-6 col-md-3">
-            <div class="card bg-light border-primary h-100">
-                <div class="card-body text-center p-2 p-md-3">
-                    <h6 class="text-primary small">Total Expenses</h6>
-                    <h4 class="mb-0">₹${totalCost.toFixed(0)}</h4>
+            <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-primary">
+                <div class="text-muted small mb-1 fw-medium">Total Expenses</div>
+                <div class="d-flex align-items-center justify-content-between">
+                    <h4 class="mb-0 fw-bold text-primary">₹${totalCost.toFixed(0)}</h4>
+                    <i class="fas fa-wallet text-primary opacity-25 fa-2x"></i>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card bg-light border-warning h-100">
-                <div class="card-body text-center p-2 p-md-3">
-                    <h6 class="text-warning small">Fuel Cost</h6>
-                    <h4 class="mb-0">₹${fuelCost.toFixed(0)}</h4>
+            <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-warning">
+                <div class="text-muted small mb-1 fw-medium">Fuel Cost</div>
+                <div class="d-flex align-items-center justify-content-between">
+                    <h4 class="mb-0 fw-bold text-warning">₹${fuelCost.toFixed(0)}</h4>
+                    <i class="fas fa-gas-pump text-warning opacity-25 fa-2x"></i>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card bg-light border-info h-100">
-                <div class="card-body text-center p-2 p-md-3">
-                    <h6 class="text-info small">Maintenance</h6>
-                    <h4 class="mb-0">₹${serviceCost.toFixed(0)}</h4>
+            <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-info">
+                <div class="text-muted small mb-1 fw-medium">Maintenance</div>
+                <div class="d-flex align-items-center justify-content-between">
+                    <h4 class="mb-0 fw-bold text-info">₹${serviceCost.toFixed(0)}</h4>
+                    <i class="fas fa-tools text-info opacity-25 fa-2x"></i>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card bg-light border-success h-100">
-                <div class="card-body text-center p-2 p-md-3">
-                    <h6 class="text-success small">Total Distance</h6>
-                    <h4 class="mb-0">${totalDistance} km</h4>
+            <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-success">
+                <div class="text-muted small mb-1 fw-medium">Total Distance</div>
+                <div class="d-flex align-items-center justify-content-between">
+                    <h4 class="mb-0 fw-bold text-success">${totalDistance} km</h4>
+                    <i class="fas fa-road text-success opacity-25 fa-2x"></i>
                 </div>
             </div>
         </div>
@@ -634,7 +637,7 @@ window.loadVehicleLogs = async function() {
     const user = auth.currentUser;
     const container = document.getElementById('vehicles-content');
     
-    // Fetch vehicles map for names
+    // Fetch vehicles map
     const vSnap = await db.collection('vehicles').where('userId', '==', user.uid).get();
     const vehicles = {};
     vSnap.forEach(d => vehicles[d.id] = d.data());
@@ -651,7 +654,7 @@ window.loadVehicleLogs = async function() {
         return;
     }
 
-    let html = '<div class="table-responsive"><table class="table table-hover"><thead><tr><th>Date</th><th>Vehicle</th><th>Type</th><th>Odometer</th><th>Cost</th><th>Details</th><th>Actions</th></tr></thead><tbody>';
+    let html = '<div class="card table-card animate-slide-up"><div class="card-body p-0"><div class="table-responsive"><table class="table table-hover mb-0"><thead><tr><th class="ps-4">Date</th><th>Vehicle</th><th>Type</th><th>Odometer</th><th>Cost</th><th>Details</th><th class="pe-4">Actions</th></tr></thead><tbody>';
     
     logsSnap.forEach(doc => {
         const d = doc.data();
@@ -670,20 +673,20 @@ window.loadVehicleLogs = async function() {
 
         html += `
             <tr>
-                <td>${new Date(d.date).toLocaleDateString()}</td>
-                <td>${vName}</td>
-                <td><span class="badge ${typeBadge}">${d.type.toUpperCase()}</span></td>
+                <td class="ps-4 text-muted fw-medium">${new Date(d.date).toLocaleDateString()}</td>
+                <td class="fw-bold">${vName}</td>
+                <td><span class="badge ${typeBadge} rounded-pill">${d.type.toUpperCase()}</span></td>
                 <td>${d.odometer} km</td>
                 <td class="fw-bold">₹${d.cost.toFixed(2)}</td>
                 <td class="small">${details}</td>
-                <td>
+                <td class="pe-4">
                     <button class="btn btn-sm btn-outline-primary me-1" onclick="editVehicleLog('${doc.id}')"><i class="fas fa-edit"></i></button>
                     <button class="btn btn-sm btn-outline-danger" onclick="deleteVehicleLog('${doc.id}')"><i class="fas fa-trash"></i></button>
                 </td>
             </tr>
         `;
     });
-    html += '</tbody></table></div>';
+    html += '</tbody></table></div></div></div>';
     container.innerHTML = html;
 };
 
@@ -691,7 +694,6 @@ window.loadServiceAlerts = async function() {
     const user = auth.currentUser;
     const container = document.getElementById('vehicles-content');
     
-    // Fetch vehicles for current odometer
     const vSnap = await db.collection('vehicles').where('userId', '==', user.uid).get();
     const vehicles = {};
     vSnap.forEach(d => vehicles[d.id] = d.data());
@@ -700,7 +702,7 @@ window.loadServiceAlerts = async function() {
         .where('userId', '==', user.uid)
         .orderBy('dueOdometer', 'asc')
         .get();
-
+        
     if (alertsSnap.empty) {
         container.innerHTML = '<div class="text-center text-muted py-5">No active service alerts. Set one to get reminded!</div>';
         return;
@@ -728,8 +730,8 @@ window.loadServiceAlerts = async function() {
 
         html += `
             <div class="col-md-6">
-                <div class="card border-${statusColor}">
-                    <div class="card-body">
+                <div class="card border-0 shadow-sm rounded-4 h-100 border-start border-4 border-${statusColor}">
+                    <div class="card-body p-4">
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
                                 <h5 class="card-title">${d.title}</h5>
@@ -846,8 +848,8 @@ window.loadMaintenanceSchedule = async function() {
         for (const [month, monthEvents] of Object.entries(grouped)) {
             html += `
                 <div class="col-md-6 col-lg-4">
-                    <div class="card h-100">
-                        <div class="card-header bg-light fw-bold text-primary">
+                    <div class="card h-100 border-0 shadow-sm rounded-4">
+                        <div class="card-header bg-transparent border-bottom fw-bold text-primary py-3">
                             <i class="fas fa-calendar-alt me-2"></i>${month}
                         </div>
                         <div class="list-group list-group-flush">
@@ -873,7 +875,7 @@ window.loadMaintenanceSchedule = async function() {
                             </div>
                             <div class="text-end">
                                 <span class="badge ${badgeClass} mb-1">${dateText}</span>
-                                <div style="font-size: 0.7rem;" class="text-muted">${e.remainingKm > 0 ? e.remainingKm + ' km left' : 'Overdue'}</div>
+                                <div class="small text-muted">${e.remainingKm > 0 ? e.remainingKm + ' km left' : 'Overdue'}</div>
                             </div>
                         </div>
                     </div>
@@ -913,8 +915,8 @@ window.loadVehiclesList = async function() {
         
         html += `
             <div class="col-md-6 col-lg-4">
-                <div class="card h-100">
-                    <div class="card-body">
+                <div class="card h-100 border-0 shadow-sm rounded-4">
+                    <div class="card-body p-4">
                         <div class="d-flex justify-content-between align-items-start mb-3">
                             <div class="d-flex align-items-center">
                                 <div class="bg-light rounded-circle p-3 me-3 text-primary">
@@ -941,7 +943,7 @@ window.loadVehiclesList = async function() {
                         <div class="mb-2">
                             <small class="text-muted d-block">Registration: <span class="text-dark fw-bold">${d.regNumber || 'N/A'}</span></small>
                             <small class="text-muted d-block">Odometer: <span class="text-dark fw-bold">${d.currentOdometer} km</span></small>
-                            ${d.averageMileage ? `<small class="text-muted d-block">Avg Mileage: <span class="text-success fw-bold">${d.averageMileage.toFixed(1)} km/l</span></small>` : ''}
+                            ${d.averageMileage ? `<small class="text-muted d-block">Avg. Mileage: <span class="text-success fw-bold">${d.averageMileage.toFixed(1)} km/l</span></small>` : ''}
                         </div>
                     </div>
                 </div>
