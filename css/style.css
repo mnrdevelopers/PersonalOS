@@ -966,7 +966,7 @@ body {
         padding: 0 25px;
         margin-top: -50px;
         position: relative;
-        z-index: 10;
+        z-index: auto;
         overflow-x: auto;
         padding-bottom: 10px;
         scrollbar-width: none;
@@ -1010,3 +1010,4 @@ body {
         padding: 0 20px;
     }
 }
+
