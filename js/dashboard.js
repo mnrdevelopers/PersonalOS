@@ -221,8 +221,88 @@ class Dashboard {
         let operator = null;
         let shouldResetDisplay = false;
 
+        // History Setup
+        let history = [];
+        let historyContainer = document.getElementById('calc-history');
+        
+        if (!historyContainer) {
+            historyContainer = document.createElement('div');
+            historyContainer.id = 'calc-history';
+            historyContainer.className = 'mb-3 p-2 border rounded bg-light d-none';
+            historyContainer.style.height = '100px';
+            historyContainer.style.overflowY = 'auto';
+            historyContainer.style.fontSize = '0.85rem';
+            historyContainer.innerHTML = '<div class="text-muted text-center small py-4">No history</div>';
+            display.parentNode.insertBefore(historyContainer, display);
+        }
+
+        // History Toggle
+        let historyToggle = document.getElementById('calc-history-toggle');
+        if (!historyToggle) {
+            const toggleContainer = document.createElement('div');
+            toggleContainer.className = 'd-flex justify-content-end mb-1';
+            historyToggle = document.createElement('button');
+            historyToggle.id = 'calc-history-toggle';
+            historyToggle.className = 'btn btn-sm btn-link text-secondary text-decoration-none p-0';
+            historyToggle.innerHTML = '<i class="fas fa-history me-1"></i> Show History';
+            toggleContainer.appendChild(historyToggle);
+            display.parentNode.insertBefore(toggleContainer, historyContainer);
+
+            historyToggle.addEventListener('click', () => {
+                historyContainer.classList.toggle('d-none');
+                const isHidden = historyContainer.classList.contains('d-none');
+                historyToggle.innerHTML = isHidden ? 
+                    '<i class="fas fa-history me-1"></i> Show History' : 
+                    '<i class="fas fa-history me-1"></i> Hide History';
+                historyToggle.classList.toggle('text-primary', !isHidden);
+                historyToggle.classList.toggle('text-secondary', isHidden);
+            });
+        }
+
+        const updateHistory = (expr, res) => {
+            history.unshift({ expr, res });
+            if (history.length > 20) history.pop();
+            
+            historyContainer.innerHTML = '';
+            history.forEach(item => {
+                const row = document.createElement('div');
+                row.className = 'd-flex justify-content-between border-bottom py-1';
+                row.style.cursor = 'pointer';
+                row.title = 'Click to use result';
+                row.innerHTML = `<span class="text-muted">${item.expr}</span><span class="fw-bold">${item.res}</span>`;
+                
+                row.addEventListener('click', () => {
+                    currentInput = item.res;
+                    updateDisplay();
+                    shouldResetDisplay = true;
+                });
+
+                historyContainer.appendChild(row);
+            });
+        };
+
         const updateDisplay = () => {
             display.value = currentInput;
+        };
+
+        const updateOperatorVisuals = (activeOp) => {
+            document.querySelectorAll('.calc-btn[data-action="operator"]').forEach(btn => {
+                const op = btn.dataset.value;
+                // Reset to default state
+                if (['/', '*', '-', '+'].includes(op)) {
+                    btn.classList.add('btn-warning');
+                    btn.classList.remove('btn-primary');
+                } else {
+                    btn.classList.add('btn-light');
+                    btn.classList.remove('btn-primary');
+                }
+
+                // Apply active state
+                if (op === activeOp) {
+                    btn.classList.remove('btn-warning', 'btn-light');
+                    btn.classList.add('btn-primary');
+                }
+            });
         };
 
         const calculate = () => {
@@ -232,6 +312,8 @@ class Dashboard {
             
             if (isNaN(prev) || isNaN(current)) return;
             
+            const expression = `${prev} ${operator} ${current}`;
+
             switch(operator) {
                 case '+': result = prev + current; break;
                 case '-': result = prev - current; break;
@@ -242,6 +324,7 @@ class Dashboard {
             }
             
             currentInput = parseFloat(result.toFixed(8)).toString();
+            updateHistory(expression, currentInput);
             shouldResetDisplay = true;
         };
 
@@ -271,16 +354,19 @@ class Dashboard {
                     previousInput = currentInput;
                     operator = value;
                     shouldResetDisplay = true;
+                    updateOperatorVisuals(operator);
                 } else if (action === 'calculate') {
                     if (operator !== null) {
                         calculate();
                         operator = null;
+                        updateOperatorVisuals(null);
                     }
                 } else if (action === 'clear') {
                     currentInput = '0';
                     previousInput = '';
                     operator = null;
                     shouldResetDisplay = false;
+                    updateOperatorVisuals(null);
                 } else if (action === 'backspace') {
                     if (currentInput.length > 1) {
                         currentInput = currentInput.slice(0, -1);
