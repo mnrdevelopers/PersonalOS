@@ -6,6 +6,7 @@ class AuthManager {
     init() {
         this.bindEvents();
         this.checkAuthState();
+        this.loadRememberedUser();
     }
 
     bindEvents() {
@@ -123,32 +124,51 @@ class AuthManager {
         }
     }
 
+    setButtonLoading(btn, isLoading, originalContent = '') {
+        if (!btn) return;
+        if (isLoading) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Processing...';
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
+        }
+    }
+
     async login() {
-        const email = document.getElementById('login-email')?.value;
+        const btn = document.getElementById('login-btn');
+        const originalContent = btn.innerHTML;
+        const email = document.getElementById('login-email')?.value.trim();
         const password = document.getElementById('login-password')?.value;
 
+        this.clearMessages();
+
         if (!email || !password) {
-            this.showMessage('Please fill in all fields', 'danger');
+            this.showMessage('Please enter both email and password.', 'warning');
             return;
         }
 
         try {
-            const userCredential = await auth.signInWithEmailAndPassword(email, password);
+            this.setButtonLoading(btn, true);
+            await auth.signInWithEmailAndPassword(email, password);
             
             // Save remember me preference
             const rememberMe = document.getElementById('remember-me')?.checked;
             if (rememberMe) {
-                localStorage.setItem('rememberMe', 'true');
+                localStorage.setItem('rememberedEmail', email);
+            } else {
+                localStorage.removeItem('rememberedEmail');
             }
             
-            this.showMessage('Login successful!', 'success');
+            this.showMessage('Login successful! Redirecting...', 'success');
             
             // Redirect to dashboard
             setTimeout(() => {
-                window.location.href = 'dashboard.html';
+                window.location.replace('dashboard.html');
             }, 1000);
             
         } catch (error) {
+            this.setButtonLoading(btn, false, originalContent);
             let errorMessage = 'Login failed. ';
             switch (error.code) {
                 case 'auth/invalid-email':
@@ -171,36 +191,49 @@ class AuthManager {
     }
 
     async register() {
-        const name = document.getElementById('register-name')?.value;
-        const email = document.getElementById('register-email')?.value;
+        const btn = document.getElementById('register-btn');
+        const originalContent = btn.innerHTML;
+        const name = document.getElementById('register-name')?.value.trim();
+        const email = document.getElementById('register-email')?.value.trim();
         const password = document.getElementById('register-password')?.value;
         const confirmPassword = document.getElementById('register-confirm-password')?.value;
 
+        this.clearMessages();
+
         // Validation
-        if (!name || !email || !password || !confirmPassword) {
-            this.showMessage('Please fill in all fields', 'danger');
+        if (!name) {
+            this.showMessage('Please enter your full name.', 'warning');
+            return;
+        }
+        if (!email || !this.isValidEmail(email)) {
+            this.showMessage('Please enter a valid email address.', 'warning');
+            return;
+        }
+
+        // Password Complexity Validation
+        const hasUpperCase = /[A-Z]/.test(password);
+        const hasLowerCase = /[a-z]/.test(password);
+        const hasNumbers = /\d/.test(password);
+        const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+        if (password.length < 8 || !hasUpperCase || !hasLowerCase || !hasNumbers || !hasSpecial) {
+            this.showMessage('Password must be at least 8 characters and include uppercase, lowercase, number, and special character.', 'warning');
             return;
         }
 
         if (password !== confirmPassword) {
-            this.showMessage('Passwords do not match', 'danger');
-            return;
-        }
-
-        if (password.length < 6) {
-            this.showMessage('Password must be at least 6 characters', 'danger');
-            return;
-        }
-
-        if (!this.isValidEmail(email)) {
-            this.showMessage('Please enter a valid email address', 'danger');
+            this.showMessage('Passwords do not match.', 'warning');
             return;
         }
 
         try {
+            this.setButtonLoading(btn, true);
             // Create user
             const userCredential = await auth.createUserWithEmailAndPassword(email, password);
             const user = userCredential.user;
+
+            // Update profile name immediately
+            await user.updateProfile({ displayName: name });
 
             // Create user profile in Firestore
             await db.collection('users').doc(user.uid).set({
@@ -217,14 +250,15 @@ class AuthManager {
             // Create default categories
             await this.createDefaultCategories(user.uid);
 
-            this.showMessage('Account created successfully!', 'success');
+            this.showMessage('Account created successfully! Redirecting...', 'success');
             
             // Redirect to dashboard
             setTimeout(() => {
-                window.location.href = 'dashboard.html';
-            }, 1000);
+                window.location.replace('dashboard.html');
+            }, 1500);
             
         } catch (error) {
+            this.setButtonLoading(btn, false, originalContent);
             let errorMessage = 'Registration failed. ';
             switch (error.code) {
                 case 'auth/email-already-in-use':
@@ -290,21 +324,22 @@ class AuthManager {
     }
 
     async resetPassword() {
-        const email = document.getElementById('reset-email')?.value;
+        const btn = document.getElementById('reset-btn');
+        const originalContent = btn.innerHTML;
+        const email = document.getElementById('reset-email')?.value.trim();
 
-        if (!email) {
-            this.showMessage('Please enter your email', 'danger');
-            return;
-        }
+        this.clearMessages();
 
-        if (!this.isValidEmail(email)) {
-            this.showMessage('Please enter a valid email address', 'danger');
+        if (!email || !this.isValidEmail(email)) {
+            this.showMessage('Please enter a valid email address.', 'warning');
             return;
         }
 
         try {
+            this.setButtonLoading(btn, true);
             await auth.sendPasswordResetEmail(email);
             this.showMessage('Password reset email sent! Check your inbox.', 'success');
+            this.setButtonLoading(btn, false, originalContent);
             
             // Clear form and show login after 3 seconds
             setTimeout(() => {
@@ -313,6 +348,7 @@ class AuthManager {
             }, 3000);
             
         } catch (error) {
+            this.setButtonLoading(btn, false, originalContent);
             let errorMessage = 'Failed to send reset email. ';
             switch (error.code) {
                 case 'auth/invalid-email':
@@ -340,6 +376,17 @@ class AuthManager {
                 window.location.replace('dashboard.html');
             }
         });
+    }
+
+    loadRememberedUser() {
+        const rememberedEmail = localStorage.getItem('rememberedEmail');
+        if (rememberedEmail) {
+            const emailInput = document.getElementById('login-email');
+            const rememberMeCheckbox = document.getElementById('remember-me');
+            
+            if (emailInput) emailInput.value = rememberedEmail;
+            if (rememberMeCheckbox) rememberMeCheckbox.checked = true;
+        }
     }
 }
 
