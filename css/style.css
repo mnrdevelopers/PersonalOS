@@ -973,7 +973,7 @@ body {
 
     .mobile-quick-nav {
         display: flex;
-        gap: 15px;
+        gap: 10px;
         padding: 0 25px;
         margin-top: -50px;
         position: relative;
@@ -1059,3 +1059,4 @@ body {
     padding: 20px;
     vertical-align: middle;
 }
+
