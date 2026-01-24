@@ -10,6 +10,7 @@ class Dashboard {
         await this.checkAuth();
         this.bindEvents();
         this.updateTime();
+        this.updateGreeting();
         this.loadUserProfile();
         
         const hashSection = window.location.hash.substring(1);
@@ -431,6 +432,37 @@ class Dashboard {
         setInterval(updateClock, 60000); // Update every minute
     }
 
+    updateGreeting() {
+        const hour = new Date().getHours();
+        const greetingElement = document.getElementById('welcome-message');
+        const dateElement = document.getElementById('current-date-full');
+        const mobileGreeting = document.getElementById('mobile-welcome-message');
+        const mobileDate = document.getElementById('mobile-date-display');
+        
+        if (greetingElement) {
+            let greeting = 'Welcome back!';
+            if (hour < 12) greeting = 'Good Morning,';
+            else if (hour < 18) greeting = 'Good Afternoon,';
+            else greeting = 'Good Evening,';
+            
+            if (this.currentUser && this.currentUser.displayName) {
+                greeting += ` ${this.currentUser.displayName.split(' ')[0]}`;
+            }
+            greetingElement.textContent = greeting;
+            
+            if (mobileGreeting) {
+                mobileGreeting.textContent = greeting;
+            }
+        }
+        if (dateElement) {
+            const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            dateElement.textContent = dateStr;
+            if (mobileDate) {
+                mobileDate.textContent = dateStr;
+            }
+        }
+    }
+
     async loadUserProfile() {
         try {
             const userDoc = await db.collection('users').doc(this.currentUser.uid).get();
@@ -491,17 +523,7 @@ class Dashboard {
         ]);
         this.setupNotificationListener();
         
-        // Update current date
-        const now = new Date();
-        const dateElement = document.getElementById('current-date');
-        if (dateElement) {
-            dateElement.textContent = now.toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
-        }
+        this.updateGreeting();
     }
 
     setupNotificationListener() {
@@ -685,6 +707,13 @@ class Dashboard {
             document.getElementById('active-habits').textContent = habitsSnapshot.size;
             document.getElementById('completed-today').textContent = todayHabitsSnapshot.size;
 
+            // Update habit progress bar
+            const progressElement = document.getElementById('habits-progress');
+            if (progressElement) {
+                const percent = habitsSnapshot.size > 0 ? (todayHabitsSnapshot.size / habitsSnapshot.size) * 100 : 0;
+                progressElement.style.width = `${percent}%`;
+            }
+
             const moneySavedContainer = document.getElementById('money-saved-container');
             if (totalMoneySaved > 0) {
                 document.getElementById('total-money-saved').textContent = `₹${totalMoneySaved.toFixed(2)}`;
@@ -721,8 +750,12 @@ class Dashboard {
                 .where('date', '>=', startOfMonth)
                 .get();
             
-            document.getElementById('total-memories').textContent = memoriesSnapshot.size;
-            document.getElementById('memories-this-month').textContent = monthMemoriesSnapshot.size;
+            if (document.getElementById('total-memories')) {
+                document.getElementById('total-memories').textContent = memoriesSnapshot.size;
+            }
+            if (document.getElementById('memories-this-month')) {
+                document.getElementById('memories-this-month').textContent = monthMemoriesSnapshot.size;
+            }
             
             // Update Loan Stats
             const loansSnapshot = await db.collection('loans')
@@ -1324,6 +1357,21 @@ class Dashboard {
         }
         
         this.currentSection = section;
+        
+        // Handle Mobile Navigation State & Back Button
+        const body = document.body;
+        const backBtn = document.getElementById('nav-back-btn');
+        
+        if (section === 'dashboard') {
+            body.classList.add('is-dashboard');
+            if (backBtn) backBtn.classList.add('d-none');
+        } else {
+            body.classList.remove('is-dashboard');
+            if (backBtn) {
+                backBtn.classList.remove('d-none');
+                backBtn.onclick = () => this.switchSection('dashboard');
+            }
+        }
     }
 
     async loadSectionContent(section) {
