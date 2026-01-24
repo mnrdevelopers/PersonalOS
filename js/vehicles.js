@@ -477,10 +477,31 @@ window.saveVehicleLog = async function() {
         logData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
         const logRef = await db.collection('vehicle_logs').add(logData);
         
-        // Update Vehicle Odometer (simple logic: update if new log has higher odo)
-        await db.collection('vehicles').doc(vehicleId).update({
+        const vehicleUpdateData = {
             currentOdometer: odometer
-        });
+        };
+
+        // Calculate and update average mileage if applicable
+        if (mileage > 0) {
+            const mileageSnap = await db.collection('vehicle_logs')
+                .where('vehicleId', '==', vehicleId)
+                .where('mileage', '>', 0)
+                .get();
+                
+            let totalM = mileage;
+            let countM = 1;
+            
+            mileageSnap.forEach(doc => {
+                if (doc.id !== logRef.id) {
+                    totalM += doc.data().mileage;
+                    countM++;
+                }
+            });
+            vehicleUpdateData.averageMileage = totalM / countM;
+        }
+
+        // Update Vehicle
+        await db.collection('vehicles').doc(vehicleId).update(vehicleUpdateData);
 
         // Add to Transaction Ledger
         const transactionData = {
@@ -550,37 +571,59 @@ window.loadVehicleStats = async function() {
     let totalCost = 0;
     let fuelCost = 0;
     let serviceCost = 0;
+    const vehicleOdos = {};
 
     logsSnap.forEach(doc => {
         const d = doc.data();
         totalCost += d.cost;
         if (d.type === 'fuel') fuelCost += d.cost;
         else serviceCost += d.cost;
+        
+        // Track min/max odometer per vehicle for distance calc
+        if (!vehicleOdos[d.vehicleId]) {
+            vehicleOdos[d.vehicleId] = { min: d.odometer, max: d.odometer };
+        } else {
+            if (d.odometer < vehicleOdos[d.vehicleId].min) vehicleOdos[d.vehicleId].min = d.odometer;
+            if (d.odometer > vehicleOdos[d.vehicleId].max) vehicleOdos[d.vehicleId].max = d.odometer;
+        }
+    });
+
+    let totalDistance = 0;
+    Object.values(vehicleOdos).forEach(v => {
+        totalDistance += (v.max - v.min);
     });
 
     const container = document.getElementById('vehicle-stats');
     container.innerHTML = `
-        <div class="col-md-4">
+        <div class="col-6 col-md-3">
             <div class="card bg-light border-primary h-100">
-                <div class="card-body text-center">
-                    <h6 class="text-primary">Total Expenses</h6>
-                    <h3>₹${totalCost.toFixed(2)}</h3>
+                <div class="card-body text-center p-2 p-md-3">
+                    <h6 class="text-primary small">Total Expenses</h6>
+                    <h4 class="mb-0">₹${totalCost.toFixed(0)}</h4>
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-6 col-md-3">
             <div class="card bg-light border-warning h-100">
-                <div class="card-body text-center">
-                    <h6 class="text-warning">Fuel Cost</h6>
-                    <h3>₹${fuelCost.toFixed(2)}</h3>
+                <div class="card-body text-center p-2 p-md-3">
+                    <h6 class="text-warning small">Fuel Cost</h6>
+                    <h4 class="mb-0">₹${fuelCost.toFixed(0)}</h4>
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-6 col-md-3">
             <div class="card bg-light border-info h-100">
-                <div class="card-body text-center">
-                    <h6 class="text-info">Maintenance</h6>
-                    <h3>₹${serviceCost.toFixed(2)}</h3>
+                <div class="card-body text-center p-2 p-md-3">
+                    <h6 class="text-info small">Maintenance</h6>
+                    <h4 class="mb-0">₹${serviceCost.toFixed(0)}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card bg-light border-success h-100">
+                <div class="card-body text-center p-2 p-md-3">
+                    <h6 class="text-success small">Total Distance</h6>
+                    <h4 class="mb-0">${totalDistance} km</h4>
                 </div>
             </div>
         </div>
@@ -898,6 +941,7 @@ window.loadVehiclesList = async function() {
                         <div class="mb-2">
                             <small class="text-muted d-block">Registration: <span class="text-dark fw-bold">${d.regNumber || 'N/A'}</span></small>
                             <small class="text-muted d-block">Odometer: <span class="text-dark fw-bold">${d.currentOdometer} km</span></small>
+                            ${d.averageMileage ? `<small class="text-muted d-block">Avg Mileage: <span class="text-success fw-bold">${d.averageMileage.toFixed(1)} km/l</span></small>` : ''}
                         </div>
                     </div>
                 </div>
