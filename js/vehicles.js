@@ -28,6 +28,9 @@ window.loadVehiclesSection = async function() {
                 <a class="nav-link active" href="javascript:void(0)" onclick="switchVehicleTab('logs', this)">Logs & History</a>
             </li>
             <li class="nav-item">
+                <a class="nav-link" href="javascript:void(0)" onclick="switchVehicleTab('schedule', this)">Maintenance Schedule</a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link" href="javascript:void(0)" onclick="switchVehicleTab('alerts', this)">Service Alerts</a>
             </li>
             <li class="nav-item">
@@ -244,6 +247,7 @@ window.switchVehicleTab = function(tab, element) {
     
     if (tab === 'logs') loadVehicleLogs();
     else if (tab === 'alerts') loadServiceAlerts();
+    else if (tab === 'schedule') loadMaintenanceSchedule();
     else loadVehiclesList();
 };
 
@@ -254,18 +258,14 @@ window.showAddVehicleModal = function() {
     modal.show();
 };
 
-window.showAddVehicleLogModal = async function() {
+window.populateLogVehicleSelect = async function() {
     const user = auth.currentUser;
     const snapshot = await db.collection('vehicles').where('userId', '==', user.uid).get();
-    
-    if (snapshot.empty) {
-        alert('Please add a vehicle first.');
-        showAddVehicleModal();
-        return;
-    }
-
     const select = document.getElementById('log-vehicle');
     select.innerHTML = '';
+    
+    if (snapshot.empty) return false;
+
     snapshot.forEach(doc => {
         const v = doc.data();
         const option = document.createElement('option');
@@ -274,6 +274,17 @@ window.showAddVehicleLogModal = async function() {
         option.dataset.odometer = v.currentOdometer || 0;
         select.appendChild(option);
     });
+    return true;
+};
+
+window.showAddVehicleLogModal = async function() {
+    const hasVehicles = await populateLogVehicleSelect();
+    
+    if (!hasVehicles) {
+        alert('Please add a vehicle first.');
+        showAddVehicleModal();
+        return;
+    }
 
     const modal = new bootstrap.Modal(document.getElementById('addVehicleLogModal'));
     document.getElementById('vehicle-log-form').reset();
@@ -385,6 +396,7 @@ window.saveVehicle = async function() {
 
 window.saveVehicleLog = async function() {
     const user = auth.currentUser;
+    const logId = document.getElementById('log-id').value;
     const vehicleId = document.getElementById('log-vehicle').value;
     const type = document.getElementById('log-type').value;
     const date = document.getElementById('log-date').value;
@@ -429,8 +441,7 @@ window.saveVehicleLog = async function() {
 
     const logData = {
         userId: user.uid,
-        vehicleId, type, date, odometer, cost, notes,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        vehicleId, type, date, odometer, cost, notes
     };
 
     if (type === 'fuel') {
@@ -442,33 +453,55 @@ window.saveVehicleLog = async function() {
         logData.serviceType = serviceType;
     }
 
-    const logRef = await db.collection('vehicle_logs').add(logData);
-    
-    // Update Vehicle Odometer
-    await db.collection('vehicles').doc(vehicleId).update({
-        currentOdometer: odometer
-    });
-
-    // Add to Transaction Ledger
     const vehicleName = document.getElementById('log-vehicle').options[document.getElementById('log-vehicle').selectedIndex].text;
-    const transactionData = {
-        userId: user.uid,
-        date: date,
-        amount: cost,
-        type: 'expense',
-        category: type === 'fuel' ? 'Fuel' : 'Vehicle Maintenance',
-        description: `${vehicleName}: ${type.charAt(0).toUpperCase() + type.slice(1)}${notes ? ' - ' + notes : ''}`,
-        paymentMode: paymentMode,
-        relatedId: logRef.id,
-        section: 'vehicles',
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
-    await db.collection('transactions').add(transactionData);
+    const description = `${vehicleName}: ${type.charAt(0).toUpperCase() + type.slice(1)}${notes ? ' - ' + notes : ''}`;
+
+    if (logId) {
+        // Update existing log
+        logData.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+        await db.collection('vehicle_logs').doc(logId).update(logData);
+
+        // Update associated transaction
+        const txSnap = await db.collection('transactions').where('relatedId', '==', logId).get();
+        if (!txSnap.empty) {
+            await txSnap.docs[0].ref.update({
+                date: date,
+                amount: cost,
+                description: description,
+                paymentMode: paymentMode,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+    } else {
+        // Create new log
+        logData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        const logRef = await db.collection('vehicle_logs').add(logData);
+        
+        // Update Vehicle Odometer (simple logic: update if new log has higher odo)
+        await db.collection('vehicles').doc(vehicleId).update({
+            currentOdometer: odometer
+        });
+
+        // Add to Transaction Ledger
+        const transactionData = {
+            userId: user.uid,
+            date: date,
+            amount: cost,
+            type: 'expense',
+            category: type === 'fuel' ? 'Fuel' : 'Vehicle Maintenance',
+            description: description,
+            paymentMode: paymentMode,
+            relatedId: logRef.id,
+            section: 'vehicles',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        await db.collection('transactions').add(transactionData);
+    }
 
     bootstrap.Modal.getInstance(document.getElementById('addVehicleLogModal')).hide();
     loadVehicleStats();
     if (currentVehicleTab === 'logs') loadVehicleLogs();
-    if (window.dashboard) window.dashboard.showNotification('Log added and linked to Ledger!', 'success');
+    if (window.dashboard) window.dashboard.showNotification(logId ? 'Log updated!' : 'Log added and linked to Ledger!', 'success');
 };
 
 window.saveServiceAlert = async function() {
@@ -497,9 +530,16 @@ window.saveServiceAlert = async function() {
 };
 
 window.deleteServiceAlert = async function(id) {
-    if (confirm('Delete this alert?')) {
+    if (!confirm('Delete this alert?')) return;
+    
+    try {
         await db.collection('service_alerts').doc(id).delete();
-        loadServiceAlerts();
+        if (currentVehicleTab === 'alerts') loadServiceAlerts();
+        else if (currentVehicleTab === 'schedule') loadMaintenanceSchedule();
+        if (window.dashboard) window.dashboard.showNotification('Alert deleted', 'success');
+    } catch (error) {
+        console.error("Error deleting alert:", error);
+        if (window.dashboard) window.dashboard.showNotification('Permission error deleting alert', 'danger');
     }
 };
 
@@ -568,7 +608,7 @@ window.loadVehicleLogs = async function() {
         return;
     }
 
-    let html = '<div class="table-responsive"><table class="table table-hover"><thead><tr><th>Date</th><th>Vehicle</th><th>Type</th><th>Odometer</th><th>Cost</th><th>Details</th></tr></thead><tbody>';
+    let html = '<div class="table-responsive"><table class="table table-hover"><thead><tr><th>Date</th><th>Vehicle</th><th>Type</th><th>Odometer</th><th>Cost</th><th>Details</th><th>Actions</th></tr></thead><tbody>';
     
     logsSnap.forEach(doc => {
         const d = doc.data();
@@ -593,6 +633,10 @@ window.loadVehicleLogs = async function() {
                 <td>${d.odometer} km</td>
                 <td class="fw-bold">₹${d.cost.toFixed(2)}</td>
                 <td class="small">${details}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editVehicleLog('${doc.id}')"><i class="fas fa-edit"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteVehicleLog('${doc.id}')"><i class="fas fa-trash"></i></button>
+                </td>
             </tr>
         `;
     });
@@ -669,6 +713,145 @@ window.loadServiceAlerts = async function() {
     container.innerHTML = html;
 };
 
+window.loadMaintenanceSchedule = async function() {
+    const user = auth.currentUser;
+    const container = document.getElementById('vehicles-content');
+    container.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-2">Calculating schedule...</p></div>';
+
+    try {
+        // 1. Fetch Vehicles
+        const vSnap = await db.collection('vehicles').where('userId', '==', user.uid).get();
+        const vehicles = {};
+        vSnap.forEach(d => vehicles[d.id] = d.data());
+
+        // 2. Fetch Alerts
+        const alertsSnap = await db.collection('service_alerts').where('userId', '==', user.uid).get();
+        
+        if (alertsSnap.empty) {
+            container.innerHTML = '<div class="text-center text-muted py-5">No service alerts set. Add alerts to see the schedule.</div>';
+            return;
+        }
+
+        // 3. Calculate Daily Usage for each vehicle
+        const vehicleUsage = {}; // km per day
+        for (const vId of Object.keys(vehicles)) {
+            const logsSnap = await db.collection('vehicle_logs')
+                .where('vehicleId', '==', vId)
+                .orderBy('date', 'asc')
+                .get();
+            
+            if (logsSnap.size >= 2) {
+                const first = logsSnap.docs[0].data();
+                const last = logsSnap.docs[logsSnap.size - 1].data();
+                
+                const daysDiff = (new Date(last.date) - new Date(first.date)) / (1000 * 60 * 60 * 24);
+                const distDiff = last.odometer - first.odometer;
+                
+                if (daysDiff > 0 && distDiff > 0) {
+                    vehicleUsage[vId] = distDiff / daysDiff;
+                } else {
+                    vehicleUsage[vId] = 30; // Default fallback
+                }
+            } else {
+                vehicleUsage[vId] = 30; // Default fallback (approx 900km/month)
+            }
+        }
+
+        // 4. Map Alerts to Dates
+        const events = [];
+        alertsSnap.forEach(doc => {
+            const alert = doc.data();
+            const vehicle = vehicles[alert.vehicleId];
+            if (!vehicle) return;
+
+            const remainingKm = alert.dueOdometer - vehicle.currentOdometer;
+            const dailyKm = vehicleUsage[alert.vehicleId];
+            const daysRemaining = Math.ceil(remainingKm / dailyKm);
+            
+            const estimatedDate = new Date();
+            estimatedDate.setDate(estimatedDate.getDate() + daysRemaining);
+            
+            events.push({
+                id: doc.id,
+                title: alert.title,
+                vehicleName: vehicle.name,
+                date: estimatedDate,
+                remainingKm: remainingKm,
+                status: remainingKm < 0 ? 'overdue' : (remainingKm < 500 ? 'soon' : 'future')
+            });
+        });
+
+        // Sort by date
+        events.sort((a, b) => a.date - b.date);
+
+        // 5. Render Calendar View (List of Months)
+        let html = '<div class="row g-4">';
+        
+        // Group by Month
+        const grouped = {};
+        events.forEach(e => {
+            const key = e.date.toLocaleString('default', { month: 'long', year: 'numeric' });
+            if (!grouped[key]) grouped[key] = [];
+            grouped[key].push(e);
+        });
+
+        if (Object.keys(grouped).length === 0) {
+            html += '<div class="col-12 text-center">No upcoming services predicted.</div>';
+        }
+
+        for (const [month, monthEvents] of Object.entries(grouped)) {
+            html += `
+                <div class="col-md-6 col-lg-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-light fw-bold text-primary">
+                            <i class="fas fa-calendar-alt me-2"></i>${month}
+                        </div>
+                        <div class="list-group list-group-flush">
+            `;
+            
+            monthEvents.forEach(e => {
+                let badgeClass = 'bg-success';
+                let dateText = e.date.getDate();
+                
+                if (e.status === 'overdue') {
+                    badgeClass = 'bg-danger';
+                    dateText = 'Overdue';
+                } else if (e.status === 'soon') {
+                    badgeClass = 'bg-warning text-dark';
+                }
+
+                html += `
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-bold">${e.title}</div>
+                                <small class="text-muted">${e.vehicleName}</small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge ${badgeClass} mb-1">${dateText}</span>
+                                <div style="font-size: 0.7rem;" class="text-muted">${e.remainingKm > 0 ? e.remainingKm + ' km left' : 'Overdue'}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        html += '</div>';
+        container.innerHTML = html;
+
+    } catch (error) {
+        console.error("Error loading schedule:", error);
+        container.innerHTML = '<div class="text-center text-danger py-5">Error loading schedule.</div>';
+    }
+};
+
 window.loadVehiclesList = async function() {
     const user = auth.currentUser;
     const container = document.getElementById('vehicles-content');
@@ -698,7 +881,18 @@ window.loadVehiclesList = async function() {
                                     <small class="text-muted">${d.make} ${d.model}</small>
                                 </div>
                             </div>
-                            <span class="badge bg-secondary">${d.type}</span>
+                            <div class="d-flex flex-column align-items-end">
+                                <span class="badge bg-secondary mb-2">${d.type}</span>
+                                <div class="dropdown">
+                                    <button class="btn btn-link text-muted p-0" data-bs-toggle="dropdown">
+                                        <i class="fas fa-ellipsis-v"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li><a class="dropdown-item" href="javascript:void(0)" onclick="editVehicle('${doc.id}')"><i class="fas fa-edit me-2"></i>Edit</a></li>
+                                        <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="deleteVehicle('${doc.id}')"><i class="fas fa-trash me-2"></i>Delete</a></li>
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
                         <div class="mb-2">
                             <small class="text-muted d-block">Registration: <span class="text-dark fw-bold">${d.regNumber || 'N/A'}</span></small>
@@ -711,4 +905,88 @@ window.loadVehiclesList = async function() {
     });
     html += '</div>';
     container.innerHTML = html;
+};
+
+window.editVehicle = async function(id) {
+    const doc = await db.collection('vehicles').doc(id).get();
+    if (!doc.exists) return;
+    const data = doc.data();
+    
+    document.getElementById('vehicle-id').value = id;
+    document.getElementById('vehicle-name').value = data.name;
+    document.getElementById('vehicle-type').value = data.type;
+    document.getElementById('vehicle-reg').value = data.regNumber || '';
+    document.getElementById('vehicle-make').value = data.make || '';
+    document.getElementById('vehicle-model').value = data.model || '';
+    document.getElementById('vehicle-odometer').value = data.currentOdometer;
+    
+    const modal = new bootstrap.Modal(document.getElementById('addVehicleModal'));
+    modal.show();
+};
+
+window.deleteVehicle = async function(id) {
+    if (!confirm('Delete this vehicle? This will also delete all associated logs and alerts.')) return;
+    
+    const batch = db.batch();
+    
+    // Delete vehicle
+    batch.delete(db.collection('vehicles').doc(id));
+    
+    // Delete logs
+    const logsSnap = await db.collection('vehicle_logs').where('vehicleId', '==', id).get();
+    logsSnap.forEach(doc => batch.delete(doc.ref));
+    
+    // Delete alerts
+    const alertsSnap = await db.collection('service_alerts').where('vehicleId', '==', id).get();
+    alertsSnap.forEach(doc => batch.delete(doc.ref));
+    
+    await batch.commit();
+    
+    if (window.dashboard) window.dashboard.showNotification('Vehicle deleted', 'success');
+    loadVehiclesList();
+    loadVehicleStats();
+};
+
+window.editVehicleLog = async function(id) {
+    await populateLogVehicleSelect();
+    const doc = await db.collection('vehicle_logs').doc(id).get();
+    if (!doc.exists) return;
+    const data = doc.data();
+    
+    // Populate form
+    document.getElementById('log-id').value = id;
+    document.getElementById('log-vehicle').value = data.vehicleId;
+    document.getElementById('log-type').value = data.type;
+    document.getElementById('log-date').value = data.date;
+    document.getElementById('log-odometer').value = data.odometer;
+    document.getElementById('log-cost').value = data.cost;
+    document.getElementById('log-notes').value = data.notes || '';
+    
+    // Trigger change events to show correct fields
+    toggleLogFields();
+    
+    if (data.type === 'fuel') {
+        document.getElementById('log-price-unit').value = data.pricePerUnit || '';
+        document.getElementById('log-quantity').value = data.quantity || '';
+        document.getElementById('log-full-tank').checked = data.fullTank || false;
+    } else if (data.type === 'service' || data.type === 'repair') {
+        document.getElementById('log-service-type').value = data.serviceType || 'Other';
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('addVehicleLogModal'));
+    modal.show();
+};
+
+window.deleteVehicleLog = async function(id) {
+    if (!confirm('Delete this log?')) return;
+    
+    await db.collection('vehicle_logs').doc(id).delete();
+    
+    // Delete associated transaction
+    const txSnap = await db.collection('transactions').where('relatedId', '==', id).get();
+    txSnap.forEach(doc => doc.ref.delete());
+    
+    loadVehicleLogs();
+    loadVehicleStats();
+    if (window.dashboard) window.dashboard.showNotification('Log deleted', 'success');
 };
