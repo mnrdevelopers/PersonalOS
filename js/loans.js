@@ -2,49 +2,53 @@ window.loadLoansSection = async function() {
     const container = document.getElementById('loans-section');
     container.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2>Loans & Debts</h2>
+            <h2 class="fw-bold gradient-text mb-0">Loans & Debts</h2>
             <button class="btn btn-primary" onclick="showAddLoanModal()">
                 <i class="fas fa-plus me-2"></i>Add Loan/Debt
             </button>
         </div>
         
         <!-- Stats Row -->
-        <div class="row g-3 mb-4">
+        <div class="row g-4 mb-5 animate-fade-in">
             <div class="col-6 col-md-3">
-                <div class="card bg-light h-100 border-danger shadow-sm">
-                    <div class="card-body p-3">
-                        <h6 class="card-title text-danger small" id="loan-stat-title-1">Total Borrowed</h6>
-                        <h4 class="mb-0" id="loan-stat-borrowed">₹0.00</h4>
+                <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-danger">
+                    <div class="text-muted small mb-1 fw-medium" id="loan-stat-title-1">Total Borrowed</div>
+                    <div class="d-flex align-items-center justify-content-between">
+                        <h4 class="mb-0 fw-bold text-danger" id="loan-stat-borrowed">₹0</h4>
+                        <i class="fas fa-hand-holding-usd text-danger opacity-25 fa-2x"></i>
                     </div>
                 </div>
             </div>
             <div class="col-6 col-md-3">
-                <div class="card bg-light h-100 border-success shadow-sm">
-                    <div class="card-body p-3">
-                        <h6 class="card-title text-success small" id="loan-stat-title-2">Total Lent</h6>
-                        <h4 class="mb-0" id="loan-stat-lent">₹0.00</h4>
+                <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-success">
+                    <div class="text-muted small mb-1 fw-medium" id="loan-stat-title-2">Total Lent</div>
+                    <div class="d-flex align-items-center justify-content-between">
+                        <h4 class="mb-0 fw-bold text-success" id="loan-stat-lent">₹0</h4>
+                        <i class="fas fa-hand-holding-heart text-success opacity-25 fa-2x"></i>
                     </div>
                 </div>
             </div>
             <div class="col-6 col-md-3">
-                <div class="card bg-light h-100 border-primary shadow-sm">
-                    <div class="card-body p-3">
-                        <h6 class="card-title text-primary small" id="loan-stat-title-3">Net Position</h6>
-                        <h4 class="mb-0" id="loan-stat-net">₹0.00</h4>
+                <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-primary">
+                    <div class="text-muted small mb-1 fw-medium" id="loan-stat-title-3">Net Position</div>
+                    <div class="d-flex align-items-center justify-content-between">
+                        <h4 class="mb-0 fw-bold text-primary" id="loan-stat-net">₹0</h4>
+                        <i class="fas fa-balance-scale text-primary opacity-25 fa-2x"></i>
                     </div>
                 </div>
             </div>
             <div class="col-6 col-md-3">
-                <div class="card bg-light h-100 border-warning shadow-sm">
-                    <div class="card-body p-3">
-                        <h6 class="card-title text-dark small">Monthly EMI</h6>
-                        <h4 class="mb-0" id="loan-stat-emi">₹0.00</h4>
+                <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-warning">
+                    <div class="text-muted small mb-1 fw-medium">Monthly EMI</div>
+                    <div class="d-flex align-items-center justify-content-between">
+                        <h4 class="mb-0 fw-bold text-warning" id="loan-stat-emi">₹0</h4>
+                        <i class="fas fa-calendar-check text-warning opacity-25 fa-2x"></i>
                     </div>
                 </div>
             </div>
         </div>
 
-        <ul class="nav nav-tabs mb-4">
+        <ul class="nav nav-pills mb-4 gap-2">
             <li class="nav-item">
                 <a class="nav-link active" href="javascript:void(0)" onclick="filterLoans('active', this)">Active</a>
             </li>
@@ -469,8 +473,8 @@ window.loadLoansGrid = async function(status = 'active') {
         const col = document.createElement('div');
         col.className = 'col-md-6';
         col.innerHTML = `
-            <div class="card h-100">
-                <div class="card-body">
+            <div class="card h-100 border-0 shadow-sm rounded-4 animate-slide-up">
+                <div class="card-body p-4">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <div>
                             <h5 class="card-title mb-0">${data.name}</h5>
