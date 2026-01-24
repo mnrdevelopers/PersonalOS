@@ -211,6 +211,45 @@ class Dashboard {
         document.getElementById('confirm-logout-btn')?.addEventListener('click', () => {
             this.logout();
         });
+
+        // Add Category from Dropdown
+        const categorySelect = document.getElementById('transaction-category');
+        if (categorySelect) {
+            categorySelect.addEventListener('change', (e) => {
+                if (e.target.value === '__add_new__') {
+                    e.target.value = ''; // Reset selection
+                    
+                    const categoriesModalEl = document.getElementById('categoriesModal');
+                    
+                    if (window.openCategoriesModal && categoriesModalEl) {
+                        // Get Transaction Modal Instance
+                        const transactionModalEl = document.getElementById('addTransactionModal');
+                        const transactionModal = bootstrap.Modal.getInstance(transactionModalEl);
+                        
+                        // Hide Transaction Modal temporarily
+                        if (transactionModal) transactionModal.hide();
+
+                        const type = document.querySelector('input[name="transaction-type"]:checked')?.value || 'expense';
+                        window.openCategoriesModal();
+                        
+                        // Switch to correct tab in categories modal
+                        setTimeout(() => {
+                            const tabLink = document.querySelector(`#categoriesModal .nav-link[onclick*="'${type}'"]`);
+                            if (tabLink) tabLink.click();
+                        }, 200);
+
+                        // Re-open Transaction Modal when Categories Modal is closed
+                        const handleHidden = () => {
+                            if (transactionModal) transactionModal.show();
+                            categoriesModalEl.removeEventListener('hidden.bs.modal', handleHidden);
+                        };
+                        categoriesModalEl.addEventListener('hidden.bs.modal', handleHidden);
+                    } else {
+                        alert("Please visit the Finance section first to initialize categories.");
+                    }
+                }
+            });
+        }
     }
 
     initCalculator() {
@@ -1481,6 +1520,19 @@ class Dashboard {
             if (!select) return;
             
             select.innerHTML = '';
+
+            // Add "Add New" option
+            const addNewOption = document.createElement('option');
+            addNewOption.value = '__add_new__';
+            addNewOption.textContent = '+ Add New Category';
+            addNewOption.className = 'fw-bold text-primary';
+            select.appendChild(addNewOption);
+
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = 'Select Category';
+            defaultOption.selected = true;
+            select.appendChild(defaultOption);
             
             // Add income categories
             if (!incomeSnapshot.empty) {
