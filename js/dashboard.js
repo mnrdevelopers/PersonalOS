@@ -1255,6 +1255,9 @@ class Dashboard {
             case 'expiry':
                 if (window.loadExpirySection) await window.loadExpirySection();
                 break;
+            case 'vehicles':
+                if (window.loadVehiclesSection) await window.loadVehiclesSection();
+                break;
         }
     }
 
