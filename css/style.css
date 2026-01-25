@@ -979,15 +979,23 @@ body {
     }
 
     .mobile-quick-nav {
-        display: flex;
-        gap: 15px;
-        padding: 0 25px;
-        margin-top: -50px;
-        position: relative;
-        z-index: 10;
-        overflow-x: auto;
-        padding-bottom: 10px;
-        scrollbar-width: none;
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 6px;
+        padding: 10px;
+        margin-top: -60px;
+        position: sticky;
+        top: 15px;
+        z-index: 100;
+        overflow-x: visible;
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-radius: 16px;
+        margin-left: 10px;
+        margin-right: 10px;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        border: 1px solid rgba(255,255,255,0.4);
     }
     
     .mobile-quick-nav::-webkit-scrollbar {
@@ -995,32 +1003,64 @@ body {
     }
 
     .nav-card {
-        min-width: 85px;
-        background: var(--card-bg);
-        border-radius: 24px;
-        padding: 15px 10px;
+        min-width: 0;
+        width: 100%;
+        background: transparent;
+        border-radius: 12px;
+        padding: 8px 2px;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.08);
-        border: 1px solid rgba(255,255,255,0.1);
-        transition: transform 0.2s;
+        box-shadow: none;
+        border: none;
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        cursor: pointer;
     }
     
+    .nav-card:hover {
+        transform: translateY(-5px);
+        background: rgba(255, 255, 255, 0.5);
+    }
+
     .nav-card:active {
-        transform: scale(0.95);
+        transform: scale(0.90);
     }
 
     .icon-circle {
-        width: 45px;
-        height: 45px;
+        width: 36px;
+        height: 36px;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.2rem;
-        margin-bottom: 8px;
+        font-size: 1.1rem;
+        margin-bottom: 4px;
+        transition: transform 0.3s ease;
+    }
+
+    .nav-card:hover .icon-circle {
+        transform: rotate(15deg) scale(1.1);
+    }
+
+    @keyframes slideDownFade {
+        from { opacity: 0; transform: translateY(-15px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .animate-nav-item {
+        animation: slideDownFade 0.5s ease forwards;
+        opacity: 0;
+    }
+
+    .nav-card span, .nav-card div:not(.icon-circle) {
+        font-size: 0.6rem;
+        line-height: 1.1;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
     }
     
     /* Adjust stats container padding on mobile */
@@ -1065,4 +1105,90 @@ body {
 .table tbody td {
     padding: 20px;
     vertical-align: middle;
+}
+
+/* Mobile Compact Optimizations */
+@media (max-width: 768px) {
+    /* Compact Section Headers */
+    .section-header, 
+    .d-flex.justify-content-between.align-items-center.mb-4,
+    .d-flex.justify-content-between.align-items-center.mb-3 {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 10px;
+        margin-bottom: 15px !important;
+    }
+
+    /* Scrollable button container for mobile */
+    .section-header > div,
+    .d-flex.justify-content-between.align-items-center.mb-4 > div,
+    .d-flex.justify-content-between.align-items-center.mb-3 > div {
+        width: 100%;
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding-bottom: 5px;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Hide scrollbar */
+    .section-header > div::-webkit-scrollbar,
+    .d-flex.justify-content-between.align-items-center.mb-4 > div::-webkit-scrollbar,
+    .d-flex.justify-content-between.align-items-center.mb-3 > div::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* Compact Buttons */
+    .btn {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+        white-space: nowrap;
+    }
+    
+    /* Compact Stats Cards */
+    .stat-mini-card {
+        padding: 10px !important;
+    }
+    
+    .stat-mini-card h4 {
+        font-size: 1rem !important;
+    }
+    
+    .stat-mini-card .text-muted {
+        font-size: 0.7rem !important;
+    }
+    
+    .stat-mini-card i {
+        font-size: 1.2rem !important;
+    }
+
+    /* Finance Premium Cards Compact */
+    .premium-card-income .card-body,
+    .premium-card-expense .card-body,
+    .premium-card-balance .card-body {
+        padding: 15px !important;
+    }
+    
+    .display-6 {
+        font-size: 1.5rem !important;
+        font-weight: 700 !important;
+    }
+    
+    .icon-box {
+        padding: 8px !important;
+    }
+    
+    .icon-box i {
+        font-size: 1rem !important;
+    }
+
+    /* Reduce grid gaps on mobile */
+    .row.g-4 {
+        --bs-gutter-y: 0.5rem;
+        --bs-gutter-x: 0.5rem;
+    }
+    
+    h2 {
+        font-size: 1.5rem;
+    }
 }
