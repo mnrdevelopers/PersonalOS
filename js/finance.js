@@ -11,13 +11,13 @@ window.loadFinanceSection = async function() {
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h2 class="fw-bold gradient-text mb-0">Income & Expenses</h2>
             <div>
-                <button class="btn btn-outline-danger me-2" onclick="exportFinancePDF()">
+                <button class="btn btn-sm btn-outline-danger me-2" onclick="exportFinancePDF()">
                     <i class="fas fa-file-pdf me-2"></i>Export PDF
                 </button>
-                <button class="btn btn-outline-success me-2" onclick="exportFinanceCSV()">
+                <button class="btn btn-sm btn-outline-success me-2" onclick="exportFinanceCSV()">
                     <i class="fas fa-file-csv me-2"></i>Export CSV
                 </button>
-                <button class="btn btn-outline-primary" onclick="openCategoriesModal()">
+                <button class="btn btn-sm btn-outline-primary" onclick="openCategoriesModal()">
                     <i class="fas fa-tags me-2"></i>Categories
                 </button>
             </div>
