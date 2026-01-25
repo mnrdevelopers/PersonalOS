@@ -94,10 +94,23 @@ window.loadLoansSection = async function() {
                                     <input type="number" class="form-control" id="loan-amount" step="0.01" min="0" required>
                                 </div>
                             </div>
-                            <div id="lent-specific-fields" class="d-none bg-light p-3 rounded mb-3 border">
+                            <div id="contact-fields" class="d-none bg-light p-3 rounded mb-3 border">
                                 <div class="mb-3">
-                                    <label class="form-label">Borrower Mobile Number</label>
-                                    <input type="tel" class="form-control" id="loan-mobile" placeholder="e.g. 919876543210">
+                                    <label class="form-label" id="label-contact-info">Borrower Mobile Number</label>
+                                    <div class="input-group">
+                                        <select class="form-select" id="loan-country-code" style="max-width: 110px;">
+                                            <option value="91" selected>🇮🇳 +91</option>
+                                            <option value="1">🇺🇸 +1</option>
+                                            <option value="44">🇬🇧 +44</option>
+                                            <option value="971">🇦🇪 +971</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                        <input type="text" class="form-control" id="loan-mobile" placeholder="Number / UPI ID">
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">UPI ID (for payments)</label>
+                                    <input type="text" class="form-control" id="loan-upi-id" placeholder="e.g. username@bank">
                                 </div>
                                 <div class="mb-3 mb-0">
                                     <label class="form-label">Reminder Context (Message)</label>
@@ -163,6 +176,12 @@ window.loadLoansSection = async function() {
                     <div class="modal-body">
                         <form id="repayment-form">
                             <input type="hidden" id="repay-loan-id">
+                            <div id="upi-pay-container" class="d-none mb-3">
+                                <button type="button" class="btn btn-success w-100 py-2" onclick="triggerUpiPayment()">
+                                    <i class="fas fa-mobile-alt me-2"></i> Pay via UPI
+                                </button>
+                                <div class="form-text text-center small mt-1">Opens UPI app with amount pre-filled</div>
+                            </div>
                             <div class="mb-3">
                                 <label class="form-label">Amount</label>
                                 <div class="input-group">
@@ -264,7 +283,8 @@ window.updateLoanModalUI = function(type) {
     const ledgerCheck = document.getElementById('loan-link-ledger');
     const ledgerLabel = document.getElementById('label-link-ledger');
     const emiInput = document.getElementById('loan-emi');
-    const lentFields = document.getElementById('lent-specific-fields');
+    const contactFields = document.getElementById('contact-fields');
+    const contactLabel = document.getElementById('label-contact-info');
     
     if (type === 'emi') {
         if(nameLabel) nameLabel.textContent = 'Product Name / Financier';
@@ -274,7 +294,7 @@ window.updateLoanModalUI = function(type) {
         }
         if(ledgerLabel) ledgerLabel.textContent = 'Link to Ledger (Disabled for EMI creation)';
         if(emiInput) emiInput.placeholder = 'Required';
-        if(lentFields) lentFields.classList.add('d-none');
+        if(contactFields) contactFields.classList.add('d-none');
     } else {
         if(nameLabel) nameLabel.textContent = 'Person / Institution Name';
         if(ledgerCheck) {
@@ -284,10 +304,14 @@ window.updateLoanModalUI = function(type) {
         if(ledgerLabel) ledgerLabel.textContent = 'Add record to Transaction Ledger';
         if(emiInput) emiInput.placeholder = 'Optional';
         
-        if (type === 'lent') {
-            if(lentFields) lentFields.classList.remove('d-none');
+        if (type === 'lent' || type === 'borrowed') {
+            if(contactFields) contactFields.classList.remove('d-none');
+            if(contactLabel) {
+                contactLabel.textContent = type === 'lent' ? 'Borrower Mobile Number' : 'Lender UPI ID / Mobile';
+                contactLabel.textContent = type === 'lent' ? 'Borrower Mobile Number' : 'Lender Mobile Number';
+            }
         } else {
-            if(lentFields) lentFields.classList.add('d-none');
+            if(contactFields) contactFields.classList.add('d-none');
         }
     }
 };
@@ -298,6 +322,8 @@ window.showAddLoanModal = function() {
     document.getElementById('loan-id').value = '';
     document.getElementById('loan-start-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('loan-mobile').value = '';
+    document.getElementById('loan-country-code').value = '91';
+    document.getElementById('loan-upi-id').value = '';
     document.getElementById('loan-message-context').value = '';
     
     // Reset UI
@@ -324,7 +350,9 @@ window.saveLoan = async function() {
     const emi = parseFloat(document.getElementById('loan-emi').value) || 0;
     const linkLedger = document.getElementById('loan-link-ledger').checked;
     const paymentMode = document.getElementById('loan-payment-mode').value;
-    const mobile = document.getElementById('loan-mobile').value;
+    const countryCode = document.getElementById('loan-country-code').value;
+    const mobileInput = document.getElementById('loan-mobile').value;
+    const upiId = document.getElementById('loan-upi-id').value.trim();
     const messageContext = document.getElementById('loan-message-context').value;
     const user = auth.currentUser;
 
@@ -338,13 +366,25 @@ window.saveLoan = async function() {
         return;
     }
 
+    let fullMobile = '';
+    if (mobileInput) {
+        const cleanInput = mobileInput.trim(); // Don't strip non-digits yet as it might be a UPI ID (e.g. name@okicici)
+        if (countryCode === 'other') {
+            fullMobile = cleanInput;
+        } else {
+            // Prevent double code if user typed it
+            fullMobile = cleanInput.startsWith(countryCode) ? cleanInput : (countryCode + cleanInput);
+        }
+    }
+
     try {
         const loan = {
             userId: user.uid,
             type, name, totalAmount: amount, paidAmount: 0,
             startDate, dueDate, interestRate: interest, emiAmount: emi,
-            mobile: mobile || '',
+            mobile: fullMobile,
             messageContext: messageContext || '',
+            upiId: upiId || '',
             status: 'active',
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
@@ -360,7 +400,8 @@ window.saveLoan = async function() {
                 interestRate: interest, 
                 emiAmount: emi, 
                 type,
-                mobile: mobile || '',
+                mobile: fullMobile,
+                upiId: upiId || '',
                 messageContext: messageContext || ''
             });
 
@@ -568,7 +609,23 @@ window.editLoan = async function(id) {
         document.getElementById('loan-due-date').value = data.dueDate || '';
         document.getElementById('loan-interest').value = data.interestRate || '';
         document.getElementById('loan-emi').value = data.emiAmount || '';
-        document.getElementById('loan-mobile').value = data.mobile || '';
+        
+        // Handle Mobile Number Split
+        const mobile = data.mobile || '';
+        const codes = ['91', '1', '44', '971'];
+        let selectedCode = 'other';
+        let displayNum = mobile;
+        for (const c of codes) {
+            if (mobile.startsWith(c)) {
+                selectedCode = c;
+                displayNum = mobile.substring(c.length);
+                break;
+            }
+        }
+        document.getElementById('loan-country-code').value = selectedCode;
+        document.getElementById('loan-mobile').value = displayNum;
+        document.getElementById('loan-upi-id').value = data.upiId || '';
+        
         document.getElementById('loan-message-context').value = data.messageContext || '';
         
         // Set radio button
@@ -639,11 +696,28 @@ window.deleteLoan = async function(id) {
     }
 };
 
-window.showRepaymentModal = function(loanId) {
+window.showRepaymentModal = async function(loanId) {
     const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('repaymentModal'));
     document.getElementById('repayment-form').reset();
     document.getElementById('repay-loan-id').value = loanId;
     document.getElementById('repay-date').value = new Date().toISOString().split('T')[0];
+    
+    // Check if we should show UPI button
+    const upiContainer = document.getElementById('upi-pay-container');
+    if (upiContainer) {
+        upiContainer.classList.add('d-none'); // Hide by default
+        try {
+            const doc = await db.collection('loans').doc(loanId).get();
+            if (doc.exists) {
+                const data = doc.data();
+                // Show if it's a liability (borrowed) and has contact info
+                if (data.type === 'borrowed' && data.mobile) {
+                    upiContainer.classList.remove('d-none');
+                }
+            }
+        } catch (e) { console.error(e); }
+    }
+    
     modal.show();
 };
 
@@ -912,9 +986,55 @@ window.sendWhatsAppReminder = async function(id) {
         // Remove non-numeric chars from mobile for link
         const cleanMobile = mobile.replace(/\D/g, '');
         
-        window.open(`https://wa.me/${cleanMobile}?text=${encodedMsg}`, '_blank');
+        window.open(`https://api.whatsapp.com/send?phone=${cleanMobile}&text=${encodedMsg}`, '_blank');
         
     } catch(e) {
         console.error("Error sending reminder:", e);
+    }
+};
+
+window.triggerUpiPayment = async function() {
+    const loanId = document.getElementById('repay-loan-id').value;
+    const amount = document.getElementById('repay-amount').value;
+    
+    if (!amount || parseFloat(amount) <= 0) {
+        alert('Please enter a valid amount first.');
+        return;
+    }
+
+    try {
+        const doc = await db.collection('loans').doc(loanId).get();
+        if (!doc.exists) return;
+        const data = doc.data();
+        
+        let payeeAddress = data.mobile;
+        // If it looks like a plain number, try to make it a UPI ID or just pass it (some apps handle it)
+        // But standard UPI intent needs a VPA. 
+        // If user entered just a number, we can't reliably guess VPA. 
+        // However, many users might enter "9876543210@ybl".
+        // If no '@' is present, we assume it's a raw number. 
+        // Note: 'upi://pay' with just a phone number in 'pa' param is not standard but we pass it.
+        // Prioritize dedicated UPI ID, fallback to mobile if it looks like a VPA (contains @)
+        let payeeAddress = data.upiId;
+        if (!payeeAddress && data.mobile && data.mobile.includes('@')) {
+            payeeAddress = data.mobile;
+        } else if (!payeeAddress && data.mobile) {
+            payeeAddress = data.mobile; // Fallback, though less reliable for UPI intent
+        }
+        
+        const payeeName = encodeURIComponent(data.name);
+        const note = encodeURIComponent(`Repayment for ${data.name}`);
+        
+        const upiUrl = `upi://pay?pa=${payeeAddress}&pn=${payeeName}&am=${amount}&cu=INR&tn=${note}`;
+        
+        window.location.href = upiUrl;
+        
+        setTimeout(() => {
+            alert("Please click 'Save Repayment' below once the transaction is successful.");
+        }, 1000);
+        
+    } catch (e) {
+        console.error("Error triggering UPI:", e);
+        alert("Could not trigger UPI app.");
     }
 };
