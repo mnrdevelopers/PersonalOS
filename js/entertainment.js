@@ -3,8 +3,7 @@ window.loadEntertainmentSection = async function() {
     container.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2>Entertainment Tracker</h2>
-            <button class="btn btn-primary" onclick="showAddEntertainmentModal()">
-                <i class="fas fa-plus me-2"></i>Add Activity
+            <button class="btn btn-us me-2"></i>Add Activity
             </button>
         </div>
         
