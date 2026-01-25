@@ -174,6 +174,20 @@ async function loadReportCharts() {
     const memoryData = sortedKeys.map(k => memoriesByMonth[k]);
 
     // --- Render Charts ---
+    const isMobile = window.innerWidth < 768;
+    const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                labels: {
+                    boxWidth: isMobile ? 12 : 40,
+                    font: { size: isMobile ? 10 : 12 }
+                }
+            }
+        }
+    };
+
     // Finance: Income vs Expense
     const ctx1 = document.getElementById('incomeExpenseChart').getContext('2d');
     new Chart(ctx1, {
@@ -185,7 +199,25 @@ async function loadReportCharts() {
                 { label: 'Expense', data: expenseByMonth, backgroundColor: 'rgba(247, 37, 133, 0.7)' }
             ]
         },
-        options: { responsive: true }
+        options: { 
+            ...commonOptions,
+            scales: {
+                x: {
+                    ticks: {
+                        font: { size: isMobile ? 9 : 12 }
+                    }
+                },
+                y: {
+                    ticks: {
+                        font: { size: isMobile ? 9 : 12 },
+                        callback: function(value) {
+                            if (isMobile && value >= 1000) return (value/1000).toFixed(0) + 'k';
+                            return value;
+                        }
+                    }
+                }
+            }
+        }
     });
 
     // Finance: Expense Breakdown
@@ -201,7 +233,7 @@ async function loadReportCharts() {
                 ]
             }]
         },
-        options: { responsive: true }
+        options: commonOptions
     });
 
     // Habits: Streaks
@@ -217,7 +249,17 @@ async function loadReportCharts() {
                 borderWidth: 1
             }]
         },
-        options: { responsive: true, scales: { y: { beginAtZero: true } } }
+        options: { 
+            ...commonOptions,
+            scales: { 
+                y: { beginAtZero: true },
+                x: {
+                    ticks: {
+                        font: { size: isMobile ? 9 : 12 }
+                    }
+                }
+            } 
+        }
     });
 
     // Tasks: Priority
@@ -230,7 +272,7 @@ async function loadReportCharts() {
                 backgroundColor: ['#4cc9f0', '#ff9e00', '#ef476f']
             }]
         },
-        options: { responsive: true }
+        options: commonOptions
     });
 
     // Goals: Progress
@@ -245,7 +287,17 @@ async function loadReportCharts() {
                 backgroundColor: 'rgba(67, 97, 238, 0.7)'
             }]
         },
-        options: { responsive: true, scales: { x: { min: 0, max: 100 } } }
+        options: { 
+            ...commonOptions,
+            scales: { 
+                x: { min: 0, max: 100 },
+                y: {
+                    ticks: {
+                        font: { size: isMobile ? 9 : 12 }
+                    }
+                }
+            } 
+        }
     });
 
     // Entertainment: Cost
@@ -258,7 +310,7 @@ async function loadReportCharts() {
                 backgroundColor: ['#7209b7', '#3a0ca3', '#b5179e']
             }]
         },
-        options: { responsive: true }
+        options: commonOptions
     });
 
     // Memories: Timeline
@@ -275,6 +327,16 @@ async function loadReportCharts() {
                 backgroundColor: 'rgba(247, 37, 133, 0.1)'
             }]
         },
-        options: { responsive: true, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+        options: { 
+            ...commonOptions,
+            scales: { 
+                y: { beginAtZero: true, ticks: { stepSize: 1 } },
+                x: {
+                    ticks: {
+                        font: { size: isMobile ? 9 : 12 }
+                    }
+                }
+            } 
+        }
     });
 }
