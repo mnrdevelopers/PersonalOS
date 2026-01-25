@@ -5,13 +5,13 @@ window.loadVehiclesSection = async function() {
     container.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2 >
-                <button class="btn btn-outline-primary me-2" onclick="showAddVehicleModal()">
+                <button class="btn btn-sm btn-outline-primary me-2" onclick="showAddVehicleModal()">
                     <i class="fas fa-car me-2"></i>Add Vehicle
                 </button>
-                <button class="btn btn-primary" onclick="showAddVehicleLogModal()">
+                <button class="btn btn-sm btn-primary" onclick="showAddVehicleLogModal()">
                     <i class="fas fa-plus me-2"></i>Add Log
                 </button>
-                <button class="btn btn-outline-warning ms-2" onclick="showAddServiceAlertModal()">
+                <button class="btn btn-sm btn-outline-warning ms-2" onclick="showAddServiceAlertModal()">
                     <i class="fas fa-bell me-2"></i>Set Alert
                 </button>
             </div>
