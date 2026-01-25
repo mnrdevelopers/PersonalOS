@@ -856,6 +856,7 @@ body {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    margin-top: 20px;
 }
 
 .premium-card-1 {
@@ -1190,5 +1191,6 @@ body {
     
     h2 {
         font-size: 1.5rem;
+        margin-top: 20px;
     }
 }
