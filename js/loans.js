@@ -3,7 +3,7 @@ window.loadLoansSection = async function() {
     container.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2 class="fw-bold gradient-text mb-0">Loans & Debts</h2>
-            <button class="btn btn-primary" onclick="showAddLoanModal()">
+            <button class="btn btn-sm btn-primary" onclick="showAddLoanModal()">
                 <i class="fas fa-plus me-2"></i>Add Loan/Debt
             </button>
         </div>
@@ -92,6 +92,17 @@ window.loadLoansSection = async function() {
                                 <div class="input-group">
                                     <span class="input-group-text">₹</span>
                                     <input type="number" class="form-control" id="loan-amount" step="0.01" min="0" required>
+                                </div>
+                            </div>
+                            <div id="lent-specific-fields" class="d-none bg-light p-3 rounded mb-3 border">
+                                <div class="mb-3">
+                                    <label class="form-label">Borrower Mobile Number</label>
+                                    <input type="tel" class="form-control" id="loan-mobile" placeholder="e.g. 919876543210">
+                                </div>
+                                <div class="mb-3 mb-0">
+                                    <label class="form-label">Reminder Context (Message)</label>
+                                    <input type="text" class="form-control" id="loan-message-context" placeholder="e.g. Tatkal, Hand Loan">
+                                    <div class="form-text small">Used in WhatsApp: "Your [Context] payment..."</div>
                                 </div>
                             </div>
                             <div class="row">
@@ -253,6 +264,7 @@ window.updateLoanModalUI = function(type) {
     const ledgerCheck = document.getElementById('loan-link-ledger');
     const ledgerLabel = document.getElementById('label-link-ledger');
     const emiInput = document.getElementById('loan-emi');
+    const lentFields = document.getElementById('lent-specific-fields');
     
     if (type === 'emi') {
         if(nameLabel) nameLabel.textContent = 'Product Name / Financier';
@@ -262,6 +274,7 @@ window.updateLoanModalUI = function(type) {
         }
         if(ledgerLabel) ledgerLabel.textContent = 'Link to Ledger (Disabled for EMI creation)';
         if(emiInput) emiInput.placeholder = 'Required';
+        if(lentFields) lentFields.classList.add('d-none');
     } else {
         if(nameLabel) nameLabel.textContent = 'Person / Institution Name';
         if(ledgerCheck) {
@@ -270,6 +283,12 @@ window.updateLoanModalUI = function(type) {
         }
         if(ledgerLabel) ledgerLabel.textContent = 'Add record to Transaction Ledger';
         if(emiInput) emiInput.placeholder = 'Optional';
+        
+        if (type === 'lent') {
+            if(lentFields) lentFields.classList.remove('d-none');
+        } else {
+            if(lentFields) lentFields.classList.add('d-none');
+        }
     }
 };
 
@@ -278,6 +297,8 @@ window.showAddLoanModal = function() {
     document.getElementById('loan-form').reset();
     document.getElementById('loan-id').value = '';
     document.getElementById('loan-start-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('loan-mobile').value = '';
+    document.getElementById('loan-message-context').value = '';
     
     // Reset UI
     document.getElementById('type-borrowed').checked = true;
@@ -303,6 +324,8 @@ window.saveLoan = async function() {
     const emi = parseFloat(document.getElementById('loan-emi').value) || 0;
     const linkLedger = document.getElementById('loan-link-ledger').checked;
     const paymentMode = document.getElementById('loan-payment-mode').value;
+    const mobile = document.getElementById('loan-mobile').value;
+    const messageContext = document.getElementById('loan-message-context').value;
     const user = auth.currentUser;
 
     if (!name || !amount || !startDate) {
@@ -320,6 +343,8 @@ window.saveLoan = async function() {
             userId: user.uid,
             type, name, totalAmount: amount, paidAmount: 0,
             startDate, dueDate, interestRate: interest, emiAmount: emi,
+            mobile: mobile || '',
+            messageContext: messageContext || '',
             status: 'active',
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
@@ -334,7 +359,9 @@ window.saveLoan = async function() {
                 dueDate, 
                 interestRate: interest, 
                 emiAmount: emi, 
-                type 
+                type,
+                mobile: mobile || '',
+                messageContext: messageContext || ''
             });
 
             // Update associated transaction
@@ -439,6 +466,7 @@ window.loadLoansGrid = async function(status = 'active') {
         if (data.type === 'lent') typeBadge = '<span class="badge bg-success">Asset</span>';
         else if (data.type === 'emi') typeBadge = '<span class="badge bg-warning text-dark">Product EMI</span>';
         
+        const remainingAmount = data.totalAmount - data.paidAmount;
         const isFullyPaid = data.paidAmount >= data.totalAmount;
         
         let emiSection = '';
@@ -470,6 +498,14 @@ window.loadLoansGrid = async function(status = 'active') {
             `;
         }
 
+        let whatsappBtn = '';
+        if (data.type === 'lent' && !isFullyPaid) {
+            whatsappBtn = `
+                <button class="btn btn-sm btn-success me-1" onclick="sendWhatsAppReminder('${doc.id}')" title="Send WhatsApp Reminder">
+                    <i class="fab fa-whatsapp"></i> Remind
+                </button>`;
+        }
+
         const col = document.createElement('div');
         col.className = 'col-md-6';
         col.innerHTML = `
@@ -492,7 +528,7 @@ window.loadLoansGrid = async function(status = 'active') {
                         </div>
                     </div>
                     <div class="mb-3">
-                        <h3 class="mb-0">₹${(data.totalAmount - data.paidAmount).toFixed(2)}</h3>
+                        <h3 class="mb-0">₹${remainingAmount.toFixed(2)}</h3>
                         <small class="text-muted">Remaining of ₹${data.totalAmount.toFixed(2)}</small>
                     </div>
                     <div class="progress mb-2" style="height: 8px;">
@@ -507,6 +543,7 @@ window.loadLoansGrid = async function(status = 'active') {
                     
                     ${!isFullyPaid ? `
                     <div class="mt-3 text-end">
+                        ${whatsappBtn}
                         <button class="btn btn-sm btn-outline-primary" onclick="showRepaymentModal('${doc.id}')">
                             <i class="fas fa-plus-circle me-1"></i>Record Payment
                         </button>
@@ -531,6 +568,8 @@ window.editLoan = async function(id) {
         document.getElementById('loan-due-date').value = data.dueDate || '';
         document.getElementById('loan-interest').value = data.interestRate || '';
         document.getElementById('loan-emi').value = data.emiAmount || '';
+        document.getElementById('loan-mobile').value = data.mobile || '';
+        document.getElementById('loan-message-context').value = data.messageContext || '';
         
         // Set radio button
         const typeRadio = document.querySelector(`input[name="loan-type"][value="${data.type}"]`);
@@ -848,5 +887,34 @@ window.deleteRepayment = async function(loanId, repaymentId) {
     } catch (error) {
         console.error("Error deleting repayment:", error);
         if(window.dashboard) window.dashboard.showNotification('Error deleting repayment.', 'danger');
+    }
+};
+
+window.sendWhatsAppReminder = async function(id) {
+    try {
+        const doc = await db.collection('loans').doc(id).get();
+        if (!doc.exists) return;
+        const data = doc.data();
+        
+        const remaining = data.totalAmount - (data.paidAmount || 0);
+        const context = data.messageContext ? data.messageContext : 'outstanding';
+        const mobile = data.mobile;
+        
+        if (!mobile) {
+            alert('No mobile number saved for this loan. Please edit the loan to add a number.');
+            return;
+        }
+
+        // Professional message format
+        const message = `Hi ${data.name}, your ${context} payment of ₹${remaining.toFixed(2)} is due. Please pay the amount at your earliest convenience. Thank you.`;
+        const encodedMsg = encodeURIComponent(message);
+        
+        // Remove non-numeric chars from mobile for link
+        const cleanMobile = mobile.replace(/\D/g, '');
+        
+        window.open(`https://wa.me/${cleanMobile}?text=${encodedMsg}`, '_blank');
+        
+    } catch(e) {
+        console.error("Error sending reminder:", e);
     }
 };
