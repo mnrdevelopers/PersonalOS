@@ -12,6 +12,7 @@ class Dashboard {
         this.updateTime();
         this.updateGreeting();
         this.loadUserProfile();
+        this.fixMobileScrolling();
         
         const hashSection = window.location.hash.substring(1);
         if (hashSection && document.getElementById(`${hashSection}-section`)) {
@@ -417,6 +418,22 @@ class Dashboard {
                 updateDisplay();
             });
         });
+    }
+
+    fixMobileScrolling() {
+        // Fix for Android PWA scrolling issues
+        const style = document.createElement('style');
+        style.textContent = `
+            @media (max-width: 991px) {
+                body:not(.sidebar-open):not(.modal-open) {
+                    overflow-y: auto !important;
+                    height: auto !important;
+                    min-height: 100vh !important;
+                    -webkit-overflow-scrolling: touch;
+                }
+            }
+        `;
+        document.head.appendChild(style);
     }
 
     hideLoading() {
