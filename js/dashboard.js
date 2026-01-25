@@ -8,6 +8,7 @@ class Dashboard {
 
     async init() {
         await this.checkAuth();
+        this.renderMobileNav();
         this.bindEvents();
         this.updateTime();
         this.updateGreeting();
@@ -417,6 +418,35 @@ class Dashboard {
                 updateDisplay();
             });
         });
+    }
+
+    renderMobileNav() {
+        const navContainer = document.querySelector('.mobile-quick-nav');
+        if (!navContainer) return;
+
+        const navItems = [
+            { id: 'finance', icon: 'fa-wallet', label: 'Finance', color: '#4361ee' },
+            { id: 'loans', icon: 'fa-hand-holding-usd', label: 'Loans', color: '#f72585' },
+            { id: 'habits', icon: 'fa-check-circle', label: 'Habits', color: '#4cc9f0' },
+            { id: 'reminders', icon: 'fa-tasks', label: 'Tasks', color: '#7209b7' },
+            { id: 'memories', icon: 'fa-images', label: 'Memory', color: '#f8961e' },
+            { id: 'goals', icon: 'fa-bullseye', label: 'Goals', color: '#f94144' },
+            { id: 'entertainment', icon: 'fa-film', label: 'Fun', color: '#90be6d' },
+            { id: 'vehicles', icon: 'fa-car', label: 'Auto', color: '#577590' },
+            { id: 'expiry', icon: 'fa-hourglass-half', label: 'Expiry', color: '#f3722c' },
+            { id: 'reports', icon: 'fa-chart-bar', label: 'Stats', color: '#277da1' },
+            { id: 'profile', icon: 'fa-user', label: 'Profile', color: '#4d908e' },
+            { id: 'settings', icon: 'fa-cog', label: 'Config', color: '#6c757d' }
+        ];
+
+        navContainer.innerHTML = navItems.map((item, index) => `
+            <div class="nav-card animate-nav-item" style="animation-delay: ${index * 0.05}s" data-section="${item.id}">
+                <div class="icon-circle" style="background-color: ${item.color}20; color: ${item.color}; box-shadow: 0 4px 10px ${item.color}30;">
+                    <i class="fas ${item.icon}"></i>
+                </div>
+                <span style="color: ${item.color}; font-weight: 600;">${item.label}</span>
+            </div>
+        `).join('');
     }
 
     hideLoading() {
@@ -1290,6 +1320,8 @@ class Dashboard {
                 this.financeChart.destroy();
             }
             
+            const isMobile = window.innerWidth < 768;
+
             this.financeChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
@@ -1300,14 +1332,18 @@ class Dashboard {
                             data: incomeValues,
                             backgroundColor: 'rgba(6, 214, 160, 0.7)',
                             borderColor: 'rgba(6, 214, 160, 1)',
-                            borderWidth: 1
+                            borderWidth: 1,
+                            barPercentage: isMobile ? 0.7 : 0.9,
+                            categoryPercentage: isMobile ? 0.8 : 0.9
                         },
                         {
                             label: 'Expense',
                             data: expenseValues,
                             backgroundColor: 'rgba(239, 71, 111, 0.7)',
                             borderColor: 'rgba(239, 71, 111, 1)',
-                            borderWidth: 1
+                            borderWidth: 1,
+                            barPercentage: isMobile ? 0.7 : 0.9,
+                            categoryPercentage: isMobile ? 0.8 : 0.9
                         }
                     ]
                 },
@@ -1318,23 +1354,41 @@ class Dashboard {
                         y: {
                             beginAtZero: true,
                             grid: {
-                                color: 'rgba(0, 0, 0, 0.1)'
+                                color: 'rgba(0, 0, 0, 0.05)'
                             },
                             ticks: {
                                 callback: function(value) {
+                                    if (isMobile && value >= 1000) return '₹' + (value/1000).toFixed(1) + 'k';
                                     return '₹' + value;
+                                },
+                                font: {
+                                    size: isMobile ? 10 : 12
                                 }
                             }
                         },
                         x: {
                             grid: {
                                 display: false
+                            },
+                            ticks: {
+                                font: {
+                                    size: isMobile ? 10 : 12
+                                },
+                                maxRotation: 45,
+                                minRotation: 0
                             }
                         }
                     },
                     plugins: {
                         legend: {
                             position: 'top',
+                            labels: {
+                                boxWidth: isMobile ? 12 : 40,
+                                padding: isMobile ? 10 : 20,
+                                font: {
+                                    size: isMobile ? 11 : 12
+                                }
+                            }
                         },
                         tooltip: {
                             callbacks: {
