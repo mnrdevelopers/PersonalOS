@@ -38,7 +38,6 @@
 
 html {
     overflow-x: hidden;
-    overscroll-behavior: none;
 }
 
 body {
@@ -49,8 +48,9 @@ body {
     padding-top: calc(56px + env(safe-area-inset-top));
     padding-bottom: calc(70px + env(safe-area-inset-bottom));
     transition: var(--transition);
-    overscroll-behavior: none; /* Prevents iOS bounce effect */
     overflow-x: hidden; /* Prevents horizontal scroll */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     -webkit-font-smoothing: antialiased; /* Premium font rendering */
 }
 
@@ -594,6 +594,13 @@ body {
     .main-content {
         margin-left: 0;
     }
+
+    /* Fix for mobile scrolling */
+    body:not(.sidebar-open):not(.modal-open) {
+        overflow-y: auto !important;
+        height: auto !important;
+        min-height: 100vh;
+    }
 }
 
 @media (max-width: 768px) {
@@ -973,7 +980,7 @@ body {
 
     .mobile-quick-nav {
         display: flex;
-        gap: 10px;
+        gap: 15px;
         padding: 0 25px;
         margin-top: -50px;
         position: relative;
@@ -1059,4 +1066,3 @@ body {
     padding: 20px;
     vertical-align: middle;
 }
-
