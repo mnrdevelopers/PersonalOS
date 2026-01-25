@@ -1007,18 +1007,28 @@ window.triggerUpiPayment = async function() {
         if (!doc.exists) return;
         const data = doc.data();
         
-        // Prioritize dedicated UPI ID, fallback to mobile if it looks like a VPA (contains @)
-        let payeeAddress = data.upiId;
-        if (!payeeAddress && data.mobile && data.mobile.includes('@')) {
-            payeeAddress = data.mobile;
-        } else if (!payeeAddress && data.mobile) {
-            payeeAddress = data.mobile; // Fallback, though less reliable for UPI intent
+        let payeeAddress = data.upiId ? data.upiId.trim() : '';
+        
+        // Fallback to mobile if it looks like a VPA
+        if (!payeeAddress && data.mobile) {
+            const cleanMobile = data.mobile.replace(/\s+/g, '').replace(/-/g, '');
+            if (cleanMobile.includes('@')) {
+                payeeAddress = cleanMobile;
+            }
         }
         
-        const payeeName = encodeURIComponent(data.name);
-        const note = encodeURIComponent(`Repayment for ${data.name}`);
+        if (!payeeAddress) {
+            alert("A valid UPI ID (e.g., name@bank) is required for payment. Please edit the loan details to add a UPI ID.");
+            return;
+        }
         
-        const upiUrl = `upi://pay?pa=${payeeAddress}&pn=${payeeName}&am=${amount}&cu=INR&tn=${note}`;
+        const payeeName = encodeURIComponent(data.name || 'Receiver');
+        const note = encodeURIComponent(`Repayment`);
+        const tr = 'T' + Date.now(); // Transaction Reference (Required by many apps)
+        const formattedAmount = parseFloat(amount).toFixed(2);
+        
+        // Standard UPI Deep Link
+        const upiUrl = `upi://pay?pa=${payeeAddress}&pn=${payeeName}&am=${formattedAmount}&cu=INR&tn=${note}&tr=${tr}`;
         
         window.location.href = upiUrl;
         
