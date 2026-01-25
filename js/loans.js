@@ -1007,13 +1007,6 @@ window.triggerUpiPayment = async function() {
         if (!doc.exists) return;
         const data = doc.data();
         
-        let payeeAddress = data.mobile;
-        // If it looks like a plain number, try to make it a UPI ID or just pass it (some apps handle it)
-        // But standard UPI intent needs a VPA. 
-        // If user entered just a number, we can't reliably guess VPA. 
-        // However, many users might enter "9876543210@ybl".
-        // If no '@' is present, we assume it's a raw number. 
-        // Note: 'upi://pay' with just a phone number in 'pa' param is not standard but we pass it.
         // Prioritize dedicated UPI ID, fallback to mobile if it looks like a VPA (contains @)
         let payeeAddress = data.upiId;
         if (!payeeAddress && data.mobile && data.mobile.includes('@')) {
