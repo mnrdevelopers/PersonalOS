@@ -541,8 +541,15 @@ window.loadLoansGrid = async function(status = 'active') {
 
         let whatsappBtn = '';
         if (data.type === 'lent' && !isFullyPaid) {
+            const safeName = (data.name || '').replace(/"/g, '&quot;');
+            const safeMobile = (data.mobile || '').replace(/"/g, '&quot;');
+            const safeContext = (data.messageContext || '').replace(/"/g, '&quot;');
+            
             whatsappBtn = `
-                <button class="btn btn-sm btn-success me-1" onclick="sendWhatsAppReminder('${doc.id}')" title="Send WhatsApp Reminder">
+                <button class="btn btn-sm btn-success me-1" 
+                    data-name="${safeName}" data-amount="${remainingAmount}" data-mobile="${safeMobile}" data-context="${safeContext}"
+                    onclick="sendWhatsAppReminder('${doc.id}', this.getAttribute('data-name'), this.getAttribute('data-amount'), this.getAttribute('data-mobile'), this.getAttribute('data-context'))" 
+                    title="Send WhatsApp Reminder">
                     <i class="fab fa-whatsapp"></i> Remind
                 </button>`;
         }
@@ -964,29 +971,40 @@ window.deleteRepayment = async function(loanId, repaymentId) {
     }
 };
 
-window.sendWhatsAppReminder = async function(id) {
+window.sendWhatsAppReminder = async function(id, name, amount, mobile, context) {
     try {
-        const doc = await db.collection('loans').doc(id).get();
-        if (!doc.exists) return;
-        const data = doc.data();
+        let cleanMobile = '';
+        let message = '';
         
-        const remaining = data.totalAmount - (data.paidAmount || 0);
-        const context = data.messageContext ? data.messageContext : 'outstanding';
-        const mobile = data.mobile;
-        
-        if (!mobile) {
-            alert('No mobile number saved for this loan. Please edit the loan to add a number.');
-            return;
+        // Try synchronous path first (fixes iOS popup blocker)
+        if (mobile && mobile !== 'null' && mobile !== 'undefined') {
+            const remaining = parseFloat(amount);
+            const msgContext = (context && context !== 'null' && context !== 'undefined') ? context : 'outstanding';
+            
+            message = `Hi ${name}, your ${msgContext} payment of ₹${remaining.toFixed(2)} is due. Please pay the amount at your earliest convenience. Thank you.`;
+            cleanMobile = mobile.replace(/\D/g, '');
+        } else {
+            // Fallback to async fetch
+            const doc = await db.collection('loans').doc(id).get();
+            if (!doc.exists) return;
+            const data = doc.data();
+            
+            const remaining = data.totalAmount - (data.paidAmount || 0);
+            const msgContext = data.messageContext ? data.messageContext : 'outstanding';
+            const dbMobile = data.mobile;
+            
+            if (!dbMobile) {
+                alert('No mobile number saved for this loan. Please edit the loan to add a number.');
+                return;
+            }
+            message = `Hi ${data.name}, your ${msgContext} payment of ₹${remaining.toFixed(2)} is due. Please pay the amount at your earliest convenience. Thank you.`;
+            cleanMobile = dbMobile.replace(/\D/g, '');
         }
 
-        // Professional message format
-        const message = `Hi ${data.name}, your ${context} payment of ₹${remaining.toFixed(2)} is due. Please pay the amount at your earliest convenience. Thank you.`;
         const encodedMsg = encodeURIComponent(message);
         
-        // Remove non-numeric chars from mobile for link
-        const cleanMobile = mobile.replace(/\D/g, '');
-        
-        window.open(`https://api.whatsapp.com/send?phone=${cleanMobile}&text=${encodedMsg}`, '_blank');
+        // Use wa.me for better mobile compatibility (supports WhatsApp Business)
+        window.open(`https://wa.me/${cleanMobile}?text=${encodedMsg}`, '_blank');
         
     } catch(e) {
         console.error("Error sending reminder:", e);
