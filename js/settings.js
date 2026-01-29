@@ -114,14 +114,16 @@ window.deleteAccount = async function() {
     if (confirm('Are you strictly sure? This will delete ALL your data permanently.')) {
         const user = auth.currentUser;
         try {
+            if(window.dashboard) window.dashboard.showLoading();
             // In a real app, you'd trigger a cloud function to recursively delete subcollections
             // Here we just delete the user doc and auth
             await db.collection('users').doc(user.uid).delete();
             await user.delete();
             window.location.href = 'auth.html';
         } catch (error) {
+            if(window.dashboard) window.dashboard.hideLoading();
             console.error("Error deleting account:", error);
-            alert("Error deleting account. You may need to re-login first.");
+            if(window.dashboard) window.dashboard.showNotification("Error deleting account. You may need to re-login first.", 'danger');
         }
     }
 };
