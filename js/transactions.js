@@ -117,10 +117,7 @@ async function loadLedgerData() {
     if (window.dashboard) window.dashboard.showLoading();
 
     try {
-        const [transactionsSnap, entertainmentSnap] = await Promise.all([
-            db.collection('transactions').where('userId', '==', user.uid).get(),
-            db.collection('entertainment').where('userId', '==', user.uid).get()
-        ]);
+        const transactionsSnap = await db.collection('transactions').where('userId', '==', user.uid).get();
 
         ledgerAllEntries = [];
 
@@ -134,20 +131,6 @@ async function loadLedgerData() {
                 debit: data.type === 'expense' ? data.amount : 0,
                 mode: data.paymentMode || 'N/A',
             });
-        });
-
-        entertainmentSnap.forEach(doc => {
-            const data = doc.data();
-            if (data.cost > 0) {
-                ledgerAllEntries.push({
-                    date: data.date,
-                    createdAt: data.createdAt,
-                    description: `Entertainment: ${data.title}`,
-                    credit: 0,
-                    debit: data.cost,
-                    mode: 'other',
-                });
-            }
         });
 
         // Sort all entries chronologically to calculate running balance
