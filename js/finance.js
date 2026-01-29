@@ -155,7 +155,7 @@ window.loadFinanceSection = async function() {
                         <div class="input-group mb-3">
                             <input type="text" class="form-control" id="new-category-name" placeholder="New category name">
                             <input type="color" class="form-control form-control-color" id="new-category-color" value="#4361ee" title="Choose color">
-                            <button class="btn btn-primary" onclick="addCategory()">Add</button>
+                            <button class="btn btn-primary" id="btn-add-category" onclick="addCategory()">Add</button>
                         </div>
                         
                         <div id="categories-list" class="list-group">
@@ -377,12 +377,20 @@ window.editTransaction = async function(id) {
 
 window.deleteTransaction = async function(id) {
     if(confirm('Are you sure you want to delete this transaction?')) {
-        await db.collection('transactions').doc(id).delete();
-        const activeFilter = document.querySelector('.btn-group .active').id.replace('filter-', '');
-        // Reload current page or reset to 1? Resetting to 1 is safer to avoid empty pages.
-        loadFinanceData(activeFilter); 
-        if(window.dashboard) window.dashboard.updateStats();
-        if(window.dashboard) window.dashboard.updateFinanceChart();
+        if(window.dashboard) window.dashboard.showLoading();
+        try {
+            await db.collection('transactions').doc(id).delete();
+            const activeInput = document.querySelector('input[name="finance-filter"]:checked');
+            const activeFilter = activeInput ? activeInput.id.replace('filter-', '') : 'all';
+            loadFinanceData(activeFilter); 
+            if(window.dashboard) window.dashboard.updateStats();
+            if(window.dashboard) window.dashboard.updateFinanceChart();
+            if(window.dashboard) window.dashboard.showNotification('Transaction deleted', 'success');
+        } catch(e) {
+            if(window.dashboard) window.dashboard.showNotification('Error deleting transaction', 'danger');
+        } finally {
+            if(window.dashboard) window.dashboard.hideLoading();
+        }
     }
 };
 
@@ -518,10 +526,15 @@ window.addCategory = async function() {
     const name = nameInput.value.trim();
     const color = colorInput.value;
     const user = auth.currentUser;
+    const btn = document.getElementById('btn-add-category');
     
-    if (!name) return;
+    if (!name) {
+        if(window.dashboard) window.dashboard.showNotification('Please enter a category name', 'warning');
+        return;
+    }
     
     try {
+        window.setBtnLoading(btn, true);
         await db.collection('categories').add({
             userId: user.uid,
             name: name,
@@ -540,9 +553,11 @@ window.addCategory = async function() {
             const catSelect = document.getElementById('transaction-category');
             if (catSelect) catSelect.value = name;
         }
+        if(window.dashboard) window.dashboard.showNotification('Category added', 'success');
     } catch (error) {
+        window.setBtnLoading(btn, false);
         console.error("Error adding category:", error);
-        alert("Failed to add category");
+        if(window.dashboard) window.dashboard.showNotification('Failed to add category', 'danger');
     }
 };
 
@@ -643,9 +658,14 @@ window.deleteCategory = async function(id) {
     if (!confirm('Delete this category?')) return;
     
     try {
+        if(window.dashboard) window.dashboard.showLoading();
         await db.collection('categories').doc(id).delete();
         loadCategories(currentCategoryType);
+        if(window.dashboard) window.dashboard.showNotification('Category deleted', 'success');
     } catch (error) {
         console.error("Error deleting category:", error);
+        if(window.dashboard) window.dashboard.showNotification('Error deleting category', 'danger');
+    } finally {
+        if(window.dashboard) window.dashboard.hideLoading();
     }
 };
