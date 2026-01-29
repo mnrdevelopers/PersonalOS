@@ -3,7 +3,8 @@ window.loadEntertainmentSection = async function() {
     container.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2>Entertainment Tracker</h2>
-            <button class="btn btn-us me-2"></i>Add Activity
+            <button class="btn btn-primary" onclick="showAddEntertainmentModal()">
+                <i class="fas fa-plus me-2"></i>Add Activity
             </button>
         </div>
         
@@ -74,6 +75,21 @@ window.loadEntertainmentSection = async function() {
                                 </div>
                             </div>
                             <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="ent-add-ledger" onchange="toggleEntPaymentMode()">
+                                    <label class="form-check-label" for="ent-add-ledger">Add to Transaction Ledger</label>
+                                </div>
+                            </div>
+                            <div class="mb-3 d-none" id="ent-payment-div">
+                                <label class="form-label">Payment Mode</label>
+                                <select class="form-select" id="ent-payment-mode">
+                                    <option value="upi">UPI</option>
+                                    <option value="card">Card</option>
+                                    <option value="cash">Cash</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
                                 <label class="form-label">Rating</label>
                                 <div class="rating-select">
                                     <select class="form-select" id="ent-rating">
@@ -93,7 +109,7 @@ window.loadEntertainmentSection = async function() {
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" onclick="saveEntertainment()">Save</button>
+                        <button type="button" class="btn btn-primary" id="btn-save-entertainment" onclick="saveEntertainment()">Save</button>
                     </div>
                 </div>
             </div>
@@ -103,13 +119,22 @@ window.loadEntertainmentSection = async function() {
 };
 
 window.showAddEntertainmentModal = function() {
-    const modal = new bootstrap.Modal(document.getElementById('addEntertainmentModal'));
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addEntertainmentModal'));
     document.getElementById('entertainment-form').reset();
     document.getElementById('ent-id').value = '';
     document.getElementById('ent-poster').value = '';
     document.getElementById('movie-preview').classList.add('d-none');
     document.getElementById('ent-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('ent-add-ledger').checked = false;
+    toggleEntPaymentMode();
     modal.show();
+};
+
+window.toggleEntPaymentMode = function() {
+    const checked = document.getElementById('ent-add-ledger').checked;
+    const div = document.getElementById('ent-payment-div');
+    if (checked) div.classList.remove('d-none');
+    else div.classList.add('d-none');
 };
 
 window.filterEntertainment = function(type, element) {
@@ -124,12 +149,12 @@ window.fetchMovieDetails = async function() {
     const type = document.getElementById('ent-type').value;
     
     if (!title) {
-        alert('Please enter a title first');
+        if(window.dashboard) window.dashboard.showNotification('Please enter a title first', 'warning');
         return;
     }
     
     if (type !== 'movie') {
-        alert('Auto-fetch is only available for movies');
+        if(window.dashboard) window.dashboard.showNotification('Auto-fetch is only available for movies', 'info');
         return;
     }
 
@@ -170,6 +195,7 @@ window.fetchMovieDetails = async function() {
 };
 
 window.saveEntertainment = async function() {
+    const btn = document.getElementById('btn-save-entertainment');
     const id = document.getElementById('ent-id').value;
     const type = document.getElementById('ent-type').value;
     const title = document.getElementById('ent-title').value;
@@ -179,26 +205,83 @@ window.saveEntertainment = async function() {
     const rating = parseInt(document.getElementById('ent-rating').value);
     const notes = document.getElementById('ent-notes').value;
     const posterUrl = document.getElementById('ent-poster').value;
+    const addToLedger = document.getElementById('ent-add-ledger').checked;
+    const paymentMode = document.getElementById('ent-payment-mode').value;
     const user = auth.currentUser;
 
     if (!title || !date) {
-        alert('Please fill in required fields');
+        if(window.dashboard) window.dashboard.showNotification('Please fill in required fields', 'warning');
         return;
     }
 
     try {
+        window.setBtnLoading(btn, true);
+
         const entry = {
             userId: user.uid,
             type, title, location, date, cost, rating, notes, posterUrl,
             status: 'watched' // Always set status to watched
         };
 
+        let entId = id;
+
         if (id) {
             entry.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
             await db.collection('entertainment').doc(id).update(entry);
         } else {
             entry.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-            await db.collection('entertainment').add(entry);
+            const docRef = await db.collection('entertainment').add(entry);
+            entId = docRef.id;
+        }
+
+        // Handle Transaction Ledger
+        const shouldHaveTransaction = cost > 0 && addToLedger;
+
+        if (shouldHaveTransaction) {
+            // Check for existing transaction to update, or create new
+            let existingTx = null;
+            if (id) {
+                const txSnap = await db.collection('transactions')
+                    .where('userId', '==', user.uid)
+                    .where('relatedId', '==', entId)
+                    .where('section', '==', 'entertainment')
+                    .limit(1)
+                    .get();
+                if (!txSnap.empty) existingTx = txSnap.docs[0];
+            }
+
+            const txData = {
+                userId: user.uid,
+                date: date,
+                amount: cost,
+                type: 'expense',
+                category: 'Entertainment',
+                description: `Entertainment: ${title}`,
+                paymentMode: paymentMode,
+                relatedId: entId,
+                section: 'entertainment',
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            if (existingTx) {
+                await existingTx.ref.update(txData);
+            } else {
+                txData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                await db.collection('transactions').add(txData);
+            }
+        } else if (id) {
+            // If not adding to ledger, check if we need to delete an existing one (only for edits)
+            const txSnap = await db.collection('transactions')
+                .where('userId', '==', user.uid)
+                .where('relatedId', '==', entId)
+                .where('section', '==', 'entertainment')
+                .get();
+            
+            if (!txSnap.empty) {
+                const batch = db.batch();
+                txSnap.forEach(doc => batch.delete(doc.ref));
+                await batch.commit();
+            }
         }
         
         const modalEl = document.getElementById('addEntertainmentModal');
@@ -208,6 +291,7 @@ window.saveEntertainment = async function() {
         loadEntertainmentGrid('all');
         if(window.dashboard) window.dashboard.showNotification(id ? 'Entry updated!' : 'Entry saved!', 'success');
     } catch (error) {
+        window.setBtnLoading(btn, false);
         console.error("Error saving entertainment:", error);
         if(window.dashboard) window.dashboard.showNotification('Error saving entry', 'danger');
     }
@@ -243,7 +327,10 @@ window.loadEntertainmentGrid = async function(filter = 'all') {
              imageHtml = `<img src="${data.posterUrl}" class="card-img-top" alt="${data.title}" style="height: 200px; object-fit: cover; object-position: top;">`;
         }
 
-        let actionButtons = `<button class="btn btn-sm btn-outline-danger" onclick="deleteEntertainment('${doc.id}')"><i class="fas fa-trash"></i></button>`;
+        let actionButtons = `
+            <button class="btn btn-sm btn-outline-primary me-1" onclick="editEntertainment('${doc.id}')"><i class="fas fa-edit"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteEntertainment('${doc.id}')"><i class="fas fa-trash"></i></button>
+        `;
 
 
         const col = document.createElement('div');
@@ -278,13 +365,77 @@ window.loadEntertainmentGrid = async function(filter = 'all') {
     });
 };
 
+window.editEntertainment = async function(id) {
+    const user = auth.currentUser;
+    try {
+        const doc = await db.collection('entertainment').doc(id).get();
+        if (!doc.exists) return;
+        const data = doc.data();
+        
+        document.getElementById('ent-id').value = id;
+        document.getElementById('ent-type').value = data.type;
+        document.getElementById('ent-title').value = data.title;
+        document.getElementById('ent-location').value = data.location || '';
+        document.getElementById('ent-date').value = data.date;
+        document.getElementById('ent-cost').value = data.cost || '';
+        document.getElementById('ent-rating').value = data.rating || 5;
+        document.getElementById('ent-notes').value = data.notes || '';
+        document.getElementById('ent-poster').value = data.posterUrl || '';
+        
+        if (data.posterUrl) {
+            document.getElementById('ent-poster-preview').src = data.posterUrl;
+            document.getElementById('movie-preview').classList.remove('d-none');
+        } else {
+            document.getElementById('movie-preview').classList.add('d-none');
+        }
+        
+        // Check for linked transaction
+        const txSnap = await db.collection('transactions')
+            .where('userId', '==', user.uid)
+            .where('relatedId', '==', id)
+            .where('section', '==', 'entertainment')
+            .limit(1)
+            .get();
+        
+        if (!txSnap.empty) {
+            document.getElementById('ent-add-ledger').checked = true;
+            document.getElementById('ent-payment-mode').value = txSnap.docs[0].data().paymentMode || 'upi';
+        } else {
+            document.getElementById('ent-add-ledger').checked = false;
+        }
+        toggleEntPaymentMode();
+
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addEntertainmentModal'));
+        modal.show();
+    } catch (e) { console.error(e); }
+};
+
 window.deleteEntertainment = async function(id) {
     if(confirm('Delete this entry?')) {
-        await db.collection('entertainment').doc(id).delete();
-        // Refresh current view based on active tab
-        const activeTab = document.querySelector('#entertainment-section .nav-link.active');
-        const filter = activeTab.textContent.toLowerCase().includes('movie') ? 'movie' : 
-                       (activeTab.textContent.toLowerCase().includes('tour') ? 'tour' : 'all');
-        loadEntertainmentGrid(filter);
+        if(window.dashboard) window.dashboard.showLoading();
+        const user = auth.currentUser;
+        try {
+            // Delete linked transaction first
+            const txSnap = await db.collection('transactions')
+                .where('userId', '==', user.uid)
+                .where('relatedId', '==', id)
+                .where('section', '==', 'entertainment')
+                .get();
+            txSnap.forEach(doc => doc.ref.delete());
+
+            await db.collection('entertainment').doc(id).delete();
+            const activeTab = document.querySelector('#entertainment-section .nav-link.active');
+            let filter = 'all';
+            if (activeTab) {
+                filter = activeTab.textContent.toLowerCase().includes('movie') ? 'movie' : 
+                         (activeTab.textContent.toLowerCase().includes('tour') ? 'tour' : 'all');
+            }
+            loadEntertainmentGrid(filter);
+            if(window.dashboard) window.dashboard.showNotification('Entry deleted', 'success');
+        } catch(e) {
+            if(window.dashboard) window.dashboard.showNotification('Error deleting entry', 'danger');
+        } finally {
+            if(window.dashboard) window.dashboard.hideLoading();
+        }
     }
 };
