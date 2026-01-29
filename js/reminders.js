@@ -103,7 +103,7 @@ window.editReminder = async function(id) {
         document.getElementById('reminder-time').value = data.time || '';
         document.getElementById('reminder-priority').value = data.priority;
         
-        const modal = new bootstrap.Modal(document.getElementById('addReminderModal'));
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addReminderModal'));
         modal.show();
     } catch (e) { console.error(e); }
 };
@@ -112,7 +112,7 @@ window.deleteTask = async function(id) {
     if(confirm('Delete this task?')) {
         await db.collection('reminders').doc(id).delete();
         const activeTab = document.querySelector('#reminders-section .nav-link.active');
-        const status = activeTab.textContent.toLowerCase();
+        const status = activeTab ? activeTab.textContent.toLowerCase() : 'pending';
         loadTasks(status);
         if(window.dashboard) window.dashboard.updateStats();
     }
@@ -142,7 +142,7 @@ window.viewTask = async function(id) {
             editReminder(id);
         };
 
-        const modal = new bootstrap.Modal(document.getElementById('viewTaskModal'));
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('viewTaskModal'));
         modal.show();
     } catch (e) { console.error(e); }
 };
