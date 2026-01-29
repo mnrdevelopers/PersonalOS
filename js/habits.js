@@ -161,7 +161,7 @@ window.editHabit = async function(id) {
         document.getElementById('habit-reminder-time').value = data.reminderTime || '';
         document.getElementById('habit-cost').value = data.cost || '';
         
-        const modal = new bootstrap.Modal(document.getElementById('addHabitModal'));
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addHabitModal'));
         modal.show();
     } catch (e) { console.error(e); }
 };
