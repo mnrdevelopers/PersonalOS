@@ -1,44 +1,21 @@
-let currentVehicleTab = 'logs';
-
 window.loadVehiclesSection = async function() {
     const container = document.getElementById('vehicles-section');
     container.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 >
-                <button class="btn btn-sm btn-outline-primary me-2" onclick="showAddVehicleModal()">
-                    <i class="fas fa-car me-2"></i>Add Vehicle
-                </button>
-                <button class="btn btn-sm btn-primary" onclick="showAddVehicleLogModal()">
-                    <i class="fas fa-plus me-2"></i>Add Log
-                </button>
-                <button class="btn btn-sm btn-outline-warning ms-2" onclick="showAddServiceAlertModal()">
-                    <i class="fas fa-bell me-2"></i>Set Alert
-                </button>
-            </div>
+            <h2 class="fw-bold gradient-text mb-0">Vehicle Tracker</h2>
+            <button class="btn btn-primary" onclick="showAddVehicleModal()">
+                <i class="fas fa-plus me-2"></i>Add Vehicle
+            </button>
         </div>
 
-        <!-- Stats Row -->
-        <div class="row g-4 mb-5 animate-fade-in" id="vehicle-stats">
+        <!-- Global Stats -->
+        <div class="row g-4 mb-4" id="vehicle-global-stats">
             <div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>
         </div>
 
-        <ul class="nav nav-pills mb-4 gap-2">
-            <li class="nav-item">
-                <a class="nav-link active" href="javascript:void(0)" onclick="switchVehicleTab('logs', this)">Logs & History</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="javascript:void(0)" onclick="switchVehicleTab('schedule', this)">Maintenance Schedule</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="javascript:void(0)" onclick="switchVehicleTab('alerts', this)">Service Alerts</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="javascript:void(0)" onclick="switchVehicleTab('vehicles', this)">My Vehicles</a>
-            </li>
-        </ul>
-
-        <div id="vehicles-content">
-            <!-- Content loaded here -->
+        <!-- Vehicles List (Single View) -->
+        <div id="vehicles-container" class="row g-4">
+            <!-- Vehicle Cards go here -->
         </div>
 
         <!-- Add Vehicle Modal -->
@@ -85,11 +62,15 @@ window.loadVehiclesSection = async function() {
                                 <label class="form-label">Current Odometer (km)</label>
                                 <input type="number" class="form-control" id="vehicle-odometer" required>
                             </div>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="vehicle-primary">
+                                <label class="form-check-label" for="vehicle-primary">Set as Primary Vehicle</label>
+                            </div>
                         </form>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" onclick="saveVehicle()">Save Vehicle</button>
+                        <button type="button" class="btn btn-primary" id="btn-save-vehicle" onclick="saveVehicle()">Save Vehicle</button>
                     </div>
                 </div>
             </div>
@@ -191,7 +172,7 @@ window.loadVehiclesSection = async function() {
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" onclick="saveVehicleLog()">Save Log</button>
+                        <button type="button" class="btn btn-primary" id="btn-save-vehicle-log" onclick="saveVehicleLog()">Save Log</button>
                     </div>
                 </div>
             </div>
@@ -228,32 +209,320 @@ window.loadVehiclesSection = async function() {
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" onclick="saveServiceAlert()">Save Alert</button>
+                        <button type="button" class="btn btn-primary" id="btn-save-service-alert" onclick="saveServiceAlert()">Save Alert</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Update Odometer Modal -->
+        <div class="modal fade" id="updateOdometerModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title fs-6">Update Odometer</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="update-odo-vehicle-id">
+                        <div class="mb-2">
+                            <label class="form-label small">New Reading (km)</label>
+                            <input type="number" class="form-control" id="update-odo-value" required>
+                        </div>
+                        <button type="button" class="btn btn-primary w-100 btn-sm" onclick="saveOdometerUpdate()">Update</button>
                     </div>
                 </div>
             </div>
         </div>
     `;
     
-    await loadVehicleStats();
-    await loadVehicleLogs();
+    await loadVehicleDashboard();
 };
 
-window.switchVehicleTab = function(tab, element) {
-    currentVehicleTab = tab;
-    document.querySelectorAll('#vehicles-section .nav-link').forEach(l => l.classList.remove('active'));
-    element.classList.add('active');
+window.loadVehicleDashboard = async function() {
+    const user = auth.currentUser;
+    const container = document.getElementById('vehicles-container');
+    const statsContainer = document.getElementById('vehicle-global-stats');
     
-    if (tab === 'logs') loadVehicleLogs();
-    else if (tab === 'alerts') loadServiceAlerts();
-    else if (tab === 'schedule') loadMaintenanceSchedule();
-    else loadVehiclesList();
+    // 1. Fetch Vehicles
+    const vehiclesSnap = await db.collection('vehicles').where('userId', '==', user.uid).get();
+    
+    if (vehiclesSnap.empty) {
+        statsContainer.innerHTML = '';
+        container.innerHTML = `
+            <div class="col-12 text-center py-5">
+                <div class="mb-3"><i class="fas fa-car fa-3x text-muted"></i></div>
+                <h5 class="text-muted">No vehicles added yet</h5>
+                <p class="text-muted small">Add a vehicle to start tracking mileage and expenses.</p>
+                <button class="btn btn-primary mt-2" onclick="showAddVehicleModal()">Add Vehicle</button>
+            </div>`;
+        return;
+    }
+
+    // 2. Fetch All Logs & Alerts
+    const logsSnap = await db.collection('vehicle_logs')
+        .where('userId', '==', user.uid)
+        .orderBy('date', 'desc')
+        .get();
+        
+    const alertsSnap = await db.collection('service_alerts')
+        .where('userId', '==', user.uid)
+        .get();
+
+    // Process Data
+    const vehicles = [];
+    vehiclesSnap.forEach(doc => {
+        vehicles.push({ id: doc.id, ...doc.data() });
+    });
+
+    // Sort: Primary first
+    vehicles.sort((a, b) => {
+        if (!!a.isPrimary === !!b.isPrimary) return 0;
+        return a.isPrimary ? -1 : 1;
+    });
+
+    const logsByVehicle = {};
+    let totalCost = 0;
+    let totalFuelCost = 0;
+    
+    logsSnap.forEach(doc => {
+        const log = doc.data();
+        log.id = doc.id;
+        if (!logsByVehicle[log.vehicleId]) logsByVehicle[log.vehicleId] = [];
+        logsByVehicle[log.vehicleId].push(log);
+        
+        totalCost += (log.cost || 0);
+        if (log.type === 'fuel') totalFuelCost += (log.cost || 0);
+    });
+
+    const alertsByVehicle = {};
+    alertsSnap.forEach(doc => {
+        const alert = doc.data();
+        alert.id = doc.id;
+        if (!alertsByVehicle[alert.vehicleId]) alertsByVehicle[alert.vehicleId] = [];
+        alertsByVehicle[alert.vehicleId].push(alert);
+    });
+
+    // Render Global Stats
+    statsContainer.innerHTML = `
+        <div class="col-6 col-md-3">
+            <div class="p-3 bg-white rounded-4 shadow-sm border-start border-4 border-primary h-100">
+                <div class="text-muted small fw-bold text-uppercase">Total Spent</div>
+                <h4 class="mb-0 text-primary">₹${totalCost.toFixed(0)}</h4>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="p-3 bg-white rounded-4 shadow-sm border-start border-4 border-warning h-100">
+                <div class="text-muted small fw-bold text-uppercase">Fuel Cost</div>
+                <h4 class="mb-0 text-warning">₹${totalFuelCost.toFixed(0)}</h4>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="p-3 bg-white rounded-4 shadow-sm border-start border-4 border-info h-100">
+                <div class="text-muted small fw-bold text-uppercase">Vehicles</div>
+                <h4 class="mb-0 text-info">${vehicles.length}</h4>
+            </div>
+        </div>
+    `;
+
+    // Render Vehicle Cards
+    container.innerHTML = '';
+    const chartsToRender = [];
+
+    vehicles.forEach(v => {
+        const vLogs = logsByVehicle[v.id] || [];
+        const vAlerts = alertsByVehicle[v.id] || [];
+        
+        // Calculate Mileage Stats
+        const fuelLogs = vLogs.filter(l => l.type === 'fuel' && l.mileage > 0);
+        const lastMileage = fuelLogs.length > 0 ? fuelLogs[0].mileage : 0;
+        const avgMileage = v.averageMileage || 0;
+        
+        // Prepare Chart Data
+        let chartHtml = '';
+        const chartLogs = [...fuelLogs].sort((a, b) => new Date(a.date) - new Date(b.date));
+        
+        if (chartLogs.length >= 2) {
+            const recentChartLogs = chartLogs.slice(-10); // Last 10 entries
+            chartHtml = `
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-end mb-2">
+                        <span class="small text-muted fw-bold text-uppercase">Efficiency Trend</span>
+                        <span class="badge bg-light text-dark border">Last ${recentChartLogs.length} fills</span>
+                    </div>
+                    <div style="height: 120px; width: 100%;">
+                        <canvas id="chart-${v.id}"></canvas>
+                    </div>
+                </div>
+            `;
+            chartsToRender.push({
+                id: `chart-${v.id}`,
+                labels: recentChartLogs.map(l => new Date(l.date).toLocaleDateString('en-US', {month:'short', day:'numeric'})),
+                data: recentChartLogs.map(l => l.mileage)
+            });
+        }
+        
+        const primaryBadge = v.isPrimary ? '<span class="badge bg-primary ms-2" style="font-size: 0.7em;">PRIMARY</span>' : '';
+
+        // Alerts Status
+        let alertHtml = '';
+        vAlerts.forEach(a => {
+            const remaining = a.dueOdometer - v.currentOdometer;
+            let badgeClass = 'bg-success';
+            if (remaining < 0) badgeClass = 'bg-danger';
+            else if (remaining < 500) badgeClass = 'bg-warning text-dark';
+            
+            alertHtml += `
+                <div class="d-flex justify-content-between align-items-center small mb-1 p-2 bg-light rounded">
+                    <span><i class="fas fa-bell text-warning me-2"></i>${a.title}</span>
+                    <span class="badge ${badgeClass}">${remaining} km left</span>
+                </div>
+            `;
+        });
+
+        // Recent Logs HTML
+        const recentLogs = vLogs.slice(0, 3).map(l => {
+            let icon = 'fa-gas-pump';
+            let color = 'text-warning';
+            if (l.type === 'service') { icon = 'fa-tools'; color = 'text-info'; }
+            else if (l.type === 'repair') { icon = 'fa-wrench'; color = 'text-danger'; }
+            
+            return `
+                <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+                    <div class="d-flex align-items-center">
+                        <div class="me-3 ${color}" style="width: 20px;"><i class="fas ${icon}"></i></div>
+                        <div>
+                            <div class="small fw-bold">${new Date(l.date).toLocaleDateString()}</div>
+                            <div class="small text-muted" style="font-size: 0.75rem;">${l.odometer} km</div>
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <div class="small fw-bold">₹${l.cost}</div>
+                        ${l.mileage ? `<div class="small text-success" style="font-size: 0.75rem;">${l.mileage.toFixed(1)} km/l</div>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        const card = document.createElement('div');
+        card.className = 'col-md-6 col-xl-4';
+        card.innerHTML = `
+            <div class="card h-100 border-0 shadow-sm rounded-4">
+                <div class="card-header bg-transparent border-0 pt-4 px-4 pb-0 d-flex justify-content-between align-items-start">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-primary bg-opacity-10 text-primary rounded-circle p-3 me-3">
+                            <i class="fas ${v.type === 'Bike' || v.type === 'Scooter' ? 'fa-motorcycle' : 'fa-car'} fa-lg"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-0 fw-bold">${v.name}${primaryBadge}</h5>
+                            <small class="text-muted">${v.make || ''} ${v.model || ''} • ${v.regNumber || ''}</small>
+                        </div>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-link text-muted p-0" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="editVehicle('${v.id}')">Edit Vehicle</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="showAddServiceAlertModal('${v.id}')">Set Alert</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="deleteVehicle('${v.id}')">Delete</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card-body px-4">
+                    <div class="row g-2 mb-4 mt-2">
+                        <div class="col-6">
+                            <div class="p-2 bg-light rounded-3 text-center position-relative">
+                                <div class="small text-muted mb-1">Odometer</div>
+                                <div class="fw-bold">${v.currentOdometer} km</div>
+                                <button class="btn btn-link btn-sm p-0 position-absolute top-0 end-0 me-2 mt-1 text-muted opacity-50" onclick="showUpdateOdometerModal('${v.id}', ${v.currentOdometer})" title="Update Odometer">
+                                    <i class="fas fa-pen" style="font-size: 0.6rem;"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="p-2 bg-success bg-opacity-10 rounded-3 text-center">
+                                <div class="small text-success mb-1">Avg. Mileage</div>
+                                <div class="fw-bold text-success">${avgMileage ? avgMileage.toFixed(1) + ' km/l' : '--'}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    ${lastMileage > 0 ? `
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span class="text-muted">Last Mileage</span>
+                            <span class="fw-bold ${lastMileage >= avgMileage ? 'text-success' : 'text-warning'}">${lastMileage.toFixed(1)} km/l</span>
+                        </div>
+                        <div class="progress" style="height: 6px;">
+                            <div class="progress-bar ${lastMileage >= avgMileage ? 'bg-success' : 'bg-warning'}" 
+                                 role="progressbar" style="width: ${Math.min(100, (lastMileage / (avgMileage * 1.5)) * 100)}%"></div>
+                        </div>
+                    </div>` : ''}
+
+                    ${alertHtml ? `<div class="mb-3">${alertHtml}</div>` : ''}
+
+                    ${chartHtml}
+
+                    <div class="d-grid gap-2 d-flex mb-3">
+                        <button class="btn btn-primary flex-grow-1" onclick="showAddVehicleLogModal('${v.id}', 'fuel')">
+                            <i class="fas fa-gas-pump me-2"></i>Fuel
+                        </button>
+                        <button class="btn btn-outline-secondary flex-grow-1" onclick="showAddVehicleLogModal('${v.id}', 'service')">
+                            <i class="fas fa-tools me-2"></i>Service
+                        </button>
+                    </div>
+
+                    ${recentLogs ? `
+                    <div class="mt-3">
+                        <div class="small text-muted fw-bold mb-2 text-uppercase">Recent Activity</div>
+                        ${recentLogs}
+                    </div>` : ''}
+                </div>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+
+    // Render Charts
+    chartsToRender.forEach(config => {
+        const ctx = document.getElementById(config.id);
+        if (ctx && typeof Chart !== 'undefined') {
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: config.labels,
+                    datasets: [{
+                        label: 'Mileage (km/l)',
+                        data: config.data,
+                        borderColor: '#198754',
+                        backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 3,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#198754'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: true, grid: { display: false }, ticks: { font: { size: 9 } } },
+                        y: { display: true, ticks: { font: { size: 9 } } }
+                    }
+                }
+            });
+        }
+    });
 };
 
 window.showAddVehicleModal = function() {
-    const modal = new bootstrap.Modal(document.getElementById('addVehicleModal'));
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addVehicleModal'));
     document.getElementById('vehicle-form').reset();
     document.getElementById('vehicle-id').value = '';
+    document.getElementById('vehicle-primary').checked = false;
     modal.show();
 };
 
@@ -270,37 +539,43 @@ window.populateLogVehicleSelect = async function() {
         const option = document.createElement('option');
         option.value = doc.id;
         option.textContent = v.name;
+        if (v.isPrimary) option.selected = true;
         option.dataset.odometer = v.currentOdometer || 0;
         select.appendChild(option);
     });
     return true;
 };
 
-window.showAddVehicleLogModal = async function() {
+window.showAddVehicleLogModal = async function(vehicleId = null, type = 'fuel') {
     const hasVehicles = await populateLogVehicleSelect();
     
     if (!hasVehicles) {
-        alert('Please add a vehicle first.');
+        if(window.dashboard) window.dashboard.showNotification('Please add a vehicle first.', 'warning');
         showAddVehicleModal();
         return;
     }
 
-    const modal = new bootstrap.Modal(document.getElementById('addVehicleLogModal'));
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addVehicleLogModal'));
     document.getElementById('vehicle-log-form').reset();
     document.getElementById('log-id').value = '';
     document.getElementById('log-date').value = new Date().toISOString().split('T')[0];
-    document.getElementById('log-type').value = 'fuel';
+    document.getElementById('log-type').value = type;
+    
+    if (vehicleId) {
+        document.getElementById('log-vehicle').value = vehicleId;
+    }
+    
     toggleLogFields();
     updateLogOdometerPlaceholder();
     modal.show();
 };
 
-window.showAddServiceAlertModal = async function() {
+window.showAddServiceAlertModal = async function(vehicleId = null) {
     const user = auth.currentUser;
     const snapshot = await db.collection('vehicles').where('userId', '==', user.uid).get();
     
     if (snapshot.empty) {
-        alert('Please add a vehicle first.');
+        if(window.dashboard) window.dashboard.showNotification('Please add a vehicle first.', 'warning');
         return;
     }
 
@@ -315,7 +590,11 @@ window.showAddServiceAlertModal = async function() {
         select.appendChild(option);
     });
 
-    const modal = new bootstrap.Modal(document.getElementById('addServiceAlertModal'));
+    if (vehicleId) {
+        select.value = vehicleId;
+    }
+
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addServiceAlertModal'));
     document.getElementById('service-alert-form').reset();
     updateAlertOdometerHelper();
     modal.show();
@@ -365,6 +644,7 @@ window.calculateFuelQty = function() {
 };
 
 window.saveVehicle = async function() {
+    const btn = document.getElementById('btn-save-vehicle');
     const user = auth.currentUser;
     const id = document.getElementById('vehicle-id').value;
     const name = document.getElementById('vehicle-name').value;
@@ -373,27 +653,54 @@ window.saveVehicle = async function() {
     const make = document.getElementById('vehicle-make').value;
     const model = document.getElementById('vehicle-model').value;
     const odo = parseInt(document.getElementById('vehicle-odometer').value) || 0;
+    const isPrimary = document.getElementById('vehicle-primary').checked;
 
-    if (!name) return;
-
-    const data = {
-        userId: user.uid,
-        name, type, regNumber: reg, make, model, currentOdometer: odo
-    };
-
-    if (id) {
-        await db.collection('vehicles').doc(id).update(data);
-    } else {
-        data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-        await db.collection('vehicles').add(data);
+    if (!name) {
+        if(window.dashboard) window.dashboard.showNotification('Please enter vehicle name', 'warning');
+        return;
     }
 
-    bootstrap.Modal.getInstance(document.getElementById('addVehicleModal')).hide();
-    loadVehicleStats();
-    if (currentVehicleTab === 'vehicles') loadVehiclesList();
+    try {
+        window.setBtnLoading(btn, true);
+        
+        // Handle Primary Logic: Unset other primaries if this one is set
+        if (isPrimary) {
+            const batch = db.batch();
+            const primaries = await db.collection('vehicles')
+                .where('userId', '==', user.uid)
+                .where('isPrimary', '==', true)
+                .get();
+            
+            primaries.forEach(doc => {
+                if (doc.id !== id) batch.update(doc.ref, { isPrimary: false });
+            });
+            await batch.commit();
+        }
+
+        const data = {
+            userId: user.uid,
+            name, type, regNumber: reg, make, model, currentOdometer: odo, isPrimary
+        };
+
+        if (id) {
+            await db.collection('vehicles').doc(id).update(data);
+        } else {
+            data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection('vehicles').add(data);
+        }
+
+        bootstrap.Modal.getInstance(document.getElementById('addVehicleModal')).hide();
+        loadVehicleDashboard();
+        if(window.dashboard) window.dashboard.showNotification(id ? 'Vehicle updated' : 'Vehicle added', 'success');
+        if(window.dashboard) window.dashboard.updateStats();
+    } catch(e) {
+        window.setBtnLoading(btn, false);
+        if(window.dashboard) window.dashboard.showNotification('Error saving vehicle', 'danger');
+    }
 };
 
 window.saveVehicleLog = async function() {
+    const btn = document.getElementById('btn-save-vehicle-log');
     const user = auth.currentUser;
     const logId = document.getElementById('log-id').value;
     const vehicleId = document.getElementById('log-vehicle').value;
@@ -413,10 +720,12 @@ window.saveVehicleLog = async function() {
     const serviceType = document.getElementById('log-service-type').value;
 
     if (!vehicleId || !date || !odometer || !cost) {
-        alert('Please fill required fields');
+        if(window.dashboard) window.dashboard.showNotification('Please fill required fields', 'warning');
         return;
     }
 
+    try {
+    window.setBtnLoading(btn, true);
     // Calculate Mileage if Fuel
     let mileage = 0;
     if (type === 'fuel' && fullTank) {
@@ -460,6 +769,12 @@ window.saveVehicleLog = async function() {
         logData.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
         await db.collection('vehicle_logs').doc(logId).update(logData);
 
+        // Check if we need to update vehicle odometer (if this log is higher than current)
+        const vDoc = await db.collection('vehicles').doc(vehicleId).get();
+        if (vDoc.exists && (vDoc.data().currentOdometer || 0) < odometer) {
+             await db.collection('vehicles').doc(vehicleId).update({ currentOdometer: odometer });
+        }
+
         // Update associated transaction
         const txSnap = await db.collection('transactions').where('relatedId', '==', logId).get();
         if (!txSnap.empty) {
@@ -476,9 +791,13 @@ window.saveVehicleLog = async function() {
         logData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
         const logRef = await db.collection('vehicle_logs').add(logData);
         
-        const vehicleUpdateData = {
-            currentOdometer: odometer
-        };
+        const vehicleUpdateData = {};
+        const vDoc = await db.collection('vehicles').doc(vehicleId).get();
+        const currentOdo = vDoc.exists ? (vDoc.data().currentOdometer || 0) : 0;
+        
+        if (odometer > currentOdo) {
+            vehicleUpdateData.currentOdometer = odometer;
+        }
 
         // Calculate and update average mileage if applicable
         if (mileage > 0) {
@@ -499,8 +818,10 @@ window.saveVehicleLog = async function() {
             vehicleUpdateData.averageMileage = totalM / countM;
         }
 
-        // Update Vehicle
-        await db.collection('vehicles').doc(vehicleId).update(vehicleUpdateData);
+        // Update Vehicle if needed
+        if (Object.keys(vehicleUpdateData).length > 0) {
+            await db.collection('vehicles').doc(vehicleId).update(vehicleUpdateData);
+        }
 
         // Add to Transaction Ledger
         const transactionData = {
@@ -519,319 +840,228 @@ window.saveVehicleLog = async function() {
     }
 
     bootstrap.Modal.getInstance(document.getElementById('addVehicleLogModal')).hide();
-    loadVehicleStats();
-    if (currentVehicleTab === 'logs') loadVehicleLogs();
+    loadVehicleDashboard();
     if (window.dashboard) window.dashboard.showNotification(logId ? 'Log updated!' : 'Log added and linked to Ledger!', 'success');
+    if (window.dashboard) window.dashboard.updateStats();
+    } catch(e) {
+        window.setBtnLoading(btn, false);
+        if(window.dashboard) window.dashboard.showNotification('Error saving log', 'danger');
+    }
 };
 
 window.saveServiceAlert = async function() {
+    const btn = document.getElementById('btn-save-service-alert');
     const user = auth.currentUser;
     const vehicleId = document.getElementById('alert-vehicle').value;
     const title = document.getElementById('alert-title').value;
     const dueOdometer = parseInt(document.getElementById('alert-due-odometer').value);
 
     if (!vehicleId || !title || !dueOdometer) {
-        alert('Please fill all fields');
+        if(window.dashboard) window.dashboard.showNotification('Please fill all fields', 'warning');
         return;
     }
 
-    await db.collection('service_alerts').add({
-        userId: user.uid,
-        vehicleId,
-        title,
-        dueOdometer,
-        status: 'active',
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    try {
+        window.setBtnLoading(btn, true);
+        await db.collection('service_alerts').add({
+            userId: user.uid,
+            vehicleId,
+            title,
+            dueOdometer,
+            status: 'active',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
 
-    bootstrap.Modal.getInstance(document.getElementById('addServiceAlertModal')).hide();
-    if (currentVehicleTab === 'alerts') loadServiceAlerts();
-    if (window.dashboard) window.dashboard.showNotification('Service alert set!', 'success');
+        bootstrap.Modal.getInstance(document.getElementById('addServiceAlertModal')).hide();
+        loadVehicleDashboard();
+        if (window.dashboard) window.dashboard.showNotification('Service alert set!', 'success');
+    } catch(e) {
+        window.setBtnLoading(btn, false);
+        if(window.dashboard) window.dashboard.showNotification('Error saving alert', 'danger');
+    }
 };
 
 window.deleteServiceAlert = async function(id) {
     if (!confirm('Delete this alert?')) return;
     
     try {
+        if(window.dashboard) window.dashboard.showLoading();
         await db.collection('service_alerts').doc(id).delete();
-        if (currentVehicleTab === 'alerts') loadServiceAlerts();
-        else if (currentVehicleTab === 'schedule') loadMaintenanceSchedule();
+        loadVehicleDashboard();
         if (window.dashboard) window.dashboard.showNotification('Alert deleted', 'success');
     } catch (error) {
         console.error("Error deleting alert:", error);
         if (window.dashboard) window.dashboard.showNotification('Permission error deleting alert', 'danger');
+    } finally {
+        if(window.dashboard) window.dashboard.hideLoading();
     }
 };
 
-window.loadVehicleStats = async function() {
-    const user = auth.currentUser;
-    const logsSnap = await db.collection('vehicle_logs').where('userId', '==', user.uid).get();
-    
-    let totalCost = 0;
-    let fuelCost = 0;
-    let serviceCost = 0;
-    const vehicleOdos = {};
-
-    logsSnap.forEach(doc => {
-        const d = doc.data();
-        totalCost += d.cost;
-        if (d.type === 'fuel') fuelCost += d.cost;
-        else serviceCost += d.cost;
-        
-        // Track min/max odometer per vehicle for distance calc
-        if (!vehicleOdos[d.vehicleId]) {
-            vehicleOdos[d.vehicleId] = { min: d.odometer, max: d.odometer };
-        } else {
-            if (d.odometer < vehicleOdos[d.vehicleId].min) vehicleOdos[d.vehicleId].min = d.odometer;
-            if (d.odometer > vehicleOdos[d.vehicleId].max) vehicleOdos[d.vehicleId].max = d.odometer;
-        }
-    });
-
-    let totalDistance = 0;
-    Object.values(vehicleOdos).forEach(v => {
-        totalDistance += (v.max - v.min);
-    });
-
-    const container = document.getElementById('vehicle-stats');
-    container.innerHTML = `
-        <div class="col-6 col-md-3">
-            <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-primary">
-                <div class="text-muted small mb-1 fw-medium">Total Expenses</div>
-                <div class="d-flex align-items-center justify-content-between">
-                    <h4 class="mb-0 fw-bold text-primary">₹${totalCost.toFixed(0)}</h4>
-                    <i class="fas fa-wallet text-primary opacity-25 fa-2x"></i>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-warning">
-                <div class="text-muted small mb-1 fw-medium">Fuel Cost</div>
-                <div class="d-flex align-items-center justify-content-between">
-                    <h4 class="mb-0 fw-bold text-warning">₹${fuelCost.toFixed(0)}</h4>
-                    <i class="fas fa-gas-pump text-warning opacity-25 fa-2x"></i>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-info">
-                <div class="text-muted small mb-1 fw-medium">Maintenance</div>
-                <div class="d-flex align-items-center justify-content-between">
-                    <h4 class="mb-0 fw-bold text-info">₹${serviceCost.toFixed(0)}</h4>
-                    <i class="fas fa-tools text-info opacity-25 fa-2x"></i>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-success">
-                <div class="text-muted small mb-1 fw-medium">Total Distance</div>
-                <div class="d-flex align-items-center justify-content-between">
-                    <h4 class="mb-0 fw-bold text-success">${totalDistance} km</h4>
-                    <i class="fas fa-road text-success opacity-25 fa-2x"></i>
-                </div>
-            </div>
-        </div>
-    `;
+window.showUpdateOdometerModal = function(vehicleId, currentOdo) {
+    document.getElementById('update-odo-vehicle-id').value = vehicleId;
+    document.getElementById('update-odo-value').value = currentOdo;
+    document.getElementById('update-odo-value').min = currentOdo;
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('updateOdometerModal'));
+    modal.show();
 };
 
-window.loadVehicleLogs = async function() {
-    const user = auth.currentUser;
-    const container = document.getElementById('vehicles-content');
+window.saveOdometerUpdate = async function() {
+    const id = document.getElementById('update-odo-vehicle-id').value;
+    const newOdo = parseInt(document.getElementById('update-odo-value').value);
     
-    // Fetch vehicles map
+    if (!newOdo) return;
+
+    try {
+        if(window.dashboard) window.dashboard.showLoading();
+        await db.collection('vehicles').doc(id).update({
+            currentOdometer: newOdo,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        bootstrap.Modal.getInstance(document.getElementById('updateOdometerModal')).hide();
+        loadVehicleDashboard();
+        if(window.dashboard) window.dashboard.showNotification('Odometer updated', 'success');
+        if(window.dashboard) window.dashboard.updateStats();
+    } catch(e) {
+        console.error(e);
+        if(window.dashboard) window.dashboard.showNotification('Error updating odometer', 'danger');
+    } finally {
+        if(window.dashboard) window.dashboard.hideLoading();
+    }
+};
+
+window.calculateMaintenanceEvents = async function() {
+    const user = auth.currentUser;
+    
+    // 1. Fetch Vehicles
     const vSnap = await db.collection('vehicles').where('userId', '==', user.uid).get();
     const vehicles = {};
     vSnap.forEach(d => vehicles[d.id] = d.data());
 
-    const logsSnap = await db.collection('vehicle_logs')
-        .where('userId', '==', user.uid)
-        .orderBy('date', 'desc')
-        .orderBy('createdAt', 'desc')
-        .limit(50)
-        .get();
-
-    if (logsSnap.empty) {
-        container.innerHTML = '<div class="text-center text-muted py-5">No logs found. Add your first fuel or service record.</div>';
-        return;
-    }
-
-    let html = '<div class="card table-card animate-slide-up"><div class="card-body p-0"><div class="table-responsive"><table class="table table-hover mb-0"><thead><tr><th class="ps-4">Date</th><th>Vehicle</th><th>Type</th><th>Odometer</th><th>Cost</th><th>Details</th><th class="pe-4">Actions</th></tr></thead><tbody>';
+    // 2. Fetch Alerts
+    const alertsSnap = await db.collection('service_alerts').where('userId', '==', user.uid).get();
     
-    logsSnap.forEach(doc => {
-        const d = doc.data();
-        const vName = vehicles[d.vehicleId]?.name || 'Unknown';
-        let details = d.notes || '';
-        if (d.type === 'fuel') {
-            details = `${d.quantity}L @ ₹${d.pricePerUnit}/L ${d.mileage ? `<br><span class="badge bg-success">${d.mileage.toFixed(1)} km/l</span>` : ''}`;
-        } else if (d.type === 'service') {
-            details = `<span class="fw-bold">${d.serviceType}</span><br>${d.notes || ''}`;
-        }
-        
-        let typeBadge = 'bg-secondary';
-        if (d.type === 'fuel') typeBadge = 'bg-warning text-dark';
-        if (d.type === 'service') typeBadge = 'bg-info';
-        if (d.type === 'repair') typeBadge = 'bg-danger';
-
-        html += `
-            <tr>
-                <td class="ps-4 text-muted fw-medium">${new Date(d.date).toLocaleDateString()}</td>
-                <td class="fw-bold">${vName}</td>
-                <td><span class="badge ${typeBadge} rounded-pill">${d.type.toUpperCase()}</span></td>
-                <td>${d.odometer} km</td>
-                <td class="fw-bold">₹${d.cost.toFixed(2)}</td>
-                <td class="small">${details}</td>
-                <td class="pe-4">
-                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editVehicleLog('${doc.id}')"><i class="fas fa-edit"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteVehicleLog('${doc.id}')"><i class="fas fa-trash"></i></button>
-                </td>
-            </tr>
-        `;
-    });
-    html += '</tbody></table></div></div></div>';
-    container.innerHTML = html;
-};
-
-window.loadServiceAlerts = async function() {
-    const user = auth.currentUser;
-    const container = document.getElementById('vehicles-content');
-    
-    const vSnap = await db.collection('vehicles').where('userId', '==', user.uid).get();
-    const vehicles = {};
-    vSnap.forEach(d => vehicles[d.id] = d.data());
-
-    const alertsSnap = await db.collection('service_alerts')
-        .where('userId', '==', user.uid)
-        .orderBy('dueOdometer', 'asc')
-        .get();
-        
     if (alertsSnap.empty) {
-        container.innerHTML = '<div class="text-center text-muted py-5">No active service alerts. Set one to get reminded!</div>';
-        return;
+        return [];
     }
 
-    let html = '<div class="row g-4">';
-    alertsSnap.forEach(doc => {
-        const d = doc.data();
-        const v = vehicles[d.vehicleId];
-        if (!v) return;
-
-        const remaining = d.dueOdometer - v.currentOdometer;
-        let statusColor = 'success';
-        let statusText = `${remaining} km to go`;
-        let progress = 100 - (remaining / 5000 * 100); // Arbitrary scale for visual
+    // 3. Calculate Daily Usage for each vehicle
+    const vehicleUsage = {}; // km per day
+    for (const vId of Object.keys(vehicles)) {
+        const logsSnap = await db.collection('vehicle_logs')
+            .where('userId', '==', user.uid)
+            .where('vehicleId', '==', vId)
+            .orderBy('date', 'asc')
+            .get();
         
-        if (remaining <= 0) {
-            statusColor = 'danger';
-            statusText = `Overdue by ${Math.abs(remaining)} km`;
-            progress = 100;
-        } else if (remaining < 500) {
-            statusColor = 'warning';
-            statusText = `Due soon (${remaining} km)`;
+        if (logsSnap.size >= 2) {
+            const first = logsSnap.docs[0].data();
+            const last = logsSnap.docs[logsSnap.size - 1].data();
+            
+            const daysDiff = (new Date(last.date) - new Date(first.date)) / (1000 * 60 * 60 * 24);
+            const distDiff = last.odometer - first.odometer;
+            
+            if (daysDiff > 0 && distDiff > 0) {
+                vehicleUsage[vId] = distDiff / daysDiff;
+            } else {
+                vehicleUsage[vId] = 30; // Default fallback
+            }
+        } else {
+            vehicleUsage[vId] = 30; // Default fallback (approx 900km/month)
+        }
+    }
+
+    // 4. Map Alerts to Dates
+    const events = [];
+    alertsSnap.forEach(doc => {
+        const alert = doc.data();
+        const vehicle = vehicles[alert.vehicleId];
+        if (!vehicle) return;
+
+        const remainingKm = alert.dueOdometer - vehicle.currentOdometer;
+        const dailyKm = vehicleUsage[alert.vehicleId];
+        const daysRemaining = Math.ceil(remainingKm / dailyKm);
+        
+        const estimatedDate = new Date();
+        estimatedDate.setDate(estimatedDate.getDate() + daysRemaining);
+        
+        events.push({
+            id: doc.id,
+            title: alert.title,
+            vehicleName: vehicle.name,
+            date: estimatedDate,
+            remainingKm: remainingKm,
+            status: remainingKm < 0 ? 'overdue' : (remainingKm < 500 ? 'soon' : 'future')
+        });
+    });
+
+    // Sort by date
+    events.sort((a, b) => a.date - b.date);
+    return events;
+};
+
+window.exportMaintenanceSchedule = async function() {
+    if(window.dashboard) window.dashboard.showLoading();
+    try {
+        const events = await calculateMaintenanceEvents();
+        if (events.length === 0) {
+            if(window.dashboard) window.dashboard.showNotification('No events to export', 'warning');
+            return;
         }
 
-        html += `
-            <div class="col-md-6">
-                <div class="card border-0 shadow-sm rounded-4 h-100 border-start border-4 border-${statusColor}">
-                    <div class="card-body p-4">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <h5 class="card-title">${d.title}</h5>
-                                <h6 class="text-muted mb-2">${v.name}</h6>
-                            </div>
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteServiceAlert('${doc.id}')"><i class="fas fa-trash"></i></button>
-                        </div>
-                        <div class="mt-3">
-                            <div class="d-flex justify-content-between small mb-1">
-                                <span>Current: ${v.currentOdometer} km</span>
-                                <span class="fw-bold text-${statusColor}">Target: ${d.dueOdometer} km</span>
-                            </div>
-                            <div class="progress" style="height: 10px;">
-                                <div class="progress-bar bg-${statusColor}" role="progressbar" style="width: ${Math.max(5, Math.min(100, progress))}%"></div>
-                            </div>
-                            <div class="text-end mt-1 small text-${statusColor}">${statusText}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-    html += '</div>';
-    container.innerHTML = html;
+        let icsContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//PersonalOS//Vehicle Maintenance//EN\n";
+        
+        events.forEach(e => {
+            const startDate = e.date.toISOString().replace(/-|:|\.\d\d\d/g, "").substring(0, 8);
+            
+            icsContent += "BEGIN:VEVENT\n";
+            icsContent += `DTSTART;VALUE=DATE:${startDate}\n`;
+            icsContent += `SUMMARY:${e.title} - ${e.vehicleName}\n`;
+            icsContent += `DESCRIPTION:Vehicle: ${e.vehicleName}\\nService: ${e.title}\\nEstimated due date based on usage.\n`;
+            icsContent += "END:VEVENT\n";
+        });
+        
+        icsContent += "END:VCALENDAR";
+        
+        const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = window.URL.createObjectURL(blob);
+        link.setAttribute('download', 'maintenance_schedule.ics');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        if(window.dashboard) window.dashboard.showNotification('Schedule exported! Import the .ics file to Google Calendar.', 'success');
+
+    } catch (e) {
+        console.error("Error exporting schedule:", e);
+        if(window.dashboard) window.dashboard.showNotification('Error exporting schedule', 'danger');
+    } finally {
+        if(window.dashboard) window.dashboard.hideLoading();
+    }
 };
 
 window.loadMaintenanceSchedule = async function() {
-    const user = auth.currentUser;
     const container = document.getElementById('vehicles-content');
     container.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-2">Calculating schedule...</p></div>';
 
     try {
-        // 1. Fetch Vehicles
-        const vSnap = await db.collection('vehicles').where('userId', '==', user.uid).get();
-        const vehicles = {};
-        vSnap.forEach(d => vehicles[d.id] = d.data());
+        const events = await calculateMaintenanceEvents();
 
-        // 2. Fetch Alerts
-        const alertsSnap = await db.collection('service_alerts').where('userId', '==', user.uid).get();
-        
-        if (alertsSnap.empty) {
-            container.innerHTML = '<div class="text-center text-muted py-5">No service alerts set. Add alerts to see the schedule.</div>';
+        if (events.length === 0) {
+            container.innerHTML = '<div class="text-center text-muted py-5">No service alerts set or calculated. Add alerts to see the schedule.</div>';
             return;
         }
 
-        // 3. Calculate Daily Usage for each vehicle
-        const vehicleUsage = {}; // km per day
-        for (const vId of Object.keys(vehicles)) {
-            const logsSnap = await db.collection('vehicle_logs')
-                .where('userId', '==', user.uid)
-                .where('vehicleId', '==', vId)
-                .orderBy('date', 'asc')
-                .get();
-            
-            if (logsSnap.size >= 2) {
-                const first = logsSnap.docs[0].data();
-                const last = logsSnap.docs[logsSnap.size - 1].data();
-                
-                const daysDiff = (new Date(last.date) - new Date(first.date)) / (1000 * 60 * 60 * 24);
-                const distDiff = last.odometer - first.odometer;
-                
-                if (daysDiff > 0 && distDiff > 0) {
-                    vehicleUsage[vId] = distDiff / daysDiff;
-                } else {
-                    vehicleUsage[vId] = 30; // Default fallback
-                }
-            } else {
-                vehicleUsage[vId] = 30; // Default fallback (approx 900km/month)
-            }
-        }
-
-        // 4. Map Alerts to Dates
-        const events = [];
-        alertsSnap.forEach(doc => {
-            const alert = doc.data();
-            const vehicle = vehicles[alert.vehicleId];
-            if (!vehicle) return;
-
-            const remainingKm = alert.dueOdometer - vehicle.currentOdometer;
-            const dailyKm = vehicleUsage[alert.vehicleId];
-            const daysRemaining = Math.ceil(remainingKm / dailyKm);
-            
-            const estimatedDate = new Date();
-            estimatedDate.setDate(estimatedDate.getDate() + daysRemaining);
-            
-            events.push({
-                id: doc.id,
-                title: alert.title,
-                vehicleName: vehicle.name,
-                date: estimatedDate,
-                remainingKm: remainingKm,
-                status: remainingKm < 0 ? 'overdue' : (remainingKm < 500 ? 'soon' : 'future')
-            });
-        });
-
-        // Sort by date
-        events.sort((a, b) => a.date - b.date);
-
         // 5. Render Calendar View (List of Months)
-        let html = '<div class="row g-4">';
+        let html = `
+            <div class="d-flex justify-content-end mb-3">
+                <button class="btn btn-sm btn-outline-primary" onclick="exportMaintenanceSchedule()">
+                    <i class="fas fa-calendar-alt me-2"></i>Export to Calendar
+                </button>
+            </div>
+            <div class="row g-4">
+        `;
         
         // Group by Month
         const grouped = {};
@@ -898,100 +1128,78 @@ window.loadMaintenanceSchedule = async function() {
     }
 };
 
-window.loadVehiclesList = async function() {
-    const user = auth.currentUser;
-    const container = document.getElementById('vehicles-content');
-    const snapshot = await db.collection('vehicles').where('userId', '==', user.uid).get();
-
-    if (snapshot.empty) {
-        container.innerHTML = '<div class="text-center text-muted py-5">No vehicles added yet.</div>';
-        return;
-    }
-
-    let html = '<div class="row g-4">';
-    snapshot.forEach(doc => {
-        const d = doc.data();
-        const icon = d.type === 'Bike' || d.type === 'Scooter' ? 'fa-motorcycle' : 'fa-car';
-        
-        html += `
-            <div class="col-md-6 col-lg-4">
-                <div class="card h-100 border-0 shadow-sm rounded-4">
-                    <div class="card-body p-4">
-                        <div class="d-flex justify-content-between align-items-start mb-3">
-                            <div class="d-flex align-items-center">
-                                <div class="bg-light rounded-circle p-3 me-3 text-primary">
-                                    <i class="fas ${icon} fa-lg"></i>
-                                </div>
-                                <div>
-                                    <h5 class="card-title mb-0">${d.name}</h5>
-                                    <small class="text-muted">${d.make} ${d.model}</small>
-                                </div>
-                            </div>
-                            <div class="d-flex flex-column align-items-end">
-                                <span class="badge bg-secondary mb-2">${d.type}</span>
-                                <div class="dropdown">
-                                    <button class="btn btn-link text-muted p-0" data-bs-toggle="dropdown">
-                                        <i class="fas fa-ellipsis-v"></i>
-                                    </button>
-                                    <ul class="dropdown-menu dropdown-menu-end">
-                                        <li><a class="dropdown-item" href="javascript:void(0)" onclick="editVehicle('${doc.id}')"><i class="fas fa-edit me-2"></i>Edit</a></li>
-                                        <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="deleteVehicle('${doc.id}')"><i class="fas fa-trash me-2"></i>Delete</a></li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="mb-2">
-                            <small class="text-muted d-block">Registration: <span class="text-dark fw-bold">${d.regNumber || 'N/A'}</span></small>
-                            <small class="text-muted d-block">Odometer: <span class="text-dark fw-bold">${d.currentOdometer} km</span></small>
-                            ${d.averageMileage ? `<small class="text-muted d-block">Avg. Mileage: <span class="text-success fw-bold">${d.averageMileage.toFixed(1)} km/l</span></small>` : ''}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-    html += '</div>';
-    container.innerHTML = html;
-};
-
 window.editVehicle = async function(id) {
-    const doc = await db.collection('vehicles').doc(id).get();
-    if (!doc.exists) return;
-    const data = doc.data();
-    
-    document.getElementById('vehicle-id').value = id;
-    document.getElementById('vehicle-name').value = data.name;
-    document.getElementById('vehicle-type').value = data.type;
-    document.getElementById('vehicle-reg').value = data.regNumber || '';
-    document.getElementById('vehicle-make').value = data.make || '';
-    document.getElementById('vehicle-model').value = data.model || '';
-    document.getElementById('vehicle-odometer').value = data.currentOdometer;
-    
-    const modal = new bootstrap.Modal(document.getElementById('addVehicleModal'));
-    modal.show();
+    // Failsafe: Ensure loading spinner doesn't get stuck if DB hangs
+    const loadingTimeout = setTimeout(() => {
+        if(window.dashboard) window.dashboard.hideLoading();
+    }, 8000);
+
+    try {
+        if(window.dashboard) window.dashboard.showLoading();
+        const doc = await db.collection('vehicles').doc(id).get();
+        
+        if (!doc.exists) {
+            if(window.dashboard) window.dashboard.showNotification('Vehicle not found', 'warning');
+            return;
+        }
+        
+        const data = doc.data();
+        
+        // Helper to safely set values
+        const setVal = (eid, val) => { const el = document.getElementById(eid); if(el) el.value = val; };
+        
+        setVal('vehicle-id', id);
+        setVal('vehicle-name', data.name || '');
+        setVal('vehicle-type', data.type || 'Car');
+        setVal('vehicle-reg', data.regNumber || '');
+        setVal('vehicle-make', data.make || '');
+        setVal('vehicle-model', data.model || '');
+        setVal('vehicle-odometer', data.currentOdometer !== undefined ? data.currentOdometer : 0);
+        
+        const primaryEl = document.getElementById('vehicle-primary');
+        if (primaryEl) primaryEl.checked = data.isPrimary || false;
+        
+        const modalEl = document.getElementById('addVehicleModal');
+        if (modalEl && typeof bootstrap !== 'undefined') {
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+        }
+    } catch(e) {
+        console.error("Error editing vehicle:", e);
+        if(window.dashboard) window.dashboard.showNotification('Error loading vehicle', 'danger');
+    } finally {
+        clearTimeout(loadingTimeout);
+        if(window.dashboard) window.dashboard.hideLoading();
+    }
 };
 
 window.deleteVehicle = async function(id) {
     if (!confirm('Delete this vehicle? This will also delete all associated logs and alerts.')) return;
     
-    const batch = db.batch();
-    
-    // Delete vehicle
-    batch.delete(db.collection('vehicles').doc(id));
-    
-    // Delete logs
-    const logsSnap = await db.collection('vehicle_logs').where('vehicleId', '==', id).get();
-    logsSnap.forEach(doc => batch.delete(doc.ref));
-    
-    // Delete alerts
-    const alertsSnap = await db.collection('service_alerts').where('vehicleId', '==', id).get();
-    alertsSnap.forEach(doc => batch.delete(doc.ref));
-    
-    await batch.commit();
-    
-    if (window.dashboard) window.dashboard.showNotification('Vehicle deleted', 'success');
-    loadVehiclesList();
-    loadVehicleStats();
+    try {
+        if(window.dashboard) window.dashboard.showLoading();
+        const batch = db.batch();
+        
+        // Delete vehicle
+        batch.delete(db.collection('vehicles').doc(id));
+        
+        // Delete logs
+        const logsSnap = await db.collection('vehicle_logs').where('vehicleId', '==', id).get();
+        logsSnap.forEach(doc => batch.delete(doc.ref));
+        
+        // Delete alerts
+        const alertsSnap = await db.collection('service_alerts').where('vehicleId', '==', id).get();
+        alertsSnap.forEach(doc => batch.delete(doc.ref));
+        
+        await batch.commit();
+        
+        if (window.dashboard) window.dashboard.showNotification('Vehicle deleted', 'success');
+        loadVehicleDashboard();
+    } catch(e) {
+        if(window.dashboard) window.dashboard.showNotification('Error deleting vehicle', 'danger');
+    } finally {
+        if(window.dashboard) window.dashboard.hideLoading();
+    }
 };
 
 window.editVehicleLog = async function(id) {
@@ -1020,20 +1228,26 @@ window.editVehicleLog = async function(id) {
         document.getElementById('log-service-type').value = data.serviceType || 'Other';
     }
     
-    const modal = new bootstrap.Modal(document.getElementById('addVehicleLogModal'));
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addVehicleLogModal'));
     modal.show();
 };
 
 window.deleteVehicleLog = async function(id) {
     if (!confirm('Delete this log?')) return;
     
-    await db.collection('vehicle_logs').doc(id).delete();
-    
-    // Delete associated transaction
-    const txSnap = await db.collection('transactions').where('relatedId', '==', id).get();
-    txSnap.forEach(doc => doc.ref.delete());
-    
-    loadVehicleLogs();
-    loadVehicleStats();
-    if (window.dashboard) window.dashboard.showNotification('Log deleted', 'success');
+    try {
+        if(window.dashboard) window.dashboard.showLoading();
+        await db.collection('vehicle_logs').doc(id).delete();
+        
+        // Delete associated transaction
+        const txSnap = await db.collection('transactions').where('relatedId', '==', id).get();
+        txSnap.forEach(doc => doc.ref.delete());
+        
+        loadVehicleDashboard();
+        if (window.dashboard) window.dashboard.showNotification('Log deleted', 'success');
+    } catch(e) {
+        if(window.dashboard) window.dashboard.showNotification('Error deleting log', 'danger');
+    } finally {
+        if(window.dashboard) window.dashboard.hideLoading();
+    }
 };
