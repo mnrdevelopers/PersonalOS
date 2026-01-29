@@ -159,7 +159,7 @@ window.loadLoansSection = async function() {
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" onclick="saveLoan()">Save</button>
+                        <button type="button" class="btn btn-primary" id="btn-save-loan" onclick="saveLoan()">Save</button>
                     </div>
                 </div>
             </div>
@@ -214,7 +214,7 @@ window.loadLoansSection = async function() {
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" onclick="saveRepayment()">Save Repayment</button>
+                        <button type="button" class="btn btn-primary" id="btn-save-repayment" onclick="saveRepayment()">Save Repayment</button>
                     </div>
                 </div>
             </div>
@@ -247,7 +247,7 @@ window.loadLoansSection = async function() {
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" onclick="saveEditedRepayment()">Save Changes</button>
+                        <button type="button" class="btn btn-primary" id="btn-save-edit-repayment" onclick="saveChanges()">Save Changes</button>
                     </div>
                 </div>
             </div>
@@ -340,6 +340,7 @@ window.filterLoans = function(status, element) {
 };
 
 window.saveLoan = async function() {
+    const btn = document.getElementById('btn-save-loan');
     const id = document.getElementById('loan-id').value;
     const type = document.querySelector('input[name="loan-type"]:checked').value;
     const name = document.getElementById('loan-name').value;
@@ -357,12 +358,12 @@ window.saveLoan = async function() {
     const user = auth.currentUser;
 
     if (!name || !amount || !startDate) {
-        alert('Please fill in required fields');
+        if(window.dashboard) window.dashboard.showNotification('Please fill in required fields', 'warning');
         return;
     }
     
     if (type === 'emi' && emi <= 0) {
-        alert('Please enter EMI amount for Product EMI type');
+        if(window.dashboard) window.dashboard.showNotification('Please enter EMI amount for Product EMI type', 'warning');
         return;
     }
 
@@ -378,6 +379,8 @@ window.saveLoan = async function() {
     }
 
     try {
+        window.setBtnLoading(btn, true);
+
         const loan = {
             userId: user.uid,
             type, name, totalAmount: amount, paidAmount: 0,
@@ -452,7 +455,9 @@ window.saveLoan = async function() {
             window.dashboard.showNotification('Loan saved successfully!', 'success');
         }
     } catch (error) {
+        window.setBtnLoading(btn, false);
         console.error("Error saving loan:", error);
+        if(window.dashboard) window.dashboard.showNotification('Error saving loan', 'danger');
     }
 };
 
@@ -670,6 +675,7 @@ window.editLoan = async function(id) {
 window.deleteLoan = async function(id) {
     if(confirm('Delete this loan record? This cannot be undone.')) {
         try {
+            if(window.dashboard) window.dashboard.showLoading();
             const user = auth.currentUser;
             const batch = db.batch();
             const loanRef = db.collection('loans').doc(id);
@@ -699,6 +705,8 @@ window.deleteLoan = async function(id) {
         } catch(e) {
             console.error(e);
             if(window.dashboard) window.dashboard.showNotification('Error deleting loan', 'danger');
+        } finally {
+            if(window.dashboard) window.dashboard.hideLoading();
         }
     }
 };
@@ -729,6 +737,7 @@ window.showRepaymentModal = async function(loanId) {
 };
 
 window.saveRepayment = async function() {
+    const btn = document.getElementById('btn-save-repayment');
     const loanId = document.getElementById('repay-loan-id').value;
     const amount = parseFloat(document.getElementById('repay-amount').value);
     const date = document.getElementById('repay-date').value;
@@ -737,11 +746,12 @@ window.saveRepayment = async function() {
     const user = auth.currentUser;
 
     if (!amount || !date) {
-        alert('Please enter amount and date');
+        if(window.dashboard) window.dashboard.showNotification('Please enter amount and date', 'warning');
         return;
     }
 
     try {
+        window.setBtnLoading(btn, true);
         const loanDoc = await db.collection('loans').doc(loanId).get();
         const loanData = loanDoc.data();
         const newPaidAmount = (loanData.paidAmount || 0) + amount;
@@ -782,6 +792,7 @@ window.saveRepayment = async function() {
         loadLoansGrid('active');
         if(window.dashboard) window.dashboard.showNotification('Repayment recorded!', 'success');
     } catch (error) {
+        window.setBtnLoading(btn, false);
         console.error("Error saving repayment:", error);
         if(window.dashboard) window.dashboard.showNotification('Error recording repayment', 'danger');
     }
@@ -847,7 +858,8 @@ window.editRepayment = async function(loanId, repaymentId) {
     }
 };
 
-window.saveEditedRepayment = async function() {
+window.saveChanges = async function() {
+    const btn = document.getElementById('btn-save-edit-repayment');
     const loanId = document.getElementById('edit-repay-loan-id').value;
     const repaymentId = document.getElementById('edit-repay-id').value;
     const newAmount = parseFloat(document.getElementById('edit-repay-amount').value);
@@ -855,13 +867,14 @@ window.saveEditedRepayment = async function() {
     const user = auth.currentUser;
 
     if (!newAmount || !newDate) {
-        alert('Please fill in all fields.');
+        if(window.dashboard) window.dashboard.showNotification('Please fill in all fields.', 'warning');
         return;
     }
 
     const repaymentRef = db.collection('loans').doc(loanId).collection('repayments').doc(repaymentId);
 
     try {
+        window.setBtnLoading(btn, true);
         const repaymentDoc = await repaymentRef.get();
         if (!repaymentDoc.exists) {
             if(window.dashboard) window.dashboard.showNotification('Repayment not found.', 'danger');
@@ -909,6 +922,7 @@ window.saveEditedRepayment = async function() {
         loadLoansGrid(status);
 
     } catch (error) {
+        window.setBtnLoading(btn, false);
         console.error("Error saving edited repayment:", error);
         if(window.dashboard) window.dashboard.showNotification('Error updating repayment.', 'danger');
     }
@@ -923,6 +937,7 @@ window.deleteRepayment = async function(loanId, repaymentId) {
     const repaymentRef = db.collection('loans').doc(loanId).collection('repayments').doc(repaymentId);
 
     try {
+        if(window.dashboard) window.dashboard.showLoading();
         const repaymentDoc = await repaymentRef.get();
         if (!repaymentDoc.exists) {
             if(window.dashboard) window.dashboard.showNotification('Repayment not found.', 'danger');
@@ -968,6 +983,8 @@ window.deleteRepayment = async function(loanId, repaymentId) {
     } catch (error) {
         console.error("Error deleting repayment:", error);
         if(window.dashboard) window.dashboard.showNotification('Error deleting repayment.', 'danger');
+    } finally {
+        if(window.dashboard) window.dashboard.hideLoading();
     }
 };
 
@@ -994,7 +1011,7 @@ window.sendWhatsAppReminder = async function(id, name, amount, mobile, context) 
             const dbMobile = data.mobile;
             
             if (!dbMobile) {
-                alert('No mobile number saved for this loan. Please edit the loan to add a number.');
+                if(window.dashboard) window.dashboard.showNotification('No mobile number saved for this loan.', 'warning');
                 return;
             }
             message = `Hi ${data.name}, your ${msgContext} payment of ₹${remaining.toFixed(2)} is due. Please pay the amount at your earliest convenience. Thank you.`;
@@ -1016,7 +1033,7 @@ window.triggerUpiPayment = async function() {
     const amount = document.getElementById('repay-amount').value;
     
     if (!amount || parseFloat(amount) <= 0) {
-        alert('Please enter a valid amount first.');
+        if(window.dashboard) window.dashboard.showNotification('Please enter a valid amount first.', 'warning');
         return;
     }
 
@@ -1036,7 +1053,7 @@ window.triggerUpiPayment = async function() {
         }
         
         if (!payeeAddress) {
-            alert("A valid UPI ID (e.g., name@bank) is required for payment. Please edit the loan details to add a UPI ID.");
+            if(window.dashboard) window.dashboard.showNotification("A valid UPI ID is required for payment.", 'warning');
             return;
         }
         
@@ -1051,11 +1068,11 @@ window.triggerUpiPayment = async function() {
         window.location.href = upiUrl;
         
         setTimeout(() => {
-            alert("Please click 'Save Repayment' below once the transaction is successful.");
+            if(window.dashboard) window.dashboard.showNotification("Please click 'Save Repayment' once successful.", 'info');
         }, 1000);
         
     } catch (e) {
         console.error("Error triggering UPI:", e);
-        alert("Could not trigger UPI app.");
+        if(window.dashboard) window.dashboard.showNotification("Could not trigger UPI app.", 'danger');
     }
 };
