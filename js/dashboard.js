@@ -851,10 +851,20 @@ class Dashboard {
             if(document.getElementById('total-monthly-emi')) document.getElementById('total-monthly-emi').textContent = `₹${totalMonthlyEmi.toFixed(0)}`;
 
             // Vehicle Distance Stats (This Month)
-            const vehicleLogsSnapshot = await db.collection('vehicle_logs')
-                .where('userId', '==', this.currentUser.uid)
-                .where('date', '>=', startOfMonth)
-                .get();
+            const [vehicleLogsSnapshot, vehiclesSnapshot] = await Promise.all([
+                db.collection('vehicle_logs')
+                    .where('userId', '==', this.currentUser.uid)
+                    .where('date', '>=', startOfMonth)
+                    .get(),
+                db.collection('vehicles')
+                    .where('userId', '==', this.currentUser.uid)
+                    .get()
+            ]);
+
+            const vehicleCurrentOdos = {};
+            vehiclesSnapshot.forEach(doc => {
+                vehicleCurrentOdos[doc.id] = doc.data().currentOdometer || 0;
+            });
 
             const vehicleOdometer = {};
             vehicleLogsSnapshot.forEach(doc => {
@@ -868,8 +878,13 @@ class Dashboard {
             });
 
             let totalDistance = 0;
-            Object.values(vehicleOdometer).forEach(v => {
-                totalDistance += (v.max - v.min);
+            Object.keys(vehicleOdometer).forEach(vId => {
+                let stats = vehicleOdometer[vId];
+                // Use current odometer if it's higher than the max log (implies recent driving without log)
+                if (vehicleCurrentOdos[vId] && vehicleCurrentOdos[vId] > stats.max) {
+                    stats.max = vehicleCurrentOdos[vId];
+                }
+                totalDistance += (stats.max - stats.min);
             });
 
             if (document.getElementById('total-distance-month')) {
@@ -1622,6 +1637,7 @@ class Dashboard {
     }
 
     async saveTransaction() {
+        const btn = document.getElementById('save-transaction');
         try {
             const id = document.getElementById('transaction-id').value;
             const type = document.querySelector('input[name="transaction-type"]:checked')?.value;
@@ -1642,6 +1658,8 @@ class Dashboard {
                 return;
             }
             
+            window.setBtnLoading(btn, true);
+
             const transaction = {
                 type: type,
                 amount: amount,
@@ -1680,6 +1698,7 @@ class Dashboard {
             this.showNotification(id ? 'Transaction updated successfully!' : 'Transaction added successfully!', 'success');
             
         } catch (error) {
+            window.setBtnLoading(btn, false);
             console.error('Error saving transaction:', error);
             this.showNotification('Error saving transaction: ' + error.message, 'danger');
         }
@@ -1747,6 +1766,7 @@ class Dashboard {
     }
 
     async saveHabit() {
+        const btn = document.getElementById('save-habit');
         try {
             const type = document.querySelector('input[name="habit-type"]:checked')?.value || 'good';
             const id = document.getElementById('habit-id').value;
@@ -1773,6 +1793,8 @@ class Dashboard {
                 return;
             }
             
+            window.setBtnLoading(btn, true);
+
             const habit = {
                 type: type,
                 name: name,
@@ -1811,6 +1833,7 @@ class Dashboard {
             this.showNotification(id ? 'Habit updated successfully!' : 'Habit created successfully!', 'success');
             
         } catch (error) {
+            window.setBtnLoading(btn, false);
             console.error('Error saving habit:', error);
             this.showNotification('Error saving habit: ' + error.message, 'danger');
         }
@@ -1833,6 +1856,7 @@ class Dashboard {
     }
 
     async saveReminder() {
+        const btn = document.getElementById('save-reminder');
         try {
             const id = document.getElementById('reminder-id').value;
             const title = document.getElementById('reminder-title').value;
@@ -1847,6 +1871,8 @@ class Dashboard {
                 return;
             }
             
+            window.setBtnLoading(btn, true);
+
             const reminder = {
                 title: title,
                 description: description,
@@ -1886,6 +1912,7 @@ class Dashboard {
             }
             
         } catch (error) {
+            window.setBtnLoading(btn, false);
             console.error('Error saving reminder:', error);
             this.showNotification('Error saving task: ' + error.message, 'danger');
         }
@@ -1961,6 +1988,7 @@ class Dashboard {
     }
 
     async saveMemory() {
+        const btn = document.getElementById('save-memory');
         try {
             const id = document.getElementById('memory-id').value;
             const title = document.getElementById('memory-title').value;
@@ -1974,6 +2002,8 @@ class Dashboard {
                 return;
             }
             
+            window.setBtnLoading(btn, true);
+
             let imageUrl = null;
             
             // Upload image if exists
@@ -2018,6 +2048,7 @@ class Dashboard {
             this.showNotification(id ? 'Memory updated successfully!' : 'Memory saved successfully!', 'success');
             
         } catch (error) {
+            window.setBtnLoading(btn, false);
             console.error('Error saving memory:', error);
             this.showNotification('Error saving memory: ' + error.message, 'danger');
         }
@@ -2171,6 +2202,19 @@ class Dashboard {
         }
     }
 }
+
+// Global Utility for Button Loading State
+window.setBtnLoading = function(btn, isLoading) {
+    if (!btn) return;
+    if (isLoading) {
+        btn.dataset.originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Processing...';
+    } else {
+        btn.disabled = false;
+        btn.innerHTML = btn.dataset.originalText || 'Save';
+    }
+};
 
 // Initialize dashboard when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
