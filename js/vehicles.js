@@ -20,7 +20,7 @@ window.loadVehiclesSection = async function() {
 
         <!-- Add Vehicle Modal -->
         <div class="modal fade" id="addVehicleModal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Add Vehicle</h5>
@@ -78,7 +78,7 @@ window.loadVehiclesSection = async function() {
 
         <!-- Add Log Modal -->
         <div class="modal fade" id="addVehicleLogModal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Add Vehicle Log</h5>
@@ -180,7 +180,7 @@ window.loadVehiclesSection = async function() {
 
         <!-- Add Service Alert Modal -->
         <div class="modal fade" id="addServiceAlertModal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Set Service Alert</h5>
@@ -230,6 +230,53 @@ window.loadVehiclesSection = async function() {
                             <input type="number" class="form-control" id="update-odo-value" required>
                         </div>
                         <button type="button" class="btn btn-primary w-100 btn-sm" onclick="saveOdometerUpdate()">Update</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vehicle Docs Modal -->
+        <div class="modal fade" id="vehicleDocsModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Vehicle Documents</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="docs-vehicle-id">
+                        <div id="vehicle-docs-list" class="mb-4 list-group">
+                            <!-- List of docs -->
+                        </div>
+                        
+                        <div class="bg-light p-3 rounded border">
+                            <h6 class="mb-3 small fw-bold text-uppercase text-muted">Add / Update Document</h6>
+                            <form id="vehicle-doc-form">
+                                <div class="row g-2">
+                                    <div class="col-6 mb-2">
+                                        <label class="form-label small">Type</label>
+                                        <select class="form-select form-select-sm" id="doc-type">
+                                            <option value="RC">RC (Registration)</option>
+                                            <option value="Insurance">Insurance</option>
+                                            <option value="PUC">PUC (Pollution)</option>
+                                            <option value="Permit">Permit</option>
+                                            <option value="Other">Other</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6 mb-2">
+                                        <label class="form-label small">Doc Number</label>
+                                        <input type="text" class="form-control form-control-sm" id="doc-number" placeholder="Optional">
+                                    </div>
+                                    <div class="col-12 mb-2">
+                                        <label class="form-label small">Expiry Date</label>
+                                        <input type="date" class="form-control form-control-sm" id="doc-expiry" required>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-primary w-100 mt-2" onclick="saveVehicleDoc()">
+                                    <i class="fas fa-save me-1"></i> Save Document
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -333,6 +380,45 @@ window.loadVehicleDashboard = async function() {
         const vLogs = logsByVehicle[v.id] || [];
         const vAlerts = alertsByVehicle[v.id] || [];
         
+        // Document Status Logic
+        const docs = v.documents || [];
+        let docStatusHtml = '';
+        if (docs.length > 0) {
+            docStatusHtml = '<div class="d-flex flex-wrap gap-2">';
+            docs.forEach(d => {
+                if (!d.expiry) return;
+                const today = new Date();
+                today.setHours(0,0,0,0);
+                const expiryDate = new Date(d.expiry);
+                const daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+                
+                let badgeClass = 'bg-success-subtle text-success border-success-subtle';
+                let icon = 'fa-check-circle';
+                let statusText = `${daysLeft} days left`;
+                
+                if (daysLeft < 0) {
+                    badgeClass = 'bg-danger-subtle text-danger border-danger-subtle';
+                    icon = 'fa-exclamation-circle';
+                    statusText = `Expired ${Math.abs(daysLeft)} days ago`;
+                } else if (daysLeft <= 30) {
+                    badgeClass = 'bg-warning-subtle text-warning-emphasis border-warning-subtle';
+                    icon = 'fa-exclamation-triangle';
+                    statusText = `${daysLeft} days left`;
+                }
+
+                docStatusHtml += `
+                    <div class="border ${badgeClass} rounded px-2 py-1 d-flex align-items-center" style="font-size: 0.75rem;">
+                        <i class="fas ${icon} me-2"></i>
+                        <div>
+                            <div class="fw-bold">${d.type}</div>
+                            <div class="small" style="font-size: 0.65rem; opacity: 0.85;">${statusText}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            docStatusHtml += '</div>';
+        }
+
         // Calculate Mileage Stats
         const fuelLogs = vLogs.filter(l => l.type === 'fuel' && l.mileage > 0);
         const lastMileage = fuelLogs.length > 0 ? fuelLogs[0].mileage : 0;
@@ -460,14 +546,18 @@ window.loadVehicleDashboard = async function() {
                     </div>` : ''}
 
                     ${alertHtml ? `<div class="mb-3">${alertHtml}</div>` : ''}
+                    ${docStatusHtml ? `<div class="mb-3">${docStatusHtml}</div>` : ''}
 
                     ${chartHtml}
 
                     <div class="d-grid gap-2 d-flex mb-3">
-                        <button class="btn btn-primary flex-grow-1" onclick="showAddVehicleLogModal('${v.id}', 'fuel')">
+                        <button class="btn btn-primary flex-grow-1" onclick="showAddVehicleLogModal('${v.id}', 'fuel')" title="Add Fuel Log">
                             <i class="fas fa-gas-pump me-2"></i>Fuel
                         </button>
-                        <button class="btn btn-outline-secondary flex-grow-1" onclick="showAddVehicleLogModal('${v.id}', 'service')">
+                        <button class="btn btn-outline-secondary flex-grow-1" onclick="showVehicleDocsModal('${v.id}')" title="Manage Documents">
+                            <i class="fas fa-file-alt me-2"></i>Docs
+                        </button>
+                        <button class="btn btn-outline-secondary flex-grow-1" onclick="showAddVehicleLogModal('${v.id}', 'service')" title="Add Service Log">
                             <i class="fas fa-tools me-2"></i>Service
                         </button>
                     </div>
@@ -598,6 +688,108 @@ window.showAddServiceAlertModal = async function(vehicleId = null) {
     document.getElementById('service-alert-form').reset();
     updateAlertOdometerHelper();
     modal.show();
+};
+
+window.showVehicleDocsModal = async function(vehicleId) {
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('vehicleDocsModal'));
+    document.getElementById('docs-vehicle-id').value = vehicleId;
+    document.getElementById('vehicle-doc-form').reset();
+    
+    const listContainer = document.getElementById('vehicle-docs-list');
+    listContainer.innerHTML = '<div class="text-center"><div class="spinner-border spinner-border-sm text-primary"></div></div>';
+    
+    try {
+        const doc = await db.collection('vehicles').doc(vehicleId).get();
+        if (!doc.exists) return;
+        
+        const v = doc.data();
+        const docs = v.documents || [];
+        
+        listContainer.innerHTML = '';
+        if (docs.length === 0) {
+            listContainer.innerHTML = '<div class="text-center text-muted small py-2">No documents added yet.</div>';
+        } else {
+            docs.forEach((d, index) => {
+                const daysLeft = Math.ceil((new Date(d.expiry) - new Date()) / (1000 * 60 * 60 * 24));
+                let badgeClass = 'bg-success';
+                let statusText = 'Valid';
+                
+                if (daysLeft < 0) { badgeClass = 'bg-danger'; statusText = 'Expired'; }
+                else if (daysLeft < 30) { badgeClass = 'bg-warning text-dark'; statusText = 'Expiring Soon'; }
+                
+                const item = document.createElement('div');
+                item.className = 'list-group-item d-flex justify-content-between align-items-center p-2';
+                item.innerHTML = `
+                    <div>
+                        <div class="fw-bold small">${d.type} <span class="badge ${badgeClass} ms-1" style="font-size: 0.6rem;">${statusText}</span></div>
+                        <div class="small text-muted">
+                            ${d.number ? `<span class="me-2"><i class="fas fa-hashtag me-1"></i>${d.number}</span>` : ''}
+                            <span><i class="fas fa-calendar me-1"></i>${new Date(d.expiry).toLocaleDateString()}</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-danger border-0" onclick="deleteVehicleDoc('${vehicleId}', ${index})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                `;
+                listContainer.appendChild(item);
+            });
+        }
+    } catch (e) {
+        console.error(e);
+        listContainer.innerHTML = '<div class="text-danger small">Error loading documents</div>';
+    }
+    
+    modal.show();
+};
+
+window.saveVehicleDoc = async function() {
+    const vehicleId = document.getElementById('docs-vehicle-id').value;
+    const type = document.getElementById('doc-type').value;
+    const number = document.getElementById('doc-number').value;
+    const expiry = document.getElementById('doc-expiry').value;
+    
+    if (!expiry) {
+        if(window.dashboard) window.dashboard.showNotification('Expiry date is required', 'warning');
+        return;
+    }
+    
+    try {
+        const docRef = db.collection('vehicles').doc(vehicleId);
+        const newDoc = { type, number, expiry };
+        
+        await docRef.update({
+            documents: firebase.firestore.FieldValue.arrayUnion(newDoc)
+        });
+        
+        showVehicleDocsModal(vehicleId); // Refresh list
+        loadVehicleDashboard(); // Refresh dashboard badges
+        if(window.dashboard) window.dashboard.showNotification('Document saved', 'success');
+    } catch (e) {
+        console.error(e);
+        if(window.dashboard) window.dashboard.showNotification('Error saving document', 'danger');
+    }
+};
+
+window.deleteVehicleDoc = async function(vehicleId, index) {
+    if (!confirm('Delete this document?')) return;
+    
+    try {
+        const docRef = db.collection('vehicles').doc(vehicleId);
+        const docSnap = await docRef.get();
+        if (!docSnap.exists) return;
+        
+        const docs = docSnap.data().documents || [];
+        if (index >= 0 && index < docs.length) {
+            docs.splice(index, 1); // Remove item at index
+            await docRef.update({ documents: docs });
+            
+            showVehicleDocsModal(vehicleId);
+            loadVehicleDashboard();
+            if(window.dashboard) window.dashboard.showNotification('Document deleted', 'success');
+        }
+    } catch (e) {
+        console.error(e);
+    }
 };
 
 window.toggleLogFields = function() {
@@ -995,6 +1187,26 @@ window.calculateMaintenanceEvents = async function() {
         });
     });
 
+    // 5. Add Document Expiries
+    Object.values(vehicles).forEach(v => {
+        if (v.documents && Array.isArray(v.documents)) {
+            v.documents.forEach(d => {
+                const expiryDate = new Date(d.expiry);
+                const daysLeft = Math.ceil((expiryDate - new Date()) / (1000 * 60 * 60 * 24));
+                
+                events.push({
+                    id: `${v.id}_${d.type}`,
+                    title: `${d.type} Expiry`,
+                    vehicleName: v.name,
+                    date: expiryDate,
+                    remainingKm: null, // Flag for doc
+                    status: daysLeft < 0 ? 'overdue' : (daysLeft < 30 ? 'soon' : 'future'),
+                    daysLeft: daysLeft
+                });
+            });
+        }
+    });
+
     // Sort by date
     events.sort((a, b) => a.date - b.date);
     return events;
@@ -1096,6 +1308,12 @@ window.loadMaintenanceSchedule = async function() {
                     badgeClass = 'bg-warning text-dark';
                 }
 
+                let subText = '';
+                if (e.remainingKm !== null) subText = e.remainingKm > 0 ? e.remainingKm + ' km left' : 'Overdue';
+                else {
+                    subText = e.daysLeft < 0 ? `Expired ${Math.abs(e.daysLeft)} days ago` : `${e.daysLeft} days left`;
+                }
+
                 html += `
                     <div class="list-group-item">
                         <div class="d-flex justify-content-between align-items-center">
@@ -1105,7 +1323,7 @@ window.loadMaintenanceSchedule = async function() {
                             </div>
                             <div class="text-end">
                                 <span class="badge ${badgeClass} mb-1">${dateText}</span>
-                                <div class="small text-muted">${e.remainingKm > 0 ? e.remainingKm + ' km left' : 'Overdue'}</div>
+                                <div class="small text-muted">${subText}</div>
                             </div>
                         </div>
                     </div>
