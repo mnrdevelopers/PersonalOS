@@ -814,6 +814,7 @@ window.confirmCheckout = async function() {
 
         await batch.commit();
         
+        window.setBtnLoading(btn, false);
         bootstrap.Modal.getInstance(document.getElementById('checkoutModal')).hide();
         await loadGroceryData(); // Full reload after a big update like checkout is fine.
         if(window.dashboard) window.dashboard.showNotification('Purchase recorded!', 'success');
