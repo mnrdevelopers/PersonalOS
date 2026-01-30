@@ -233,22 +233,6 @@ window.loadFinanceSection = async function() {
                         
                         <div class="mb-3">
                             <div class="input-group mb-2">
-                                <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" id="selected-emoji-btn">🏷️</button>
-                                <ul class="dropdown-menu" style="max-height: 200px; overflow-y: auto;">
-                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('💰')">💰 Money</a></li>
-                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('🍔')">🍔 Food</a></li>
-                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('🚌')">🚌 Transport</a></li>
-                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('🛍️')">🛍️ Shopping</a></li>
-                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('🎬')">🎬 Entertainment</a></li>
-                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('🏠')">🏠 Home</a></li>
-                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('⚕️')">⚕️ Health</a></li>
-                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('🎓')">🎓 Education</a></li>
-                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('🧾')">🧾 Bills</a></li>
-                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('✈️')">✈️ Travel</a></li>
-                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('⛽')">⛽ Fuel</a></li>
-                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('🔧')">🔧 Service</a></li>
-                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('📦')">📦 Other</a></li>
-                                </ul>
                                 <input type="text" class="form-control" id="new-category-name" placeholder="Category Name">
                                 <input type="color" class="form-control form-control-color" id="new-category-color" value="#4361ee" title="Choose color">
                                 <button class="btn btn-primary" id="btn-add-category" onclick="addCategory()">Add</button>
@@ -423,11 +407,6 @@ window.stopRecurring = async function(id) {
     } finally {
         if(window.dashboard) window.dashboard.hideLoading();
     }
-};
-
-window.selectCategoryEmoji = function(emoji) {
-    document.getElementById('new-category-icon').value = emoji;
-    document.getElementById('selected-emoji-btn').textContent = emoji;
 };
 
 async function loadFinanceData(filter = null) {
@@ -806,7 +785,7 @@ window.loadCategories = async function(type) {
                     <span class="fw-medium">${data.name}</span>
                 </div>
                 <div>
-                    <button class="btn btn-sm btn-outline-primary border-0 me-1" onclick="editCategory('${doc.id}', '${safeName}', '${data.color}', '${safeIcon}')">
+                    <button class="btn btn-sm btn-outline-primary border-0 me-1" onclick="editCategory('${doc.id}', '${safeName}', '${data.color}')">
                         <i class="fas fa-edit"></i>
                     </button>
                     <button class="btn btn-sm btn-outline-danger border-0" onclick="deleteCategory('${doc.id}')">
@@ -825,10 +804,9 @@ window.loadCategories = async function(type) {
 window.addCategory = async function() {
     const nameInput = document.getElementById('new-category-name');
     const colorInput = document.getElementById('new-category-color');
-    const iconInput = document.getElementById('new-category-icon');
     const name = nameInput.value.trim();
     const color = colorInput.value;
-    const icon = iconInput.value || '🏷️';
+    const icon = '🏷️';
     const user = auth.currentUser;
     const btn = document.getElementById('btn-add-category');
     
@@ -849,8 +827,6 @@ window.addCategory = async function() {
         });
         
         nameInput.value = '';
-        // Reset icon to default
-        selectCategoryEmoji('🏷️');
         loadCategories(currentCategoryType);
 
         // Refresh dashboard transaction dropdown if available
@@ -863,6 +839,7 @@ window.addCategory = async function() {
         // Refresh filter dropdown
         if (window.populateCategoryFilter) window.populateCategoryFilter();
 
+        window.setBtnLoading(btn, false);
         if(window.dashboard) window.dashboard.showNotification('Category added', 'success');
     } catch (error) {
         window.setBtnLoading(btn, false);
@@ -871,13 +848,10 @@ window.addCategory = async function() {
     }
 };
 
-window.editCategory = function(id, name, color, icon) {
+window.editCategory = function(id, name, color) {
     document.getElementById('edit-category-id').value = id;
     document.getElementById('new-category-name').value = name;
     document.getElementById('new-category-color').value = color;
-    
-    // Set icon
-    selectCategoryEmoji(icon);
     
     const btn = document.getElementById('btn-add-category');
     btn.textContent = 'Update';
@@ -891,7 +865,6 @@ window.resetCategoryForm = function() {
     document.getElementById('edit-category-id').value = '';
     document.getElementById('new-category-name').value = '';
     document.getElementById('new-category-color').value = '#4361ee';
-    selectCategoryEmoji('🏷️');
     
     const btn = document.getElementById('btn-add-category');
     btn.textContent = 'Add';
@@ -905,7 +878,6 @@ window.updateCategory = async function() {
     const id = document.getElementById('edit-category-id').value;
     const name = document.getElementById('new-category-name').value.trim();
     const color = document.getElementById('new-category-color').value;
-    const icon = document.getElementById('new-category-icon').value;
     const btn = document.getElementById('btn-add-category');
     
     if (!name) {
@@ -921,7 +893,7 @@ window.updateCategory = async function() {
         const oldName = oldDoc.data().name;
 
         await db.collection('categories').doc(id).update({
-            name, color, icon,
+            name, color,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         
@@ -949,6 +921,7 @@ window.updateCategory = async function() {
         // Refresh filter dropdown
         if (window.populateCategoryFilter) window.populateCategoryFilter();
         
+        window.setBtnLoading(btn, false);
         if(window.dashboard) window.dashboard.showNotification('Category updated', 'success');
     } catch(e) {
         window.setBtnLoading(btn, false);
