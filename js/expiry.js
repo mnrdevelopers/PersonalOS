@@ -39,7 +39,7 @@ window.loadExpirySection = async function() {
         
         <!-- Add/Edit Modal -->
         <div class="modal fade" id="addExpiryModal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title" id="expiryModalTitle">Add Document</h5>
@@ -105,7 +105,7 @@ window.loadExpirySection = async function() {
 
         <!-- Renew Modal -->
         <div class="modal fade" id="renewExpiryModal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Renew Document</h5>
@@ -402,4 +402,32 @@ window.confirmRenew = async function() {
     } catch (error) {
         console.error("Error renewing document:", error);
     }
+};
+
+window.getExpiryEvents = async function() {
+    const user = auth.currentUser;
+    if (!user) return [];
+    const snapshot = await db.collection('expiry_docs')
+        .where('userId', '==', user.uid)
+        .get();
+    
+    const events = [];
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    snapshot.forEach(doc => {
+        const data = doc.data();
+        const expiry = new Date(data.expiryDate);
+        const diffTime = expiry - today;
+        const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        events.push({
+            ...data,
+            id: doc.id,
+            date: expiry,
+            daysRemaining: daysRemaining,
+            status: daysRemaining < 0 ? 'expired' : (daysRemaining <= 30 ? 'warning' : 'normal')
+        });
+    });
+    return events;
 };
