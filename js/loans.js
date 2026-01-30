@@ -491,6 +491,7 @@ window.saveLoan = async function() {
             }
         }
         
+        window.setBtnLoading(btn, false);
         bootstrap.Modal.getOrCreateInstance(document.getElementById('addLoanModal')).hide();
         loadLoansGrid('active');
         if(window.dashboard) {
@@ -900,6 +901,7 @@ window.saveRepayment = async function() {
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
+        window.setBtnLoading(btn, false);
         bootstrap.Modal.getOrCreateInstance(document.getElementById('repaymentModal')).hide();
         loadLoansGrid('active');
         if(window.dashboard) window.dashboard.showNotification('Repayment recorded!', 'success');
@@ -1018,6 +1020,7 @@ window.saveChanges = async function() {
 
         await batch.commit();
 
+        window.setBtnLoading(btn, false);
         bootstrap.Modal.getOrCreateInstance(document.getElementById('editRepaymentModal')).hide();
         if(window.dashboard) window.dashboard.showNotification('Repayment updated successfully!', 'success');
         
