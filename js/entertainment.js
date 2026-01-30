@@ -284,6 +284,7 @@ window.saveEntertainment = async function() {
             }
         }
         
+        window.setBtnLoading(btn, false);
         const modalEl = document.getElementById('addEntertainmentModal');
         const modal = bootstrap.Modal.getInstance(modalEl);
         modal.hide();
