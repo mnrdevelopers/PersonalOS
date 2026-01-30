@@ -3,6 +3,7 @@ class Dashboard {
         this.currentUser = null;
         this.currentSection = 'dashboard';
         this.financeChart = null;
+        this.notificationTimeouts = {};
         this.init();
     }
 
@@ -21,6 +22,8 @@ class Dashboard {
             this.initializeDashboard();
             this.switchSection('dashboard');
         }
+        this.startGlobalAlertSystem();
+        this.processRecurringTransactions();
         this.hideLoading();
     }
 
@@ -433,6 +436,7 @@ class Dashboard {
             { id: 'goals', icon: 'fa-bullseye', label: 'Goals', color: '#f94144' },
             { id: 'entertainment', icon: 'fa-film', label: 'Fun', color: '#90be6d' },
             { id: 'vehicles', icon: 'fa-car', label: 'Auto', color: '#577590' },
+            { id: 'groceries', icon: 'fa-shopping-basket', label: 'Grocery', color: '#2ec4b6' },
             { id: 'expiry', icon: 'fa-hourglass-half', label: 'Expiry', color: '#f3722c' },
             { id: 'reports', icon: 'fa-chart-bar', label: 'Stats', color: '#277da1' },
             { id: 'profile', icon: 'fa-user', label: 'Profile', color: '#4d908e' },
@@ -550,13 +554,51 @@ class Dashboard {
                     el.textContent = this.currentUser.email;
                 });
 
+                // Member Since Badge
+                const memberSinceElement = document.getElementById('member-since-badge');
+                if (memberSinceElement) {
+                    let joinDate = new Date();
+                    if (this.currentUser.metadata && this.currentUser.metadata.creationTime) {
+                        joinDate = new Date(this.currentUser.metadata.creationTime);
+                    } else if (userData.createdAt) {
+                        joinDate = userData.createdAt.toDate();
+                    }
+                    const dateStr = joinDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                    memberSinceElement.innerHTML = `<span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25" style="font-size: 0.65rem; font-weight: 500;">Member since ${dateStr}</span>`;
+                }
+
+                // Profile Completion Logic
+                let completedFields = 0;
+                const totalFields = 4; // Name, Avatar, Currency, Theme
+                
+                if (userData.name) completedFields++;
+                if (userData.avatar && userData.avatar !== '👤') completedFields++;
+                if (userData.settings?.currency) completedFields++;
+                if (userData.settings?.theme) completedFields++;
+                
+                const completionPercent = Math.round((completedFields / totalFields) * 100);
+                const completionText = document.getElementById('profile-completion-text');
+                const completionBar = document.getElementById('profile-completion-bar');
+                
+                if (completionText) completionText.textContent = `${completionPercent}%`;
+                if (completionBar) completionBar.style.width = `${completionPercent}%`;
+
                 // Update Avatar
                 const avatar = userData.avatar || '👤';
                 const avatarElements = document.querySelectorAll('.avatar');
                 avatarElements.forEach(el => {
-                    // Apply emoji style
-                    el.innerHTML = avatar;
-                    el.style.cssText = 'display: flex; align-items: center; justify-content: center; font-size: 1.5rem; width: 40px; height: 40px; background-color: rgba(255,255,255,0.2); border-radius: 50%;';
+                    if (avatar.includes('/') || avatar.includes('.png')) {
+                        // Image Avatar
+                        el.innerHTML = `<img src="${avatar}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+                        el.style.backgroundColor = 'transparent';
+                        el.style.display = 'block';
+                        el.style.width = '40px';
+                        el.style.height = '40px';
+                    } else {
+                        // Emoji Avatar
+                        el.innerHTML = avatar;
+                        el.style.cssText = 'display: flex; align-items: center; justify-content: center; font-size: 1.5rem; width: 40px; height: 40px; background-color: rgba(255,255,255,0.2); border-radius: 50%;';
+                    }
                 });
                 
                 // Apply theme
@@ -593,6 +635,14 @@ class Dashboard {
         this.setupNotificationListener();
         
         this.updateGreeting();
+    }
+
+    startGlobalAlertSystem() {
+        // Run immediately
+        this.checkGlobalAlerts();
+        
+        // Run every 15 minutes
+        setInterval(() => this.checkGlobalAlerts(), 15 * 60 * 1000);
     }
 
     setupNotificationListener() {
@@ -714,6 +764,58 @@ class Dashboard {
         } catch (error) {
             console.error("Error marking all read:", error);
         }
+    }
+
+    calculateNextDate(dateStr, frequency) {
+        const date = new Date(dateStr);
+        if (frequency === 'weekly') date.setDate(date.getDate() + 7);
+        else if (frequency === 'monthly') date.setMonth(date.getMonth() + 1);
+        else if (frequency === 'yearly') date.setFullYear(date.getFullYear() + 1);
+        return date.toISOString().split('T')[0];
+    }
+
+    async processRecurringTransactions() {
+        if (!this.currentUser) return;
+        const today = new Date().toISOString().split('T')[0];
+        
+        try {
+            const snapshot = await db.collection('transactions')
+                .where('userId', '==', this.currentUser.uid)
+                .where('recurring', '==', true)
+                .where('nextDueDate', '<=', today)
+                .get();
+                
+            if (snapshot.empty) return;
+            
+            const batch = db.batch();
+            let count = 0;
+            
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                let nextDate = data.nextDueDate;
+                let iterations = 0;
+                
+                // Process missed occurrences (limit to 12 to prevent infinite loops)
+                while (nextDate <= today && iterations < 12) {
+                    const newRef = db.collection('transactions').doc();
+                    const newTx = { ...data, date: nextDate, createdAt: firebase.firestore.FieldValue.serverTimestamp(), recurring: false, parentTransactionId: doc.id, nextDueDate: null, frequency: null };
+                    delete newTx.id;
+                    batch.set(newRef, newTx);
+                    nextDate = this.calculateNextDate(nextDate, data.frequency);
+                    count++;
+                    iterations++;
+                }
+                batch.update(doc.ref, { nextDueDate: nextDate });
+            });
+            
+            if (count > 0) {
+                await batch.commit();
+                this.showNotification(`Processed ${count} recurring transactions`, 'info');
+                this.updateStats();
+                this.loadRecentTransactions();
+                if (this.currentSection === 'finance' && window.loadFinanceData) window.loadFinanceData();
+            }
+        } catch (e) { console.error("Recurring tx error:", e); }
     }
 
     async updateStats() {
@@ -1487,6 +1589,9 @@ class Dashboard {
             case 'dashboard':
                 await this.initializeDashboard();
                 break;
+            case 'notifications':
+                if (window.loadNotificationsSection) await window.loadNotificationsSection();
+                break;
             case 'finance':
                 await window.loadFinanceSection();
                 break;
@@ -1526,6 +1631,13 @@ class Dashboard {
             case 'vehicles':
                 if (window.loadVehiclesSection) await window.loadVehiclesSection();
                 break;
+            case 'groceries':
+                if (window.loadGroceriesSection) {
+                    await window.loadGroceriesSection();
+                } else {
+                    document.getElementById('groceries-section').innerHTML = '<div class="col-12 text-center py-5 text-danger"><i class="fas fa-exclamation-triangle fa-2x mb-3"></i><br>Groceries module not loaded.<br>Please refresh the page.</div>';
+                }
+                break;
         }
     }
 
@@ -1552,6 +1664,9 @@ class Dashboard {
             case 'add-expiry':
                 if (window.showAddExpiryModal) window.showAddExpiryModal();
                 break;
+            case 'add-grocery':
+                if (window.showAddGroceryItemModal) window.showAddGroceryItemModal();
+                break;
         }
     }
 
@@ -1568,6 +1683,13 @@ class Dashboard {
             document.getElementById('transaction-id').value = '';
             document.getElementById('transaction-amount').value = '';
             document.getElementById('transaction-description').value = '';
+            document.getElementById('recurring-transaction').checked = false;
+            document.getElementById('recurring-options').classList.add('d-none');
+            document.getElementById('transaction-frequency').value = 'monthly';
+
+            // Reset button state
+            const btn = document.getElementById('save-transaction');
+            if(btn) window.setBtnLoading(btn, false);
             
             modal.show();
         });
@@ -1608,10 +1730,12 @@ class Dashboard {
                 const optgroup = document.createElement('optgroup');
                 optgroup.label = 'Income Categories';
                 incomeSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    const icon = data.icon || (window.getCategoryIcon ? window.getCategoryIcon(data.name) : '');
                     const option = document.createElement('option');
-                    option.value = doc.data().name;
-                    option.textContent = doc.data().name;
-                    option.style.color = doc.data().color;
+                    option.value = data.name;
+                    option.textContent = `${icon} ${data.name}`;
+                    option.style.color = data.color;
                     optgroup.appendChild(option);
                 });
                 select.appendChild(optgroup);
@@ -1622,10 +1746,12 @@ class Dashboard {
                 const optgroup = document.createElement('optgroup');
                 optgroup.label = 'Expense Categories';
                 expenseSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    const icon = data.icon || (window.getCategoryIcon ? window.getCategoryIcon(data.name) : '');
                     const option = document.createElement('option');
-                    option.value = doc.data().name;
-                    option.textContent = doc.data().name;
-                    option.style.color = doc.data().color;
+                    option.value = data.name;
+                    option.textContent = `${icon} ${data.name}`;
+                    option.style.color = data.color;
                     optgroup.appendChild(option);
                 });
                 select.appendChild(optgroup);
@@ -1647,6 +1773,7 @@ class Dashboard {
             const description = document.getElementById('transaction-description').value;
             const date = document.getElementById('transaction-date').value;
             const isRecurring = document.getElementById('recurring-transaction').checked;
+            const frequency = document.getElementById('transaction-frequency').value;
             
             if (!type || !amount || !category || !date) {
                 this.showNotification('Please fill all required fields', 'danger');
@@ -1668,7 +1795,9 @@ class Dashboard {
                 description: description,
                 date: date,
                 userId: this.currentUser.uid,
-                recurring: isRecurring
+                recurring: isRecurring,
+                frequency: isRecurring ? frequency : null,
+                nextDueDate: isRecurring ? this.calculateNextDate(date, frequency) : null
             };
             
             if (id) {
@@ -1696,6 +1825,7 @@ class Dashboard {
             }
             
             this.showNotification(id ? 'Transaction updated successfully!' : 'Transaction added successfully!', 'success');
+            window.setBtnLoading(btn, false);
             
         } catch (error) {
             window.setBtnLoading(btn, false);
@@ -1865,6 +1995,7 @@ class Dashboard {
             const time = document.getElementById('reminder-time').value;
             const priority = document.getElementById('reminder-priority').value;
             const sendNotification = document.getElementById('reminder-notification').checked;
+            const alertDaysBefore = parseInt(document.getElementById('reminder-alert-days').value) || 0;
             
             if (!title || !dueDate) {
                 this.showNotification('Please fill all required fields', 'danger');
@@ -1880,6 +2011,7 @@ class Dashboard {
                 time: time || null,
                 priority: priority,
                 sendNotification: sendNotification,
+                alertDaysBefore: alertDaysBefore,
                 completed: false,
                 userId: this.currentUser.uid,
             };
@@ -1904,12 +2036,24 @@ class Dashboard {
             this.updateStats();
             this.loadUpcomingTasks();
             
+            // Refresh Reminders Section if active
+            if (this.currentSection === 'reminders' && window.loadTasks) {
+                const activeTab = document.querySelector('#reminders-section .nav-link.active');
+                const status = activeTab && activeTab.textContent.trim() === 'Completed' ? 'completed' : 'pending';
+                window.loadTasks(status);
+            }
+
             this.showNotification(id ? 'Task updated successfully!' : 'Task added successfully!', 'success');
             
-            // Schedule notification if enabled
+            // Schedule or Cancel notification
             if (sendNotification) {
                 this.scheduleNotification(reminder);
+            } else if (id && this.notificationTimeouts[id]) {
+                clearTimeout(this.notificationTimeouts[id]);
+                delete this.notificationTimeouts[id];
             }
+
+            window.setBtnLoading(btn, false);
             
         } catch (error) {
             window.setBtnLoading(btn, false);
@@ -1918,18 +2062,39 @@ class Dashboard {
         }
     }
 
-    scheduleNotification(reminder) {
-        const dueDateTime = new Date(reminder.dueDate);
+    async scheduleNotification(reminder) {
+        // Clear existing timeout if any (prevent duplicates on edit)
+        if (this.notificationTimeouts[reminder.id]) {
+            clearTimeout(this.notificationTimeouts[reminder.id]);
+            delete this.notificationTimeouts[reminder.id];
+        }
+
+        // Request permission if needed
+        if ('Notification' in window && Notification.permission === 'default') {
+            await Notification.requestPermission();
+        }
+
+        // Parse date as Local Time (append T00:00:00)
+        const dueDateTime = new Date(reminder.dueDate + 'T00:00:00');
+        
         if (reminder.time) {
             const [hours, minutes] = reminder.time.split(':');
             dueDateTime.setHours(parseInt(hours), parseInt(minutes));
+        } else {
+            // Default to 9:00 AM if no time specified
+            dueDateTime.setHours(9, 0, 0);
+        }
+        
+        // Adjust for "Days Before"
+        if (reminder.alertDaysBefore && reminder.alertDaysBefore > 0) {
+            dueDateTime.setDate(dueDateTime.getDate() - parseInt(reminder.alertDaysBefore));
         }
         
         const now = new Date();
         const timeUntilDue = dueDateTime.getTime() - now.getTime();
         
         if (timeUntilDue > 0) {
-            setTimeout(() => {
+            this.notificationTimeouts[reminder.id] = setTimeout(() => {
                 if ('Notification' in window && Notification.permission === 'granted') {
                     new Notification('Task Reminder', {
                         body: `${reminder.title} is due now!`,
@@ -1947,6 +2112,9 @@ class Dashboard {
                     relatedId: reminder.id || null,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
+                
+                // Cleanup timeout reference
+                delete this.notificationTimeouts[reminder.id];
             }, timeUntilDue);
         }
     }
@@ -2079,6 +2247,21 @@ class Dashboard {
                 const logDoc = existingLog.docs[0];
                 const currentStatus = logDoc.data().completed;
                 
+                // If undoing a bad habit relapse (setting to false), restore lastLogDate
+                if (habitData.type === 'bad' && currentStatus === true) {
+                    const prevLogSnap = await db.collection('habit_logs')
+                        .where('userId', '==', this.currentUser.uid)
+                        .where('habitId', '==', habitId)
+                        .where('completed', '==', true)
+                        .where('date', '<', today)
+                        .orderBy('date', 'desc')
+                        .limit(1)
+                        .get();
+                    
+                    const newLastLogDate = !prevLogSnap.empty ? prevLogSnap.docs[0].data().date : (habitData.createdAt ? new Date(habitData.createdAt.toDate()).toISOString().split('T')[0] : null);
+                    await db.collection('habits').doc(habitId).update({ lastLogDate: newLastLogDate });
+                }
+
                 await db.collection('habit_logs').doc(logDoc.id).update({
                     completed: !currentStatus,
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -2089,6 +2272,19 @@ class Dashboard {
                     : (!currentStatus ? 'Habit completed!' : 'Habit unchecked.');
                 this.showNotification(msg, 'success');
             } else {
+                // If logging a bad habit relapse (creating new log), update longest streak
+                if (habitData.type === 'bad') {
+                    const lastDate = habitData.lastLogDate ? new Date(habitData.lastLogDate) : (habitData.createdAt ? habitData.createdAt.toDate() : new Date());
+                    const todayDate = new Date();
+                    const diffTime = Math.abs(todayDate - lastDate);
+                    const daysClean = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                    
+                    const currentLongest = habitData.longestStreak || 0;
+                    if (daysClean > currentLongest) {
+                        await db.collection('habits').doc(habitId).update({ longestStreak: daysClean });
+                    }
+                }
+
                 // Update habit total completions
                 await db.collection('habits').doc(habitId).update({
                     totalCompletions: firebase.firestore.FieldValue.increment(1),
@@ -2199,6 +2395,137 @@ class Dashboard {
         } catch (error) {
             console.error('Error logging out:', error);
             this.showNotification('Error logging out', 'danger');
+        }
+    }
+
+    async checkGlobalAlerts() {
+        if (!this.currentUser) return;
+
+        try {
+            // 1. Get User Settings
+            const userDoc = await db.collection('users').doc(this.currentUser.uid).get();
+            const settings = userDoc.data()?.settings || {};
+            
+            // Master switch
+            if (settings.notifications === false) return;
+
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const todayStr = today.toISOString().split('T')[0];
+
+            // Helper to check if we already notified for this item
+            const shouldNotify = async (relatedId) => {
+                const existing = await db.collection('notifications')
+                    .where('userId', '==', this.currentUser.uid)
+                    .where('relatedId', '==', relatedId)
+                    .where('read', '==', false) // Only check unread. If user read it, we might remind again if still urgent? For now, avoid spam.
+                    .limit(1)
+                    .get();
+                return existing.empty;
+            };
+
+            // Helper to send alert
+            const sendAlert = async (title, message, type, relatedId, priority = 'normal') => {
+                if (await shouldNotify(relatedId)) {
+                    // DB Notification
+                    await db.collection('notifications').add({
+                        userId: this.currentUser.uid,
+                        title, message, type, relatedId,
+                        read: false,
+                        priority,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    // Browser Notification
+                    if (settings.notifications_browser !== false && 'Notification' in window && Notification.permission === 'granted') {
+                        new Notification(title, { body: message, icon: '/icons/icon-192.png' });
+                    }
+
+                    // Toast
+                    this.showNotification(`${title}: ${message}`, priority === 'high' ? 'danger' : 'info');
+                }
+            };
+
+            // --- 2. Check Tasks ---
+            if (settings.notifications_tasks !== false) {
+                const tasksSnap = await db.collection('reminders')
+                    .where('userId', '==', this.currentUser.uid)
+                    .where('completed', '==', false)
+                    .where('dueDate', '<=', todayStr)
+                    .get();
+                
+                tasksSnap.forEach(doc => {
+                    const task = doc.data();
+                    // Simple logic: If due today or overdue
+                    const isOverdue = new Date(task.dueDate) < today;
+                    sendAlert(
+                        isOverdue ? 'Task Overdue' : 'Task Due Today',
+                        task.title,
+                        'task',
+                        doc.id,
+                        task.priority === 'high' ? 'high' : 'normal'
+                    );
+                });
+            }
+
+            // --- 3. Check Expiry Docs ---
+            if (settings.notifications_expiry !== false) {
+                const expirySnap = await db.collection('expiry_docs')
+                    .where('userId', '==', this.currentUser.uid)
+                    .get();
+                
+                expirySnap.forEach(doc => {
+                    const data = doc.data();
+                    const expiryDate = new Date(data.expiryDate);
+                    const diffTime = expiryDate - today;
+                    const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    const reminderDays = data.reminderDays || 30;
+
+                    if (daysRemaining <= reminderDays && daysRemaining >= 0) {
+                        sendAlert('Document Expiring', `${data.title} expires in ${daysRemaining} days`, 'expiry', doc.id, 'high');
+                    } else if (daysRemaining < 0) {
+                        // Optional: Remind once about expired?
+                    }
+                });
+            }
+
+            // --- 4. Check Loans ---
+            if (settings.notifications_loans !== false) {
+                const loansSnap = await db.collection('loans')
+                    .where('userId', '==', this.currentUser.uid)
+                    .where('status', '==', 'active')
+                    .get();
+                
+                loansSnap.forEach(doc => {
+                    const loan = doc.data();
+                    if (loan.dueDate) {
+                        const due = new Date(loan.dueDate);
+                        if (due <= today) {
+                            sendAlert('Loan Repayment Due', `Payment for ${loan.name} is due`, 'loan', doc.id, 'high');
+                        }
+                    }
+                });
+            }
+
+            // --- 5. Check Vehicles (Service) ---
+            if (settings.notifications_vehicles !== false) {
+                // Need vehicles to compare odometer
+                const vehiclesSnap = await db.collection('vehicles').where('userId', '==', this.currentUser.uid).get();
+                const vehicles = {};
+                vehiclesSnap.forEach(v => vehicles[v.id] = v.data());
+
+                const alertsSnap = await db.collection('service_alerts').where('userId', '==', this.currentUser.uid).get();
+                alertsSnap.forEach(doc => {
+                    const alert = doc.data();
+                    const vehicle = vehicles[alert.vehicleId];
+                    if (vehicle && vehicle.currentOdometer >= alert.dueOdometer - 100) { // Alert 100km before
+                        sendAlert('Vehicle Service Due', `${alert.title} for ${vehicle.name} is due soon`, 'vehicle', doc.id, 'high');
+                    }
+                });
+            }
+
+        } catch (e) {
+            console.error("Global Alert Check Failed:", e);
         }
     }
 }
