@@ -1950,6 +1950,7 @@ class Dashboard {
             }
             
             // Close modal
+            window.setBtnLoading(btn, false);
             bootstrap.Modal.getOrCreateInstance(document.getElementById('addHabitModal')).hide();
             
             // Reset form
@@ -2201,6 +2202,7 @@ class Dashboard {
             }
             
             // Close modal
+            window.setBtnLoading(btn, false);
             bootstrap.Modal.getOrCreateInstance(document.getElementById('addMemoryModal')).hide();
             
             // Reset form
