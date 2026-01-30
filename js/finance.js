@@ -1,9 +1,44 @@
 let currentCategoryType = 'income';
 let currentFinanceFilter = 'all';
+let financeCategoryFilter = 'all';
 let financeLastDocs = [];
 let financeCurrentPage = 1;
 const FINANCE_PAGE_SIZE = 50;
 let financeSearchQuery = '';
+window.userCategoryIcons = {};
+
+window.refreshCategoryIcons = async function() {
+    const user = auth.currentUser;
+    if (!user) return;
+    try {
+        const snap = await db.collection('categories').where('userId', '==', user.uid).get();
+        window.userCategoryIcons = {};
+        snap.forEach(doc => {
+            const d = doc.data();
+            if (d.name) window.userCategoryIcons[d.name] = d.icon;
+        });
+    } catch (e) { console.error("Error refreshing icons:", e); }
+};
+
+// Helper to get icon for category name (fallback for existing data)
+window.getCategoryIcon = function(name, explicitIcon = null) {
+    if (explicitIcon) return explicitIcon;
+    if (!name) return '🏷️';
+    if (window.userCategoryIcons && window.userCategoryIcons[name]) return window.userCategoryIcons[name];
+    const lower = name.toLowerCase();
+    const map = {
+        'salary': '💰', 'freelance': '💻', 'investment': '📈', 'gift': '🎁',
+        'food': '🍔', 'transport': '🚌', 'shopping': '🛍️', 'entertainment': '🎬',
+        'bills': '🧾', 'healthcare': '⚕️', 'education': '🎓', 'travel': '✈️',
+        'groceries': '🛒', 'rent': '🏠', 'utilities': '💡', 'fuel': '⛽',
+        'emi': '🏦', 'loan': '💸', 'insurance': '🛡️', 'maintenance': '🔧', 'grocery': '🛒',
+        'vehicle': '🚗', 'home': '🏡', 'subscription': '🔄'
+    };
+    for (const [key, icon] of Object.entries(map)) {
+        if (lower.includes(key)) return icon;
+    }
+    return '🏷️';
+};
 
 window.loadFinanceSection = async function() {
     const container = document.getElementById('finance-section');
@@ -69,66 +104,110 @@ window.loadFinanceSection = async function() {
             </div>
         </div>
 
-        <div class="row g-2 mb-4">
-            <div class="col-md-4">
-                <div class="input-group">
-                    <span class="input-group-text bg-white border-end-0 rounded-start-pill ps-3"><i class="fas fa-search text-muted"></i></span>
-                    <input type="text" class="form-control border-start-0 rounded-end-pill" id="finance-search" placeholder="Search transactions..." onkeyup="searchFinance(this.value)">
+        <!-- Tabs -->
+        <ul class="nav nav-tabs mb-4">
+            <li class="nav-item">
+                <a class="nav-link active" href="javascript:void(0)" onclick="switchFinanceTab('ledger', this)">Transactions</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="javascript:void(0)" onclick="switchFinanceTab('recurring', this)">Recurring Rules</a>
+            </li>
+        </ul>
+
+        <!-- Ledger View -->
+        <div id="finance-ledger-view">
+            <div class="row g-2 mb-4">
+                <div class="col-md-3">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0 rounded-start-pill ps-3"><i class="fas fa-search text-muted"></i></span>
+                        <input type="text" class="form-control border-start-0 rounded-end-pill" id="finance-search" placeholder="Search transactions..." onkeyup="searchFinance(this.value)">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select rounded-pill" id="finance-category-filter" onchange="filterFinanceCategory(this.value)">
+                        <option value="all">All Categories</option>
+                        <!-- Populated via JS -->
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white rounded-start-pill">Date</span>
+                        <input type="date" class="form-control" id="finance-start-date" onchange="filterFinanceDate()">
+                        <span class="input-group-text">to</span>
+                        <input type="date" class="form-control" id="finance-end-date" onchange="filterFinanceDate()">
+                        <button class="btn btn-outline-secondary rounded-end-pill" type="button" onclick="clearFinanceDate()" title="Clear Dates">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-3 text-md-end">
+                    <div class="btn-group w-100" role="group">
+                        <input type="radio" class="btn-check" name="finance-filter" id="filter-all" autocomplete="off" checked>
+                        <label class="btn btn-outline-primary" for="filter-all">All</label>
+
+                        <input type="radio" class="btn-check" name="finance-filter" id="filter-income" autocomplete="off">
+                        <label class="btn btn-outline-success" for="filter-income">Income</label>
+
+                        <input type="radio" class="btn-check" name="finance-filter" id="filter-expense" autocomplete="off">
+                        <label class="btn btn-outline-danger" for="filter-expense">Expense</label>
+                    </div>
                 </div>
             </div>
-            <div class="col-md-5">
-                <div class="input-group">
-                    <span class="input-group-text bg-white rounded-start-pill">Date</span>
-                    <input type="date" class="form-control" id="finance-start-date" onchange="filterFinanceDate()">
-                    <span class="input-group-text">to</span>
-                    <input type="date" class="form-control" id="finance-end-date" onchange="filterFinanceDate()">
-                    <button class="btn btn-outline-secondary rounded-end-pill" type="button" onclick="clearFinanceDate()" title="Clear Dates">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="col-md-3 text-md-end">
-                <div class="btn-group w-100" role="group">
-                    <input type="radio" class="btn-check" name="finance-filter" id="filter-all" autocomplete="off" checked>
-                    <label class="btn btn-outline-primary" for="filter-all">All</label>
-
-                    <input type="radio" class="btn-check" name="finance-filter" id="filter-income" autocomplete="off">
-                    <label class="btn btn-outline-success" for="filter-income">Income</label>
-
-                    <input type="radio" class="btn-check" name="finance-filter" id="filter-expense" autocomplete="off">
-                    <label class="btn btn-outline-danger" for="filter-expense">Expense</label>
+            <div class="card table-card animate-slide-up" style="animation-delay: 0.4s;">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="ps-4">Date</th>
+                                    <th>Category & Desc</th>
+                                    <th>Payment Mode</th>
+                                    <th class="text-end pe-4">Amount</th>
+                                    <th class="text-end pe-4">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="finance-table-body">
+                                <tr><td colspan="6" class="text-center">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination -->
+                    <div class="d-flex justify-content-between align-items-center p-3 border-top bg-light">
+                        <span class="text-muted small" id="finance-page-info">Page 1</span>
+                        <div class="btn-group">
+                            <button class="btn btn-outline-secondary btn-sm" id="btn-finance-prev" onclick="changeFinancePage(-1)" disabled>
+                                <i class="fas fa-chevron-left"></i> Previous
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" id="btn-finance-next" onclick="changeFinancePage(1)" disabled>
+                                Next <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="card table-card animate-slide-up" style="animation-delay: 0.4s;">
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead>
-                            <tr>
-                                <th class="ps-4">Date</th>
-                                <th>Category & Desc</th>
-                                <th>Payment Mode</th>
-                                <th class="text-end pe-4">Amount</th>
-                                <th class="text-end pe-4">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="finance-table-body">
-                            <tr><td colspan="6" class="text-center">Loading...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-                
-                <!-- Pagination -->
-                <div class="d-flex justify-content-between align-items-center p-3 border-top bg-light">
-                    <span class="text-muted small" id="finance-page-info">Page 1</span>
-                    <div class="btn-group">
-                        <button class="btn btn-outline-secondary btn-sm" id="btn-finance-prev" onclick="changeFinancePage(-1)" disabled>
-                            <i class="fas fa-chevron-left"></i> Previous
-                        </button>
-                        <button class="btn btn-outline-secondary btn-sm" id="btn-finance-next" onclick="changeFinancePage(1)" disabled>
-                            Next <i class="fas fa-chevron-right"></i>
-                        </button>
+
+        <!-- Recurring View -->
+        <div id="finance-recurring-view" class="d-none">
+            <div class="card table-card animate-slide-up">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="ps-4">Description</th>
+                                    <th>Category</th>
+                                    <th>Frequency</th>
+                                    <th>Next Due</th>
+                                    <th class="text-end pe-4">Amount</th>
+                                    <th class="text-end pe-4">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recurring-table-body">
+                                <tr><td colspan="6" class="text-center">Loading...</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -136,7 +215,7 @@ window.loadFinanceSection = async function() {
 
         <!-- Categories Modal -->
         <div class="modal fade" id="categoriesModal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Manage Categories</h5>
@@ -152,10 +231,31 @@ window.loadFinanceSection = async function() {
                             </li>
                         </ul>
                         
-                        <div class="input-group mb-3">
-                            <input type="text" class="form-control" id="new-category-name" placeholder="New category name">
-                            <input type="color" class="form-control form-control-color" id="new-category-color" value="#4361ee" title="Choose color">
-                            <button class="btn btn-primary" id="btn-add-category" onclick="addCategory()">Add</button>
+                        <div class="mb-3">
+                            <div class="input-group mb-2">
+                                <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" id="selected-emoji-btn">🏷️</button>
+                                <ul class="dropdown-menu" style="max-height: 200px; overflow-y: auto;">
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('💰')">💰 Money</a></li>
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('🍔')">🍔 Food</a></li>
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('🚌')">🚌 Transport</a></li>
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('🛍️')">🛍️ Shopping</a></li>
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('🎬')">🎬 Entertainment</a></li>
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('🏠')">🏠 Home</a></li>
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('⚕️')">⚕️ Health</a></li>
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('🎓')">🎓 Education</a></li>
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('🧾')">🧾 Bills</a></li>
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('✈️')">✈️ Travel</a></li>
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('⛽')">⛽ Fuel</a></li>
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('🔧')">🔧 Service</a></li>
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectCategoryEmoji('📦')">📦 Other</a></li>
+                                </ul>
+                                <input type="text" class="form-control" id="new-category-name" placeholder="Category Name">
+                                <input type="color" class="form-control form-control-color" id="new-category-color" value="#4361ee" title="Choose color">
+                                <button class="btn btn-primary" id="btn-add-category" onclick="addCategory()">Add</button>
+                                <button class="btn btn-outline-secondary d-none" id="btn-cancel-category" onclick="resetCategoryForm()">Cancel</button>
+                            </div>
+                            <input type="hidden" id="new-category-icon" value="🏷️">
+                            <input type="hidden" id="edit-category-id">
                         </div>
                         
                         <div id="categories-list" class="list-group">
@@ -168,12 +268,166 @@ window.loadFinanceSection = async function() {
     `;
 
     // Load data
+    await window.refreshCategoryIcons();
+    await window.populateCategoryFilter();
     await loadFinanceData();
 
     // Setup filters
     document.getElementById('filter-all').addEventListener('click', () => filterFinance('all', true));
     document.getElementById('filter-income').addEventListener('click', () => filterFinance('income', true));
     document.getElementById('filter-expense').addEventListener('click', () => filterFinance('expense', true));
+};
+
+window.switchFinanceTab = function(tab, element) {
+    document.querySelectorAll('#finance-section .nav-tabs .nav-link').forEach(l => l.classList.remove('active'));
+    element.classList.add('active');
+
+    if (tab === 'ledger') {
+        document.getElementById('finance-ledger-view').classList.remove('d-none');
+        document.getElementById('finance-recurring-view').classList.add('d-none');
+        loadFinanceData();
+    } else {
+        document.getElementById('finance-ledger-view').classList.add('d-none');
+        document.getElementById('finance-recurring-view').classList.remove('d-none');
+        loadRecurringTransactions();
+    }
+};
+
+window.populateCategoryFilter = async function() {
+    const user = auth.currentUser;
+    if (!user) return;
+    const select = document.getElementById('finance-category-filter');
+    if (!select) return;
+
+    select.innerHTML = '<option value="all">All Categories</option>';
+
+    try {
+        const snap = await db.collection('categories')
+            .where('userId', '==', user.uid)
+            .orderBy('name')
+            .get();
+        
+        const incomeCats = [];
+        const expenseCats = [];
+
+        snap.forEach(doc => {
+            const d = doc.data();
+            if (d.type === 'income') incomeCats.push(d);
+            else expenseCats.push(d);
+        });
+
+        if (incomeCats.length > 0) {
+            const grp = document.createElement('optgroup');
+            grp.label = 'Income';
+            incomeCats.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.name;
+                opt.textContent = `${c.icon || '💰'} ${c.name}`;
+                grp.appendChild(opt);
+            });
+            select.appendChild(grp);
+        }
+
+        if (expenseCats.length > 0) {
+            const grp = document.createElement('optgroup');
+            grp.label = 'Expense';
+            expenseCats.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.name;
+                opt.textContent = `${c.icon || '💸'} ${c.name}`;
+                grp.appendChild(opt);
+            });
+            select.appendChild(grp);
+        }
+        
+        select.value = financeCategoryFilter;
+    } catch (e) { console.error("Error populating categories:", e); }
+};
+
+window.filterFinanceCategory = function(category) {
+    financeCategoryFilter = category;
+    financeCurrentPage = 1;
+    financeLastDocs = [];
+    loadFinanceData();
+};
+
+window.loadRecurringTransactions = async function() {
+    const user = auth.currentUser;
+    const tbody = document.getElementById('recurring-table-body');
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center"><div class="spinner-border spinner-border-sm text-primary"></div> Loading...</td></tr>';
+
+    try {
+        const snapshot = await db.collection('transactions')
+            .where('userId', '==', user.uid)
+            .where('recurring', '==', true)
+            .orderBy('nextDueDate', 'asc')
+            .get();
+
+        if (snapshot.empty) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No active recurring transactions found.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = '';
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const isIncome = data.type === 'income';
+            const colorClass = isIncome ? 'text-success' : 'text-danger';
+            const icon = window.getCategoryIcon(data.category);
+            
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="ps-4">
+                    <div class="fw-bold text-dark">${data.description || 'Recurring Transaction'}</div>
+                </td>
+                <td>
+                    <span class="me-2">${icon}</span>${data.category}
+                </td>
+                <td><span class="badge bg-info text-dark">${(data.frequency || 'Monthly').toUpperCase()}</span></td>
+                <td>${data.nextDueDate ? new Date(data.nextDueDate).toLocaleDateString() : 'N/A'}</td>
+                <td class="text-end ${colorClass} fw-bold pe-4">₹${data.amount.toFixed(2)}</td>
+                <td class="text-end pe-4">
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editTransaction('${doc.id}')" title="Edit">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="stopRecurring('${doc.id}')" title="Stop Recurring">
+                        <i class="fas fa-stop-circle"></i>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (e) {
+        console.error(e);
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading data</td></tr>';
+    }
+};
+
+window.stopRecurring = async function(id) {
+    if (!confirm('Stop this recurring transaction? It will no longer generate future entries.')) return;
+    
+    try {
+        if(window.dashboard) window.dashboard.showLoading();
+        await db.collection('transactions').doc(id).update({
+            recurring: false,
+            nextDueDate: null,
+            frequency: null,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        loadRecurringTransactions();
+        if(window.dashboard) window.dashboard.showNotification('Recurring transaction stopped', 'success');
+    } catch(e) {
+        console.error(e);
+        if(window.dashboard) window.dashboard.showNotification('Error updating transaction', 'danger');
+    } finally {
+        if(window.dashboard) window.dashboard.hideLoading();
+    }
+};
+
+window.selectCategoryEmoji = function(emoji) {
+    document.getElementById('new-category-icon').value = emoji;
+    document.getElementById('selected-emoji-btn').textContent = emoji;
 };
 
 async function loadFinanceData(filter = null) {
@@ -194,6 +448,10 @@ async function loadFinanceData(filter = null) {
 
     if (currentFinanceFilter !== 'all') {
         query = query.where('type', '==', currentFinanceFilter);
+    }
+
+    if (financeCategoryFilter !== 'all') {
+        query = query.where('category', '==', financeCategoryFilter);
     }
 
     const startDate = document.getElementById('finance-start-date')?.value;
@@ -261,12 +519,13 @@ async function loadFinanceData(filter = null) {
             const sign = isIncome ? '+' : '-';
             const modeBadge = data.paymentMode === 'upi' ? 'bg-info' : 'bg-warning text-dark';
             const modeText = data.paymentMode ? data.paymentMode.toUpperCase() : 'CASH';
+            const icon = window.getCategoryIcon(data.category);
             
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td class="ps-4 text-muted fw-medium">${new Date(data.date).toLocaleDateString()}</td>
                 <td>
-                    <div class="fw-bold text-dark">${data.category}</div>
+                    <div class="fw-bold text-dark"><span class="me-2">${icon}</span>${data.category}</div>
                     <div class="small text-muted">${data.description || ''}</div>
                 </td>
                 <td><span class="badge ${modeBadge} rounded-pill px-3">${modeText}</span></td>
@@ -296,6 +555,10 @@ async function updateFinanceStats() {
 
     if (currentFinanceFilter !== 'all') {
         query = query.where('type', '==', currentFinanceFilter);
+    }
+
+    if (financeCategoryFilter !== 'all') {
+        query = query.where('category', '==', financeCategoryFilter);
     }
 
     const startDate = document.getElementById('finance-start-date')?.value;
@@ -370,6 +633,19 @@ window.editTransaction = async function(id) {
         if (data.type === 'income') document.getElementById('type-income').checked = true;
         else document.getElementById('type-expense').checked = true;
         
+        if (data.recurring) {
+            document.getElementById('recurring-transaction').checked = true;
+            document.getElementById('recurring-options').classList.remove('d-none');
+            document.getElementById('transaction-frequency').value = data.frequency || 'monthly';
+        } else {
+            document.getElementById('recurring-transaction').checked = false;
+            document.getElementById('recurring-options').classList.add('d-none');
+        }
+
+        // Reset button state
+        const btn = document.getElementById('save-transaction');
+        if(btn) window.setBtnLoading(btn, false);
+
         const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addTransactionModal'));
         modal.show();
     } catch (e) { console.error(e); }
@@ -420,6 +696,10 @@ window.exportFinanceCSV = async function() {
             query = query.where('type', '==', currentFinanceFilter);
         }
 
+        if (financeCategoryFilter !== 'all') {
+            query = query.where('category', '==', financeCategoryFilter);
+        }
+
         const startDate = document.getElementById('finance-start-date')?.value;
         const endDate = document.getElementById('finance-end-date')?.value;
         if (startDate) {
@@ -466,8 +746,21 @@ window.exportFinanceCSV = async function() {
 
 window.openCategoriesModal = function() {
     const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('categoriesModal'));
+    
+    // Reset form and state to ensure clean slate
+    resetCategoryForm();
+    
+    // Default to Income tab
+    currentCategoryType = 'income';
+    document.querySelectorAll('#categoriesModal .nav-link').forEach(l => l.classList.remove('active'));
+    const incomeTab = document.querySelector('#categoriesModal .nav-link[onclick*="income"]');
+    if (incomeTab) incomeTab.classList.add('active');
+    
     modal.show();
     loadCategories('income');
+    
+    // Ensure form resets when modal closes to prevent state leaking
+    document.getElementById('categoriesModal').addEventListener('hidden.bs.modal', resetCategoryForm, { once: true });
 };
 
 window.switchCategoryTab = function(type, element) {
@@ -501,16 +794,25 @@ window.loadCategories = async function(type) {
         
         snapshot.forEach(doc => {
             const data = doc.data();
+            const safeName = (data.name || '').replace(/'/g, "\\'");
+            const safeIcon = (data.icon || window.getCategoryIcon(data.name)).replace(/'/g, "\\'");
+            
             const item = document.createElement('div');
             item.className = 'list-group-item d-flex justify-content-between align-items-center';
             item.innerHTML = `
                 <div class="d-flex align-items-center">
-                    <div style="width: 15px; height: 15px; border-radius: 50%; background-color: ${data.color}; margin-right: 10px;"></div>
-                    <span>${data.name}</span>
+                    <div class="me-3 fs-5">${data.icon || window.getCategoryIcon(data.name)}</div>
+                    <div style="width: 10px; height: 10px; border-radius: 50%; background-color: ${data.color}; margin-right: 10px;"></div>
+                    <span class="fw-medium">${data.name}</span>
                 </div>
-                <button class="btn btn-sm btn-outline-danger border-0" onclick="deleteCategory('${doc.id}')">
-                    <i class="fas fa-times"></i>
-                </button>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary border-0 me-1" onclick="editCategory('${doc.id}', '${safeName}', '${data.color}', '${safeIcon}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger border-0" onclick="deleteCategory('${doc.id}')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
             `;
             container.appendChild(item);
         });
@@ -523,8 +825,10 @@ window.loadCategories = async function(type) {
 window.addCategory = async function() {
     const nameInput = document.getElementById('new-category-name');
     const colorInput = document.getElementById('new-category-color');
+    const iconInput = document.getElementById('new-category-icon');
     const name = nameInput.value.trim();
     const color = colorInput.value;
+    const icon = iconInput.value || '🏷️';
     const user = auth.currentUser;
     const btn = document.getElementById('btn-add-category');
     
@@ -540,10 +844,13 @@ window.addCategory = async function() {
             name: name,
             type: currentCategoryType,
             color: color,
+            icon: icon,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         
         nameInput.value = '';
+        // Reset icon to default
+        selectCategoryEmoji('🏷️');
         loadCategories(currentCategoryType);
 
         // Refresh dashboard transaction dropdown if available
@@ -553,11 +860,100 @@ window.addCategory = async function() {
             const catSelect = document.getElementById('transaction-category');
             if (catSelect) catSelect.value = name;
         }
+        // Refresh filter dropdown
+        if (window.populateCategoryFilter) window.populateCategoryFilter();
+
         if(window.dashboard) window.dashboard.showNotification('Category added', 'success');
     } catch (error) {
         window.setBtnLoading(btn, false);
         console.error("Error adding category:", error);
         if(window.dashboard) window.dashboard.showNotification('Failed to add category', 'danger');
+    }
+};
+
+window.editCategory = function(id, name, color, icon) {
+    document.getElementById('edit-category-id').value = id;
+    document.getElementById('new-category-name').value = name;
+    document.getElementById('new-category-color').value = color;
+    
+    // Set icon
+    selectCategoryEmoji(icon);
+    
+    const btn = document.getElementById('btn-add-category');
+    btn.textContent = 'Update';
+    btn.className = 'btn btn-success';
+    btn.onclick = updateCategory;
+    
+    document.getElementById('btn-cancel-category').classList.remove('d-none');
+};
+
+window.resetCategoryForm = function() {
+    document.getElementById('edit-category-id').value = '';
+    document.getElementById('new-category-name').value = '';
+    document.getElementById('new-category-color').value = '#4361ee';
+    selectCategoryEmoji('🏷️');
+    
+    const btn = document.getElementById('btn-add-category');
+    btn.textContent = 'Add';
+    btn.className = 'btn btn-primary';
+    btn.onclick = addCategory;
+    
+    document.getElementById('btn-cancel-category').classList.add('d-none');
+};
+
+window.updateCategory = async function() {
+    const id = document.getElementById('edit-category-id').value;
+    const name = document.getElementById('new-category-name').value.trim();
+    const color = document.getElementById('new-category-color').value;
+    const icon = document.getElementById('new-category-icon').value;
+    const btn = document.getElementById('btn-add-category');
+    
+    if (!name) {
+        if(window.dashboard) window.dashboard.showNotification('Please enter a category name', 'warning');
+        return;
+    }
+    
+    try {
+        window.setBtnLoading(btn, true);
+        
+        // Get old data to check for name change
+        const oldDoc = await db.collection('categories').doc(id).get();
+        const oldName = oldDoc.data().name;
+
+        await db.collection('categories').doc(id).update({
+            name, color, icon,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // If name changed, update all associated transactions
+        if (oldName && oldName !== name) {
+            const batch = db.batch();
+            const txSnap = await db.collection('transactions')
+                .where('userId', '==', user.uid)
+                .where('category', '==', oldName)
+                .get();
+            
+            txSnap.forEach(doc => batch.update(doc.ref, { category: name }));
+            await batch.commit();
+        }
+
+        resetCategoryForm();
+        await window.refreshCategoryIcons();
+        loadCategories(currentCategoryType);
+        loadFinanceData(currentFinanceFilter); // Refresh grid to show new icons/names
+        
+        // Refresh dashboard transaction dropdown if available
+        if (window.dashboard && window.dashboard.loadTransactionCategories) {
+            await window.dashboard.loadTransactionCategories();
+        }
+        // Refresh filter dropdown
+        if (window.populateCategoryFilter) window.populateCategoryFilter();
+        
+        if(window.dashboard) window.dashboard.showNotification('Category updated', 'success');
+    } catch(e) {
+        window.setBtnLoading(btn, false);
+        console.error(e);
+        if(window.dashboard) window.dashboard.showNotification('Error updating category', 'danger');
     }
 };
 
@@ -580,6 +976,10 @@ window.exportFinancePDF = async function() {
 
         if (currentFinanceFilter !== 'all') {
             query = query.where('type', '==', currentFinanceFilter);
+        }
+
+        if (financeCategoryFilter !== 'all') {
+            query = query.where('category', '==', financeCategoryFilter);
         }
 
         const startDate = document.getElementById('finance-start-date')?.value;
@@ -661,6 +1061,7 @@ window.deleteCategory = async function(id) {
         if(window.dashboard) window.dashboard.showLoading();
         await db.collection('categories').doc(id).delete();
         loadCategories(currentCategoryType);
+        if (window.populateCategoryFilter) window.populateCategoryFilter();
         if(window.dashboard) window.dashboard.showNotification('Category deleted', 'success');
     } catch (error) {
         console.error("Error deleting category:", error);
