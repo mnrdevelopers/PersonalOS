@@ -460,8 +460,15 @@ window.loadVehicleDashboard = async function() {
             
             alertHtml += `
                 <div class="d-flex justify-content-between align-items-center small mb-1 p-2 bg-light rounded">
-                    <span><i class="fas fa-bell text-warning me-2"></i>${a.title}</span>
-                    <span class="badge ${badgeClass}">${remaining} km left</span>
+                    <div class="d-flex align-items-center text-truncate">
+                        <i class="fas fa-bell text-warning me-2"></i>
+                        <span class="text-truncate">${a.title}</span>
+                    </div>
+                    <div class="d-flex align-items-center flex-shrink-0">
+                        <span class="badge ${badgeClass} me-2">${remaining} km</span>
+                        <button class="btn btn-link text-muted p-0 me-2" onclick="editServiceAlert('${a.id}')" title="Edit"><i class="fas fa-edit" style="font-size: 0.8rem;"></i></button>
+                        <button class="btn btn-link text-danger p-0" onclick="deleteServiceAlert('${a.id}')" title="Delete"><i class="fas fa-trash" style="font-size: 0.8rem;"></i></button>
+                    </div>
                 </div>
             `;
         });
@@ -685,6 +692,7 @@ window.showAddServiceAlertModal = async function(vehicleId = null) {
     }
 
     const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addServiceAlertModal'));
+    document.getElementById('alert-id').value = '';
     document.getElementById('service-alert-form').reset();
     updateAlertOdometerHelper();
     modal.show();
@@ -881,6 +889,7 @@ window.saveVehicle = async function() {
             await db.collection('vehicles').add(data);
         }
 
+        window.setBtnLoading(btn, false);
         bootstrap.Modal.getInstance(document.getElementById('addVehicleModal')).hide();
         loadVehicleDashboard();
         if(window.dashboard) window.dashboard.showNotification(id ? 'Vehicle updated' : 'Vehicle added', 'success');
@@ -1031,6 +1040,7 @@ window.saveVehicleLog = async function() {
         await db.collection('transactions').add(transactionData);
     }
 
+    window.setBtnLoading(btn, false);
     bootstrap.Modal.getInstance(document.getElementById('addVehicleLogModal')).hide();
     loadVehicleDashboard();
     if (window.dashboard) window.dashboard.showNotification(logId ? 'Log updated!' : 'Log added and linked to Ledger!', 'success');
@@ -1044,6 +1054,7 @@ window.saveVehicleLog = async function() {
 window.saveServiceAlert = async function() {
     const btn = document.getElementById('btn-save-service-alert');
     const user = auth.currentUser;
+    const id = document.getElementById('alert-id').value;
     const vehicleId = document.getElementById('alert-vehicle').value;
     const title = document.getElementById('alert-title').value;
     const dueOdometer = parseInt(document.getElementById('alert-due-odometer').value);
@@ -1055,21 +1066,59 @@ window.saveServiceAlert = async function() {
 
     try {
         window.setBtnLoading(btn, true);
-        await db.collection('service_alerts').add({
+        const data = {
             userId: user.uid,
             vehicleId,
             title,
             dueOdometer,
-            status: 'active',
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
+            status: 'active'
+        };
 
+        if (id) {
+            data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection('service_alerts').doc(id).update(data);
+        } else {
+            data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection('service_alerts').add(data);
+        }
+
+        window.setBtnLoading(btn, false);
         bootstrap.Modal.getInstance(document.getElementById('addServiceAlertModal')).hide();
         loadVehicleDashboard();
-        if (window.dashboard) window.dashboard.showNotification('Service alert set!', 'success');
+        if (window.dashboard) window.dashboard.showNotification(id ? 'Alert updated!' : 'Service alert set!', 'success');
     } catch(e) {
         window.setBtnLoading(btn, false);
         if(window.dashboard) window.dashboard.showNotification('Error saving alert', 'danger');
+    }
+};
+
+window.editServiceAlert = async function(id) {
+    try {
+        const doc = await db.collection('service_alerts').doc(id).get();
+        if (!doc.exists) return;
+        const data = doc.data();
+        
+        document.getElementById('alert-id').value = id;
+        
+        // Ensure vehicle select is populated
+        if (document.getElementById('alert-vehicle').options.length === 0) {
+            await populateLogVehicleSelect(); // Reuse this or similar logic if available, or just rely on showAddServiceAlertModal logic if we refactor. 
+            // Since populateLogVehicleSelect populates log-vehicle, we need to populate alert-vehicle.
+            // Let's just call showAddServiceAlertModal to populate and then set values.
+            await showAddServiceAlertModal();
+        } else {
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addServiceAlertModal'));
+            modal.show();
+        }
+        
+        document.getElementById('alert-id').value = id; // Set again as showAddServiceAlertModal clears it
+        document.getElementById('alert-vehicle').value = data.vehicleId;
+        document.getElementById('alert-title').value = data.title;
+        document.getElementById('alert-due-odometer').value = data.dueOdometer;
+        
+        updateAlertOdometerHelper();
+    } catch(e) {
+        console.error(e);
     }
 };
 
