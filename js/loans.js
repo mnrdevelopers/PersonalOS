@@ -1,3 +1,5 @@
+let currentLoanTypeFilter = 'all';
+
 window.loadLoansSection = async function() {
     const container = document.getElementById('loans-section');
     container.innerHTML = `
@@ -55,6 +57,14 @@ window.loadLoansSection = async function() {
             <li class="nav-item">
                 <a class="nav-link" href="javascript:void(0)" onclick="filterLoans('closed', this)">Closed</a>
             </li>
+            <li class="nav-item ms-auto">
+                <select class="form-select" id="loan-type-filter" onchange="filterLoanType(this.value)">
+                    <option value="all">All Types</option>
+                    <option value="borrowed">Liabilities (Borrowed)</option>
+                    <option value="lent">Assets (Lent)</option>
+                    <option value="emi">Product EMIs</option>
+                </select>
+            </li>
         </ul>
 
         <div class="row g-4" id="loans-grid">
@@ -63,7 +73,7 @@ window.loadLoansSection = async function() {
         
         <!-- Add Loan Modal -->
         <div class="modal fade" id="addLoanModal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Add Loan or Debt</h5>
@@ -91,7 +101,7 @@ window.loadLoansSection = async function() {
                                 <label class="form-label">Total Amount</label>
                                 <div class="input-group">
                                     <span class="input-group-text">₹</span>
-                                    <input type="number" class="form-control" id="loan-amount" step="0.01" min="0" required>
+                                    <input type="number" class="form-control" id="loan-amount" step="0.01" min="0" required oninput="calculateEMIAmount()">
                                 </div>
                             </div>
                             <div id="contact-fields" class="d-none bg-light p-3 rounded mb-3 border">
@@ -130,12 +140,16 @@ window.loadLoansSection = async function() {
                             </div>
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Interest Rate (%)</label>
+                                    <label class="form-label" id="label-interest">Interest Rate (%)</label>
                                     <input type="number" class="form-control" id="loan-interest" step="0.1" min="0" placeholder="Optional">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">EMI Amount</label>
                                     <input type="number" class="form-control" id="loan-emi" step="0.01" min="0" placeholder="Optional">
+                                </div>
+                                <div class="col-md-6 mb-3 d-none" id="div-loan-duration">
+                                    <label class="form-label">Duration (Months)</label>
+                                    <input type="number" class="form-control" id="loan-duration" min="1" placeholder="Auto-calc EMI" oninput="calculateEMIAmount()">
                                 </div>
                             </div>
                             <div class="mb-3">
@@ -167,7 +181,7 @@ window.loadLoansSection = async function() {
 
         <!-- Repayment Modal -->
         <div class="modal fade" id="repaymentModal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Add Repayment</h5>
@@ -222,7 +236,7 @@ window.loadLoansSection = async function() {
 
         <!-- Edit Repayment Modal -->
         <div class="modal fade" id="editRepaymentModal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Edit Repayment</h5>
@@ -255,7 +269,7 @@ window.loadLoansSection = async function() {
 
         <!-- Repayment History Modal -->
         <div class="modal fade" id="historyModal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Repayment History</h5>
@@ -285,6 +299,8 @@ window.updateLoanModalUI = function(type) {
     const emiInput = document.getElementById('loan-emi');
     const contactFields = document.getElementById('contact-fields');
     const contactLabel = document.getElementById('label-contact-info');
+    const durationDiv = document.getElementById('div-loan-duration');
+    const interestLabel = document.getElementById('label-interest');
     
     if (type === 'emi') {
         if(nameLabel) nameLabel.textContent = 'Product Name / Financier';
@@ -295,6 +311,8 @@ window.updateLoanModalUI = function(type) {
         if(ledgerLabel) ledgerLabel.textContent = 'Link to Ledger (Disabled for EMI creation)';
         if(emiInput) emiInput.placeholder = 'Required';
         if(contactFields) contactFields.classList.add('d-none');
+        if(durationDiv) durationDiv.classList.remove('d-none');
+        if(interestLabel) interestLabel.textContent = 'Down Payment (Optional)';
     } else {
         if(nameLabel) nameLabel.textContent = 'Person / Institution Name';
         if(ledgerCheck) {
@@ -303,6 +321,8 @@ window.updateLoanModalUI = function(type) {
         }
         if(ledgerLabel) ledgerLabel.textContent = 'Add record to Transaction Ledger';
         if(emiInput) emiInput.placeholder = 'Optional';
+        if(durationDiv) durationDiv.classList.add('d-none');
+        if(interestLabel) interestLabel.textContent = 'Interest Rate (%)';
         
         if (type === 'lent' || type === 'borrowed') {
             if(contactFields) contactFields.classList.remove('d-none');
@@ -316,6 +336,20 @@ window.updateLoanModalUI = function(type) {
     }
 };
 
+window.calculateEMIAmount = function() {
+    const type = document.querySelector('input[name="loan-type"]:checked').value;
+    if (type !== 'emi') return;
+
+    const amount = parseFloat(document.getElementById('loan-amount').value) || 0;
+    const months = parseFloat(document.getElementById('loan-duration').value) || 0;
+    const emiInput = document.getElementById('loan-emi');
+
+    if (amount > 0 && months > 0) {
+        const emi = amount / months;
+        emiInput.value = emi.toFixed(2);
+    }
+};
+
 window.showAddLoanModal = function() {
     const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addLoanModal'));
     document.getElementById('loan-form').reset();
@@ -325,6 +359,7 @@ window.showAddLoanModal = function() {
     document.getElementById('loan-country-code').value = '91';
     document.getElementById('loan-upi-id').value = '';
     document.getElementById('loan-message-context').value = '';
+    document.getElementById('loan-duration').value = '';
     
     // Reset UI
     document.getElementById('type-borrowed').checked = true;
@@ -339,6 +374,13 @@ window.filterLoans = function(status, element) {
     loadLoansGrid(status);
 };
 
+window.filterLoanType = function(type) {
+    currentLoanTypeFilter = type;
+    const activeTab = document.querySelector('#loans-section .nav-link.active');
+    const status = activeTab ? activeTab.textContent.toLowerCase() : 'active';
+    loadLoansGrid(status);
+};
+
 window.saveLoan = async function() {
     const btn = document.getElementById('btn-save-loan');
     const id = document.getElementById('loan-id').value;
@@ -349,6 +391,7 @@ window.saveLoan = async function() {
     const dueDate = document.getElementById('loan-due-date').value;
     const interest = parseFloat(document.getElementById('loan-interest').value) || 0;
     const emi = parseFloat(document.getElementById('loan-emi').value) || 0;
+    const duration = parseInt(document.getElementById('loan-duration').value) || 0;
     const linkLedger = document.getElementById('loan-link-ledger').checked;
     const paymentMode = document.getElementById('loan-payment-mode').value;
     const countryCode = document.getElementById('loan-country-code').value;
@@ -385,6 +428,7 @@ window.saveLoan = async function() {
             userId: user.uid,
             type, name, totalAmount: amount, paidAmount: 0,
             startDate, dueDate, interestRate: interest, emiAmount: emi,
+            durationMonths: duration,
             mobile: fullMobile,
             messageContext: messageContext || '',
             upiId: upiId || '',
@@ -402,6 +446,7 @@ window.saveLoan = async function() {
                 dueDate, 
                 interestRate: interest, 
                 emiAmount: emi, 
+                durationMonths: duration,
                 type,
                 mobile: fullMobile,
                 upiId: upiId || '',
@@ -469,9 +514,15 @@ window.loadLoansGrid = async function(status = 'active') {
         .orderBy('createdAt', 'desc')
         .get();
 
+    // Client-side filtering for type (since Firestore compound queries with != or multiple filters can be tricky without composite indexes)
+    let docs = snapshot.docs;
+    if (currentLoanTypeFilter !== 'all') {
+        docs = docs.filter(doc => doc.data().type === currentLoanTypeFilter);
+    }
+
     const container = document.getElementById('loans-grid');
-    if (snapshot.empty) {
-        container.innerHTML = `<div class="col-12 text-center text-muted py-5">No ${status} loans found.</div>`;
+    if (docs.length === 0) {
+        container.innerHTML = `<div class="col-12 text-center text-muted py-5">No ${status} ${currentLoanTypeFilter !== 'all' ? currentLoanTypeFilter : ''} loans found.</div>`;
         return;
     }
 
@@ -480,7 +531,7 @@ window.loadLoansGrid = async function(status = 'active') {
     let totalLent = 0;
     let totalEmi = 0;
 
-    snapshot.forEach(doc => {
+    docs.forEach(doc => {
         const data = doc.data();
         // If active, calculate outstanding. If closed, calculate total/paid.
         const amount = status === 'active' ? (data.totalAmount - (data.paidAmount || 0)) : data.totalAmount;
@@ -505,41 +556,90 @@ window.loadLoansGrid = async function(status = 'active') {
     document.getElementById('loan-stat-title-2').textContent = status === 'active' ? 'Outstanding Assets' : 'Total Repaid Assets';
 
     container.innerHTML = '';
-    snapshot.forEach(doc => {
+    docs.forEach(doc => {
         const data = doc.data();
         const progress = Math.min(100, Math.round((data.paidAmount / data.totalAmount) * 100));
-        let typeBadge = '<span class="badge bg-danger">Liability</span>';
-        if (data.type === 'lent') typeBadge = '<span class="badge bg-success">Asset</span>';
-        else if (data.type === 'emi') typeBadge = '<span class="badge bg-warning text-dark">Product EMI</span>';
+        let typeBadge = '<span class="badge bg-danger-subtle text-danger border border-danger-subtle">Liability</span>';
+        let cardBorder = 'border-start border-4 border-danger';
+        
+        if (data.type === 'lent') {
+            typeBadge = '<span class="badge bg-success-subtle text-success border border-success-subtle">Asset</span>';
+            cardBorder = 'border-start border-4 border-success';
+        } else if (data.type === 'emi') {
+            typeBadge = '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">EMI</span>';
+            cardBorder = 'border-start border-4 border-warning';
+        }
         
         const remainingAmount = data.totalAmount - data.paidAmount;
         const isFullyPaid = data.paidAmount >= data.totalAmount;
         
-        let emiSection = '';
+        // Calculate Next Due Date Logic
+        let nextDueDateDisplay = 'No due date';
+        let nextDueDateObj = null;
+
+        if (data.type === 'emi' && data.emiAmount > 0) {
+            // For EMI: Start Date + (Paid Installments + 1) months
+            const paidInstallments = Math.floor((data.paidAmount || 0) / data.emiAmount);
+            const baseDate = data.dueDate ? new Date(data.dueDate) : new Date(data.startDate);
+            
+            // If dueDate is provided, that's the first EMI date. If not, assume 1 month after start.
+            if (!data.dueDate) baseDate.setMonth(baseDate.getMonth() + 1);
+            
+            const nextDate = new Date(baseDate);
+            nextDate.setMonth(baseDate.getMonth() + paidInstallments); // Add months for paid installments
+            
+            nextDueDateObj = nextDate;
+            nextDueDateDisplay = nextDate.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+        } else if (data.dueDate) {
+            // For standard loans
+            nextDueDateObj = new Date(data.dueDate);
+            nextDueDateDisplay = nextDueDateObj.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+
+        // Check if overdue
+        let dateClass = 'text-muted';
+        if (status === 'active' && nextDueDateObj && nextDueDateObj < new Date()) {
+            dateClass = 'text-danger fw-bold';
+            nextDueDateDisplay += ' (Overdue)';
+        }
+
+        let detailsHtml = '';
         if (data.emiAmount && data.emiAmount > 0) {
             const totalInstallments = Math.ceil(data.totalAmount / data.emiAmount);
             const paidInstallments = Math.floor((data.paidAmount || 0) / data.emiAmount);
             const remaining = Math.max(0, totalInstallments - paidInstallments);
-            const instProgress = Math.min(100, (paidInstallments / totalInstallments) * 100);
             
-            let estimatedCompletionHtml = '';
-            if (remaining > 0) {
-                const estDate = new Date();
-                estDate.setMonth(estDate.getMonth() + remaining);
-                estimatedCompletionHtml = `<div class="mt-1 small text-muted"><i class="fas fa-flag-checkered me-1"></i> Est. End: ${estDate.toLocaleDateString(undefined, {month: 'short', year: 'numeric'})}</div>`;
-            }
-
-            emiSection = `
-                <div class="mb-2 small"><i class="fas fa-calendar-alt me-1"></i> EMI: ₹${data.emiAmount}</div>
-                <div class="mb-2 bg-light p-2 rounded border">
-                    <div class="d-flex justify-content-between small text-muted mb-1">
-                        <span>Installments: ${paidInstallments}/${totalInstallments}</span>
-                        <span class="fw-bold text-primary">${remaining} left</span>
+            detailsHtml = `
+                <div class="row g-2 mt-2 small">
+                    <div class="col-6">
+                        <div class="p-2 bg-light rounded">
+                            <div class="text-muted" style="font-size: 0.75rem;">EMI Amount</div>
+                            <div class="fw-bold">₹${data.emiAmount}</div>
+                        </div>
                     </div>
-                    <div class="progress" style="height: 6px;">
-                        <div class="progress-bar bg-info" role="progressbar" style="width: ${instProgress}%"></div>
+                    <div class="col-6">
+                        <div class="p-2 bg-light rounded">
+                            <div class="text-muted" style="font-size: 0.75rem;">Installments</div>
+                            <div class="fw-bold">${paidInstallments} / ${totalInstallments} <span class="text-muted fw-normal">(${remaining} left)</span></div>
+                        </div>
                     </div>
-                    ${estimatedCompletionHtml}
+                </div>
+            `;
+        } else {
+             detailsHtml = `
+                <div class="row g-2 mt-2 small">
+                    <div class="col-6">
+                        <div class="p-2 bg-light rounded">
+                            <div class="text-muted" style="font-size: 0.75rem;">Interest Rate</div>
+                            <div class="fw-bold">${data.interestRate ? data.interestRate + '%' : 'N/A'}</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-2 bg-light rounded">
+                            <div class="text-muted" style="font-size: 0.75rem;">Start Date</div>
+                            <div class="fw-bold">${new Date(data.startDate).toLocaleDateString()}</div>
+                        </div>
+                    </div>
                 </div>
             `;
         }
@@ -562,11 +662,11 @@ window.loadLoansGrid = async function(status = 'active') {
         const col = document.createElement('div');
         col.className = 'col-md-6';
         col.innerHTML = `
-            <div class="card h-100 border-0 shadow-sm rounded-4 animate-slide-up">
+            <div class="card h-100 border-0 shadow-sm rounded-4 animate-slide-up ${cardBorder}">
                 <div class="card-body p-4">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <div>
-                            <h5 class="card-title mb-0">${data.name}</h5>
+                            <h5 class="card-title fw-bold mb-1">${data.name}</h5>
                             ${typeBadge}
                         </div>
                         <div class="dropdown">
@@ -580,24 +680,32 @@ window.loadLoansGrid = async function(status = 'active') {
                             </ul>
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <h3 class="mb-0">₹${remainingAmount.toFixed(2)}</h3>
-                        <small class="text-muted">Remaining of ₹${data.totalAmount.toFixed(2)}</small>
+                    
+                    <div class="d-flex justify-content-between align-items-end mb-3">
+                        <div>
+                            <small class="text-muted d-block">Outstanding</small>
+                            <h3 class="mb-0 fw-bold text-primary">₹${remainingAmount.toFixed(2)}</h3>
+                        </div>
+                        <div class="text-end">
+                            <small class="text-muted d-block">Total</small>
+                            <span class="fw-medium">₹${data.totalAmount.toFixed(2)}</span>
+                        </div>
                     </div>
-                    <div class="progress mb-2" style="height: 8px;">
-                        <div class="progress-bar bg-primary" role="progressbar" style="width: ${progress}%"></div>
+
+                    <div class="progress mb-2" style="height: 6px;">
+                        <div class="progress-bar bg-primary" role="progressbar" style="width: ${progress}%" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100"></div>
                     </div>
                     <div class="d-flex justify-content-between small text-muted mb-3">
-                        <span>Paid: ₹${data.paidAmount.toFixed(2)}</span>
-                        <span>${progress}%</span>
+                        <span>${progress}% Paid</span>
+                        <span class="${dateClass}"><i class="far fa-clock me-1"></i> Due: ${nextDueDateDisplay}</span>
                     </div>
-                    ${emiSection}
-                    ${data.dueDate ? `<div class="mb-2 small"><i class="fas fa-clock me-1"></i> Due: ${new Date(data.dueDate).toLocaleDateString()}</div>` : ''}
+                    
+                    ${detailsHtml}
                     
                     ${!isFullyPaid ? `
-                    <div class="mt-3 text-end">
+                    <div class="mt-3 d-flex gap-2 justify-content-end">
                         ${whatsappBtn}
-                        <button class="btn btn-sm btn-outline-primary" onclick="showRepaymentModal('${doc.id}')">
+                        <button class="btn btn-sm btn-primary px-3" onclick="showRepaymentModal('${doc.id}')">
                             <i class="fas fa-plus-circle me-1"></i>Record Payment
                         </button>
                     </div>` : '<div class="mt-3 text-end text-success fw-bold"><i class="fas fa-check-circle me-1"></i>Closed</div>'}
@@ -621,6 +729,7 @@ window.editLoan = async function(id) {
         document.getElementById('loan-due-date').value = data.dueDate || '';
         document.getElementById('loan-interest').value = data.interestRate || '';
         document.getElementById('loan-emi').value = data.emiAmount || '';
+        document.getElementById('loan-duration').value = data.durationMonths || '';
         
         // Handle Mobile Number Split
         const mobile = data.mobile || '';
@@ -762,12 +871,13 @@ window.saveRepayment = async function() {
             status: status,
             lastPaymentDate: date
         });
-
+        
+        let transactionId = null;
         if (linkLedger) {
             const type = loanData.type === 'lent' ? 'income' : 'expense';
             const description = `Repayment: ${loanData.name} (${loanData.type === 'emi' ? 'EMI' : 'Loan'})`;
             
-            await db.collection('transactions').add({
+            const transactionRef = await db.collection('transactions').add({
                 userId: user.uid,
                 loanId: loanId,
                 date: date,
@@ -778,15 +888,17 @@ window.saveRepayment = async function() {
                 paymentMode: paymentMode,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
-            
-            // Also add to a subcollection for history tracking
-            await db.collection('loans').doc(loanId).collection('repayments').add({
-                userId: user.uid,
-                amount: amount,
-                date: date,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
+            transactionId = transactionRef.id;
         }
+
+        // Always add to a subcollection for history tracking, linking transaction if created
+        await db.collection('loans').doc(loanId).collection('repayments').add({
+            userId: user.uid,
+            amount: amount,
+            date: date,
+            transactionId: transactionId, // Will be null if not linked to ledger
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
 
         bootstrap.Modal.getOrCreateInstance(document.getElementById('repaymentModal')).hide();
         loadLoansGrid('active');
@@ -880,27 +992,21 @@ window.saveChanges = async function() {
             if(window.dashboard) window.dashboard.showNotification('Repayment not found.', 'danger');
             return;
         }
-        const originalAmount = repaymentDoc.data().amount;
-        const originalDate = repaymentDoc.data().date;
+        const repaymentData = repaymentDoc.data();
+        const originalAmount = repaymentData.amount;
+        const transactionId = repaymentData.transactionId;
 
         const amountDifference = newAmount - originalAmount;
 
-        // Find and update the associated transaction
-        const transactionsSnap = await db.collection('transactions')
-            .where('userId', '==', user.uid)
-            .where('loanId', '==', loanId)
-            .where('category', '==', 'Loan Repayment')
-            .where('amount', '==', originalAmount)
-            .where('date', '==', originalDate)
-            .limit(1)
-            .get();
-
         const batch = db.batch();
 
-        if (!transactionsSnap.empty) {
-            const txRef = transactionsSnap.docs[0].ref;
+        // If a transaction was linked, update it.
+        if (transactionId) {
+            const txRef = db.collection('transactions').doc(transactionId);
             batch.update(txRef, { amount: newAmount, date: newDate });
-        }
+        } 
+        // If no transactionId, we just update the loan amount, which is correct
+        // as it wasn't linked to the main ledger in the first place.
 
         // Update the repayment
         batch.update(repaymentRef, { amount: newAmount, date: newDate });
@@ -945,21 +1051,14 @@ window.deleteRepayment = async function(loanId, repaymentId) {
         }
         const repaymentData = repaymentDoc.data();
         const amountToDelete = repaymentData.amount;
-
-        // Find and delete the associated transaction
-        const transactionsSnap = await db.collection('transactions')
-            .where('userId', '==', user.uid)
-            .where('loanId', '==', loanId)
-            .where('category', '==', 'Loan Repayment')
-            .where('amount', '==', amountToDelete)
-            .where('date', '==', repaymentData.date)
-            .limit(1)
-            .get();
+        const transactionId = repaymentData.transactionId;
 
         const batch = db.batch();
 
-        if (!transactionsSnap.empty) {
-            batch.delete(transactionsSnap.docs[0].ref);
+        // If a transaction was linked, delete it.
+        if (transactionId) {
+            const txRef = db.collection('transactions').doc(transactionId);
+            batch.delete(txRef);
         }
 
         // Delete the repayment
