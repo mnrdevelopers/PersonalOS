@@ -1,4 +1,4 @@
-const CACHE_NAME = 'personalos-v7';
+const CACHE_NAME = 'personalos-v8';
 const ASSETS_TO_CACHE = [
   '/',
   '/auth.html',
@@ -20,6 +20,9 @@ const ASSETS_TO_CACHE = [
   '/js/memories.js',
   '/js/settings.js',
   '/js/expiry.js',
+  '/js/vehicles.js',
+  '/js/notifications.js',
+  '/js/groceries.js',
   '/manifest.json',
   'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
@@ -69,5 +72,6 @@ self.addEventListener('fetch', (event) => {
       })
   );
 });
+
 
 
