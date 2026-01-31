@@ -147,6 +147,12 @@ window.loadGroceriesSection = async function() {
             </div>
         </div>
 
+        <!-- Top Items Row -->
+        <div id="top-items-container" class="mb-4" style="display: none;">
+            <h6 class="fw-bold text-muted text-uppercase small mb-3">Most Frequently Bought</h6>
+            <div class="row g-3" id="top-items-list"></div>
+        </div>
+
         <!-- Search & Filter -->
         <div class="row g-2 mb-3">
             <div class="col-md-8">
@@ -292,6 +298,40 @@ window.loadGroceriesSection = async function() {
                 </div>
             </div>
         </div>
+
+        <!-- Edit Log Modal -->
+        <div class="modal fade" id="editGroceryLogModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edit Purchase Log</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="edit-grocery-log-form">
+                            <input type="hidden" id="edit-log-id">
+                            <div class="mb-3">
+                                <label class="form-label">Date</label>
+                                <input type="date" class="form-control" id="edit-log-date" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Store</label>
+                                <input type="text" class="form-control" id="edit-log-store">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Total Amount (₹)</label>
+                                <input type="number" class="form-control" id="edit-log-total" step="0.01">
+                                <div class="form-text">Updating this will update the linked transaction.</div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="btn-save-log-edit" onclick="saveGroceryLogEdit()">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     `;
 
     await loadGroceryData();
@@ -357,6 +397,7 @@ window.loadGroceryData = async function() {
         });
 
         await calculateAndDisplayGroceryStats();
+        await loadTopItems();
         renderGroceryView();
 
     } catch (e) {
@@ -892,9 +933,18 @@ window.loadGroceryHistory = async function() {
                     </div>
                     <div class="text-end">
                         <h5 class="mb-0 text-success">₹${data.totalAmount.toFixed(2)}</h5>
-                        <button class="btn btn-sm btn-link text-decoration-none p-0" type="button" data-bs-toggle="collapse" data-bs-target="#log-${doc.id}" aria-expanded="false">
-                            Details <i class="fas fa-chevron-down small"></i>
-                        </button>
+                        <div class="d-flex align-items-center justify-content-end gap-2">
+                            <button class="btn btn-sm btn-link text-decoration-none p-0" type="button" data-bs-toggle="collapse" data-bs-target="#log-${doc.id}" aria-expanded="false">
+                                Details <i class="fas fa-chevron-down small"></i>
+                            </button>
+                            <div class="dropdown">
+                                <button class="btn btn-link text-muted p-0" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="editGroceryLog('${doc.id}')">Edit</a></li>
+                                    <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="deleteGroceryLog('${doc.id}')">Delete</a></li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="collapse mt-2" id="log-${doc.id}">
@@ -971,4 +1021,150 @@ window.importCatalog = async function() {
     } finally {
         if (window.dashboard) window.dashboard.hideLoading();
     }
+};
+
+window.deleteGroceryLog = async function(id) {
+    if (!confirm('Are you sure you want to delete this purchase record? This will also delete the associated transaction.')) return;
+
+    const user = auth.currentUser;
+    if (!user) return;
+
+    try {
+        if(window.dashboard) window.dashboard.showLoading();
+        
+        const batch = db.batch();
+        const logRef = db.collection('grocery_logs').doc(id);
+        batch.delete(logRef);
+
+        // Find and delete associated transaction
+        const txSnap = await db.collection('transactions')
+            .where('userId', '==', user.uid)
+            .where('relatedId', '==', id)
+            .get();
+        txSnap.forEach(doc => batch.delete(doc.ref));
+
+        await batch.commit();
+        
+        await loadGroceryHistory();
+        await calculateAndDisplayGroceryStats();
+        if (window.dashboard) window.dashboard.showNotification('Purchase log deleted', 'success');
+    } catch (e) {
+        console.error(e);
+        if (window.dashboard) window.dashboard.showNotification('Error deleting log', 'danger');
+    } finally {
+        if (window.dashboard) window.dashboard.hideLoading();
+    }
+};
+
+window.editGroceryLog = async function(id) {
+    try {
+        const doc = await db.collection('grocery_logs').doc(id).get();
+        if (!doc.exists) return;
+        const data = doc.data();
+
+        document.getElementById('edit-log-id').value = id;
+        document.getElementById('edit-log-date').value = data.date;
+        document.getElementById('edit-log-store').value = data.store || '';
+        document.getElementById('edit-log-total').value = data.totalAmount;
+
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('editGroceryLogModal'));
+        modal.show();
+    } catch (e) {
+        console.error(e);
+    }
+};
+
+window.saveGroceryLogEdit = async function() {
+    const btn = document.getElementById('btn-save-log-edit');
+    const id = document.getElementById('edit-log-id').value;
+    const user = auth.currentUser;
+    if (!user) return;
+    const date = document.getElementById('edit-log-date').value;
+    const store = document.getElementById('edit-log-store').value;
+    const total = parseFloat(document.getElementById('edit-log-total').value) || 0;
+
+    try {
+        window.setBtnLoading(btn, true);
+        
+        const batch = db.batch();
+        const logRef = db.collection('grocery_logs').doc(id);
+        
+        batch.update(logRef, {
+            date, store, totalAmount: total,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Update transaction if exists
+        const txSnap = await db.collection('transactions')
+            .where('userId', '==', user.uid)
+            .where('relatedId', '==', id)
+            .get();
+        txSnap.forEach(doc => {
+            batch.update(doc.ref, {
+                date: date,
+                amount: total,
+                description: `Grocery Run: ${store || 'Supermarket'}`,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        });
+
+        await batch.commit();
+        
+        bootstrap.Modal.getInstance(document.getElementById('editGroceryLogModal')).hide();
+        await loadGroceryHistory();
+        await calculateAndDisplayGroceryStats();
+        
+        window.setBtnLoading(btn, false);
+        if (window.dashboard) window.dashboard.showNotification('Log updated', 'success');
+    } catch (e) {
+        window.setBtnLoading(btn, false);
+        console.error(e);
+        if (window.dashboard) window.dashboard.showNotification('Error updating log', 'danger');
+    }
+};
+
+window.loadTopItems = async function() {
+    const user = auth.currentUser;
+    // Fetch logs (limit to last 50 for performance)
+    const logsSnap = await db.collection('grocery_logs')
+        .where('userId', '==', user.uid)
+        .orderBy('date', 'desc')
+        .limit(50)
+        .get();
+
+    const itemCounts = {};
+    logsSnap.forEach(doc => {
+        const data = doc.data();
+        if (data.items && Array.isArray(data.items)) {
+            data.items.forEach(item => {
+                const name = item.name;
+                if (name) {
+                    itemCounts[name] = (itemCounts[name] || 0) + (item.quantity || 1);
+                }
+            });
+        }
+    });
+
+    // Sort
+    const sortedItems = Object.entries(itemCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 4); // Top 4
+
+    const container = document.getElementById('top-items-container');
+    const list = document.getElementById('top-items-list');
+    
+    if (sortedItems.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+
+    container.style.display = 'block';
+    list.innerHTML = sortedItems.map(([name, count]) => `
+        <div class="col-6 col-md-3">
+            <div class="p-3 bg-white border rounded shadow-sm text-center h-100">
+                <div class="fw-bold text-truncate" title="${name}">${name}</div>
+                <div class="small text-muted">${Math.round(count)} bought</div>
+            </div>
+        </div>
+    `).join('');
 };
