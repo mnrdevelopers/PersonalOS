@@ -1,3 +1,155 @@
+const FASTAG_PROVIDERS = [
+  {"id":"PAYTM","name":"Paytm FASTag","logo":"logos/paytm.svg"},
+  {"id":"PHONEPE","name":"PhonePe FASTag","logo":"logos/phonepe.svg"},
+  {"id":"AIRTEL","name":"Airtel Payments Bank","logo":"logos/airtel.svg"},
+  {"id":"SBI","name":"State Bank of India","logo":"logos/sbi.svg"},
+  {"id":"ICICI","name":"ICICI Bank","logo":"logos/icici.svg"},
+  {"id":"HDFC","name":"HDFC Bank","logo":"logos/hdfc.svg"},
+  {"id":"AXIS","name":"Axis Bank","logo":"logos/axis.svg"},
+  {"id":"IDFC","name":"IDFC First Bank","logo":"logos/idfc.svg"},
+  {"id":"KOTAK","name":"Kotak Mahindra Bank","logo":"logos/kotak.svg"},
+  {"id":"BOB","name":"Bank of Baroda","logo":"logos/bob.svg"},
+  {"id":"PNB","name":"Punjab National Bank","logo":"logos/pnb.svg"},
+  {"id":"CANARA","name":"Canara Bank","logo":"logos/canara.svg"},
+  {"id":"UNION","name":"Union Bank of India","logo":"logos/union.svg"},
+  {"id":"INDUSIND","name":"IndusInd Bank","logo":"logos/indusind.svg"},
+  {"id":"YES","name":"Yes Bank","logo":"logos/yes.svg"},
+  {"id":"FEDERAL","name":"Federal Bank","logo":"logos/federal.svg"},
+  {"id":"CUB","name":"City Union Bank","logo":"logos/cub.svg"},
+  {"id":"EQUITAS","name":"Equitas Small Finance Bank","logo":"logos/equitas.svg"},
+  {"id":"FINO","name":"Fino Payments Bank","logo":"logos/fino.svg"},
+  {"id":"BANDHAN","name":"Bandhan Bank","logo":"logos/bandhan.svg"},
+  {"id":"AU","name":"AU Small Finance Bank","logo":"logos/au.svg"},
+  {"id":"IOB","name":"Indian Overseas Bank","logo":"logos/iob.svg"},
+  {"id":"UCO","name":"UCO Bank","logo":"logos/uco.svg"},
+  {"id":"KVB","name":"Karur Vysya Bank","logo":"logos/kvb.svg"},
+  {"id":"SOUTHINDIAN","name":"South Indian Bank","logo":"logos/sib.svg"},
+  {"id":"CSB","name":"CSB Bank","logo":"logos/csb.svg"},
+  {"id":"DBS","name":"DBS Bank India","logo":"logos/dbs.svg"}
+];
+
+const CAR_DATA = {
+  "makers": [
+    "Maruti Suzuki", "Hyundai", "Tata", "Mahindra", "Honda", "Toyota", "Ford", 
+    "Volkswagen", "Skoda", "Renault", "Nissan", "Chevrolet", "Fiat", "Kia", 
+    "MG", "Datsun", "Jeep", "Isuzu", "BMW", "Mercedes-Benz", "Audi"
+  ],
+  "models": {
+    "Maruti Suzuki": [
+      "800","Omni","Gypsy","Alto","Alto 800","Wagon R","Zen","Zen Estilo",
+      "Swift","Swift Dzire","Baleno","Esteem","A-Star","Ritz","Ertiga",
+      "Ciaz","S-Cross","Vitara Brezza","XL6","Ignis","Celerio","Fronx"
+    ],
+    "Hyundai": [
+      "Santro","Santro Xing","i10","Grand i10","i20","Elite i20",
+      "Accent","Verna","Elantra","Creta","Venue","Tucson","Xcent","Eon"
+    ],
+    "Tata": [
+      "Indica","Indigo","Nano","Tiago","Tigor","Altroz","Nexon",
+      "Harrier","Safari","Sumo","Bolt","Zest","Hexa","Manza"
+    ],
+    "Mahindra": [
+      "Bolero","Scorpio","Scorpio Classic","XUV300","XUV500",
+      "XUV700","Thar","Quanto","Verito","Logan","TUV300","Marazzo"
+    ],
+    "Honda": [
+      "City","Amaze","Jazz","Brio","Accord","Civic","WR-V","CR-V"
+    ],
+    "Toyota": [
+      "Innova","Innova Crysta","Fortuner","Corolla","Camry",
+      "Glanza","Urban Cruiser","Yaris","Etios","Liva"
+    ],
+    "Ford": [
+      "Ikon","Fiesta","Figo","Aspire","EcoSport","Endeavour"
+    ],
+    "Volkswagen": [
+      "Polo","Vento","Virtus","Taigun","Jetta","Passat"
+    ],
+    "Skoda": [
+      "Octavia","Rapid","Superb","Kushaq","Slavia","Fabia"
+    ],
+    "Renault": [
+      "Kwid","Duster","Triber","Lodgy","Pulse","Scala"
+    ],
+    "Nissan": [
+      "Micra","Sunny","Terrano","Kicks","Teana"
+    ],
+    "Chevrolet": [
+      "Spark","Beat","Sail","Cruze","Tavera","Enjoy"
+    ],
+    "Fiat": [
+      "Punto","Linea","Palio","Avventura","Uno"
+    ],
+    "Kia": [
+      "Seltos","Sonet","Carens","Carnival","EV6"
+    ],
+    "MG": [
+      "Hector","Astor","ZS EV","Gloster","Comet"
+    ],
+    "Datsun": [
+      "Go","Go Plus","Redi-Go"
+    ],
+    "Jeep": [
+      "Compass","Meridian","Wrangler","Grand Cherokee"
+    ],
+    "Isuzu": [
+      "D-Max","V-Cross","MU-X"
+    ],
+    "BMW": [
+      "3 Series","5 Series","7 Series","X1","X3","X5"
+    ],
+    "Mercedes-Benz": [
+      "C-Class","E-Class","S-Class","GLA","GLC","GLE"
+    ],
+    "Audi": [
+      "A3","A4","A6","Q3","Q5","Q7"
+    ]
+  }
+};
+
+const BIKE_DATA = [
+  {
+    "maker":"Hero",
+    "models":[
+      {"name":"Splendor","from":2005,"to":2026},
+      {"name":"HF Deluxe","from":2005,"to":2026},
+      {"name":"Passion","from":2005,"to":2026}
+    ]
+  },
+  {
+    "maker":"Honda",
+    "models":[
+      {"name":"Shine","from":2006,"to":2026},
+      {"name":"Unicorn","from":2005,"to":2026},
+      {"name":"Activa","from":2005,"to":2026}
+    ]
+  },
+  {
+    "maker":"Bajaj",
+    "models":[
+      {"name":"Pulsar","from":2005,"to":2026},
+      {"name":"Discover","from":2005,"to":2020},
+      {"name":"Dominar","from":2016,"to":2026}
+    ]
+  },
+  {
+    "maker":"TVS",
+    "models":[
+      {"name":"Apache","from":2006,"to":2026},
+      {"name":"Jupiter","from":2013,"to":2026},
+      {"name":"XL100","from":2005,"to":2026}
+    ]
+  },
+  {
+    "maker":"Royal Enfield",
+    "models":[
+      {"name":"Classic 350","from":2009,"to":2026},
+      {"name":"Bullet","from":2005,"to":2026},
+      {"name":"Himalayan","from":2016,"to":2026}
+    ]
+  }
+];
+
 window.loadVehiclesSection = async function() {
     const container = document.getElementById('vehicles-section');
     container.innerHTML = `
@@ -36,7 +188,7 @@ window.loadVehiclesSection = async function() {
                             <div class="row">
                                 <div class="col-6 mb-3">
                                     <label class="form-label">Type</label>
-                                    <select class="form-select" id="vehicle-type">
+                                    <select class="form-select" id="vehicle-type" onchange="populateVehicleMakes()">
                                         <option value="Car">Car</option>
                                         <option value="Bike">Bike</option>
                                         <option value="Scooter">Scooter</option>
@@ -44,23 +196,58 @@ window.loadVehiclesSection = async function() {
                                     </select>
                                 </div>
                                 <div class="col-6 mb-3">
+                                    <label class="form-label">Year</label>
+                                    <select class="form-select" id="vehicle-year">
+                                        <!-- Populated by JS -->
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-6 mb-3">
                                     <label class="form-label">Reg. Number</label>
                                     <input type="text" class="form-control" id="vehicle-reg">
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">RC Expiry</label>
+                                    <input type="date" class="form-control" id="vehicle-rc-expiry">
                                 </div>
                             </div>
                             <div class="row">
                                 <div class="col-6 mb-3">
                                     <label class="form-label">Make</label>
-                                    <input type="text" class="form-control" id="vehicle-make" placeholder="e.g. Honda">
+                                    <select class="form-select" id="vehicle-make" onchange="populateVehicleModels()">
+                                        <option value="">Select Make</option>
+                                    </select>
                                 </div>
                                 <div class="col-6 mb-3">
                                     <label class="form-label">Model</label>
-                                    <input type="text" class="form-control" id="vehicle-model" placeholder="e.g. City">
+                                    <select class="form-select" id="vehicle-model">
+                                        <option value="">Select Model</option>
+                                    </select>
                                 </div>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Current Odometer (km)</label>
                                 <input type="number" class="form-control" id="vehicle-odometer" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">FASTag Provider</label>
+                                <select class="form-select" id="vehicle-fastag-provider" onchange="toggleFastagBalanceField()">
+                                    <option value="">None</option>
+                                    ${FASTAG_PROVIDERS.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div id="div-fastag-balance" style="display:none;">
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <label class="form-label">Current Balance (₹)</label>
+                                        <input type="number" class="form-control" id="vehicle-fastag-balance" step="0.01" placeholder="0.00">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label">Low Alert Limit (₹)</label>
+                                        <input type="number" class="form-control" id="vehicle-fastag-threshold" step="1" placeholder="e.g. 200">
+                                    </div>
+                                </div>
                             </div>
                             <div class="form-check mb-3">
                                 <input class="form-check-input" type="checkbox" id="vehicle-primary">
@@ -100,6 +287,7 @@ window.loadVehiclesSection = async function() {
                                     <option value="service">Service / Maintenance</option>
                                     <option value="repair">Repair</option>
                                     <option value="insurance">Insurance</option>
+                                    <option value="toll">FASTag Toll</option>
                                     <option value="expense">Other Expense</option>
                                 </select>
                             </div>
@@ -124,6 +312,7 @@ window.loadVehiclesSection = async function() {
                                 <label class="form-label">Payment Mode</label>
                                 <select class="form-select" id="log-payment-mode">
                                     <option value="cash">Cash</option>
+                                    <option value="fastag_wallet">FASTag Wallet</option>
                                     <option value="upi" selected>UPI</option>
                                     <option value="card">Card</option>
                                     <option value="bank">Bank Transfer</option>
@@ -281,6 +470,41 @@ window.loadVehiclesSection = async function() {
                 </div>
             </div>
         </div>
+
+        <!-- FASTag Recharge Modal -->
+        <div class="modal fade" id="fastagRechargeModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title fs-6">Recharge FASTag</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="recharge-vehicle-id">
+                        <div class="mb-3">
+                            <label class="form-label small">Amount (₹)</label>
+                            <input type="number" class="form-control" id="recharge-amount" step="1" min="1" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small">Date</label>
+                            <input type="date" class="form-control" id="recharge-date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small">Payment Source</label>
+                            <select class="form-select form-select-sm" id="recharge-payment-mode">
+                                <option value="upi">UPI</option>
+                                <option value="bank">Net Banking</option>
+                                <option value="card">Credit/Debit Card</option>
+                                <option value="wallet">Wallet</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn btn-success w-100 btn-sm" onclick="saveFastagRecharge()">
+                            <i class="fas fa-bolt me-1"></i> Recharge
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     `;
     
     await loadVehicleDashboard();
@@ -331,6 +555,7 @@ window.loadVehicleDashboard = async function() {
     const logsByVehicle = {};
     let totalCost = 0;
     let totalFuelCost = 0;
+    let totalFastagCost = 0;
     
     logsSnap.forEach(doc => {
         const log = doc.data();
@@ -338,8 +563,12 @@ window.loadVehicleDashboard = async function() {
         if (!logsByVehicle[log.vehicleId]) logsByVehicle[log.vehicleId] = [];
         logsByVehicle[log.vehicleId].push(log);
         
-        totalCost += (log.cost || 0);
+        // Calculate Total Running Cost (Consumption)
+        // Exclude 'fastag_recharge' from running cost as it's a fund transfer. Include 'toll'.
+        if (log.type !== 'fastag_recharge') totalCost += (log.cost || 0);
+        
         if (log.type === 'fuel') totalFuelCost += (log.cost || 0);
+        if (log.type === 'toll') totalFastagCost += (log.cost || 0); // Track actual toll usage
     });
 
     const alertsByVehicle = {};
@@ -365,6 +594,12 @@ window.loadVehicleDashboard = async function() {
             </div>
         </div>
         <div class="col-6 col-md-3">
+            <div class="p-3 bg-white rounded-4 shadow-sm border-start border-4 border-secondary h-100" style="border-color: #6610f2 !important;">
+                <div class="text-muted small fw-bold text-uppercase">Toll Usage</div>
+                <h4 class="mb-0" style="color: #6610f2;">₹${totalFastagCost.toFixed(0)}</h4>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
             <div class="p-3 bg-white rounded-4 shadow-sm border-start border-4 border-info h-100">
                 <div class="text-muted small fw-bold text-uppercase">Vehicles</div>
                 <h4 class="mb-0 text-info">${vehicles.length}</h4>
@@ -383,8 +618,45 @@ window.loadVehicleDashboard = async function() {
         // Document Status Logic
         const docs = v.documents || [];
         let docStatusHtml = '';
+        let hasDocs = false;
+        let docsContent = '';
+
+        // 1. Check RC Expiry (Root Field)
+        if (v.rcExpiry) {
+            hasDocs = true;
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const expiryDate = new Date(v.rcExpiry);
+            const daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+            
+            let badgeClass = 'bg-success-subtle text-success border-success-subtle';
+            let icon = 'fa-check-circle';
+            let statusText = `${daysLeft} days left`;
+            
+            if (daysLeft < 0) {
+                badgeClass = 'bg-danger-subtle text-danger border-danger-subtle';
+                icon = 'fa-exclamation-circle';
+                statusText = `Expired ${Math.abs(daysLeft)} days ago`;
+            } else if (daysLeft <= 30) {
+                badgeClass = 'bg-warning-subtle text-warning-emphasis border-warning-subtle';
+                icon = 'fa-exclamation-triangle';
+                statusText = `${daysLeft} days left`;
+            }
+
+            docsContent += `
+                <div class="border ${badgeClass} rounded px-2 py-1 d-flex align-items-center" style="font-size: 0.75rem;">
+                    <i class="fas ${icon} me-2"></i>
+                    <div>
+                        <div class="fw-bold">RC Expiry</div>
+                        <div class="small" style="font-size: 0.65rem; opacity: 0.85;">${statusText}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 2. Check Other Documents
         if (docs.length > 0) {
-            docStatusHtml = '<div class="d-flex flex-wrap gap-2">';
+            hasDocs = true;
             docs.forEach(d => {
                 if (!d.expiry) return;
                 const today = new Date();
@@ -406,7 +678,7 @@ window.loadVehicleDashboard = async function() {
                     statusText = `${daysLeft} days left`;
                 }
 
-                docStatusHtml += `
+                docsContent += `
                     <div class="border ${badgeClass} rounded px-2 py-1 d-flex align-items-center" style="font-size: 0.75rem;">
                         <i class="fas ${icon} me-2"></i>
                         <div>
@@ -416,7 +688,10 @@ window.loadVehicleDashboard = async function() {
                     </div>
                 `;
             });
-            docStatusHtml += '</div>';
+        }
+
+        if (hasDocs) {
+            docStatusHtml = `<div class="d-flex flex-wrap gap-2">${docsContent}</div>`;
         }
 
         // Calculate Mileage Stats
@@ -473,12 +748,44 @@ window.loadVehicleDashboard = async function() {
             `;
         });
 
+        // FASTag Low Balance Alert
+        if (v.fastagProvider && v.fastagThreshold > 0 && (v.fastagBalance || 0) < v.fastagThreshold) {
+            alertHtml += `
+                <div class="d-flex justify-content-between align-items-center small mb-1 p-2 bg-danger bg-opacity-10 rounded text-danger">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-wallet me-2"></i>
+                        <span>Low FASTag Balance</span>
+                    </div>
+                    <div class="fw-bold">₹${(v.fastagBalance || 0).toFixed(0)} <span class="small opacity-75">/ ₹${v.fastagThreshold}</span></div>
+                </div>
+            `;
+        }
+
+        // FASTag Widget
+        let fastagHtml = '';
+        if (v.fastagProvider) {
+            const provider = FASTAG_PROVIDERS.find(p => p.id === v.fastagProvider) || { name: v.fastagProvider };
+            fastagHtml = `
+                <div class="p-2 bg-white border rounded mb-3 d-flex justify-content-between align-items-center shadow-sm">
+                    <div class="d-flex align-items-center overflow-hidden">
+                        <div class="me-2 text-primary"><i class="fas fa-tag"></i></div>
+                        <div class="text-truncate">
+                            <div class="small text-muted text-truncate" style="font-size: 0.65rem;">${provider.name}</div>
+                            <div class="fw-bold text-dark">₹${(v.fastagBalance || 0).toFixed(2)}</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-success ms-2" style="font-size: 0.7rem;" onclick="showFastagRechargeModal('${v.id}')">Recharge</button>
+                </div>
+            `;
+        }
+
         // Recent Logs HTML
         const recentLogs = vLogs.slice(0, 3).map(l => {
             let icon = 'fa-gas-pump';
             let color = 'text-warning';
             if (l.type === 'service') { icon = 'fa-tools'; color = 'text-info'; }
             else if (l.type === 'repair') { icon = 'fa-wrench'; color = 'text-danger'; }
+            else if (l.type === 'toll') { icon = 'fa-road'; color = 'text-secondary'; }
             
             return `
                 <div class="d-flex justify-content-between align-items-center border-bottom py-2">
@@ -508,7 +815,7 @@ window.loadVehicleDashboard = async function() {
                         </div>
                         <div>
                             <h5 class="mb-0 fw-bold">${v.name}${primaryBadge}</h5>
-                            <small class="text-muted">${v.make || ''} ${v.model || ''} • ${v.regNumber || ''}</small>
+                            <small class="text-muted">${v.year || ''} ${v.make || ''} ${v.model || ''} • ${v.regNumber || ''}</small>
                         </div>
                     </div>
                     <div class="dropdown">
@@ -554,6 +861,7 @@ window.loadVehicleDashboard = async function() {
 
                     ${alertHtml ? `<div class="mb-3">${alertHtml}</div>` : ''}
                     ${docStatusHtml ? `<div class="mb-3">${docStatusHtml}</div>` : ''}
+                    ${fastagHtml}
 
                     ${chartHtml}
 
@@ -620,6 +928,9 @@ window.showAddVehicleModal = function() {
     document.getElementById('vehicle-form').reset();
     document.getElementById('vehicle-id').value = '';
     document.getElementById('vehicle-primary').checked = false;
+    toggleFastagBalanceField();
+    populateVehicleMakes(); // Initialize dropdowns
+    populateVehicleYears();
     modal.show();
 };
 
@@ -815,6 +1126,14 @@ window.toggleLogFields = function() {
         fuelFields.classList.add('d-none');
         serviceFields.classList.add('d-none');
     }
+
+    // Auto-select FASTag Wallet for Tolls
+    const paymentSelect = document.getElementById('log-payment-mode');
+    if (type === 'toll') {
+        paymentSelect.value = 'fastag_wallet';
+    } else if (paymentSelect.value === 'fastag_wallet') {
+        paymentSelect.value = 'upi'; // Reset if changing away from toll
+    }
 };
 
 window.updateLogOdometerPlaceholder = function() {
@@ -843,6 +1162,79 @@ window.calculateFuelQty = function() {
     }
 };
 
+window.toggleFastagBalanceField = function() {
+    const provider = document.getElementById('vehicle-fastag-provider').value;
+    const div = document.getElementById('div-fastag-balance');
+    div.style.display = provider ? 'block' : 'none';
+};
+
+window.populateVehicleYears = function() {
+    const yearSelect = document.getElementById('vehicle-year');
+    yearSelect.innerHTML = '<option value="">Year</option>';
+    const years = Array.from({ length: 2026 - 2005 + 1 }, (_, i) => 2005 + i);
+    years.reverse().forEach(year => {
+        const option = document.createElement('option');
+        option.value = year;
+        option.textContent = year;
+        yearSelect.appendChild(option);
+    });
+};
+
+window.populateVehicleMakes = function(selectedMake = null) {
+    const type = document.getElementById('vehicle-type').value;
+    const makeSelect = document.getElementById('vehicle-make');
+    const modelSelect = document.getElementById('vehicle-model');
+    
+    makeSelect.innerHTML = '<option value="">Select Make</option>';
+    modelSelect.innerHTML = '<option value="">Select Model</option>';
+    
+    let makers = [];
+    if (type === 'Car') {
+        makers = CAR_DATA.makers;
+    } else if (type === 'Bike' || type === 'Scooter') {
+        makers = BIKE_DATA.map(item => item.maker);
+    }
+    
+    makers.forEach(maker => {
+        const option = document.createElement('option');
+        option.value = maker;
+        option.textContent = maker;
+        makeSelect.appendChild(option);
+    });
+
+    if (selectedMake) {
+        makeSelect.value = selectedMake;
+        populateVehicleModels(null); // Trigger model population if make is set
+    }
+};
+
+window.populateVehicleModels = function(selectedModel = null) {
+    const type = document.getElementById('vehicle-type').value;
+    const make = document.getElementById('vehicle-make').value;
+    const modelSelect = document.getElementById('vehicle-model');
+    
+    modelSelect.innerHTML = '<option value="">Select Model</option>';
+    
+    let models = [];
+    if (type === 'Car') {
+        models = CAR_DATA.models[make] || [];
+    } else if (type === 'Bike' || type === 'Scooter') {
+        const makerData = BIKE_DATA.find(m => m.maker === make);
+        if (makerData) models = makerData.models.map(m => m.name);
+    }
+
+    models.forEach(modelName => {
+        const option = document.createElement('option');
+        option.value = modelName;
+        option.textContent = modelName;
+        modelSelect.appendChild(option);
+    });
+
+    if (selectedModel) {
+        modelSelect.value = selectedModel;
+    }
+};
+
 window.saveVehicle = async function() {
     const btn = document.getElementById('btn-save-vehicle');
     const user = auth.currentUser;
@@ -850,9 +1242,14 @@ window.saveVehicle = async function() {
     const name = document.getElementById('vehicle-name').value;
     const type = document.getElementById('vehicle-type').value;
     const reg = document.getElementById('vehicle-reg').value;
+    const rcExpiry = document.getElementById('vehicle-rc-expiry').value;
+    const year = document.getElementById('vehicle-year').value;
     const make = document.getElementById('vehicle-make').value;
     const model = document.getElementById('vehicle-model').value;
     const odo = parseInt(document.getElementById('vehicle-odometer').value) || 0;
+    const fastagProvider = document.getElementById('vehicle-fastag-provider').value;
+    const fastagBalance = parseFloat(document.getElementById('vehicle-fastag-balance').value) || 0;
+    const fastagThreshold = parseFloat(document.getElementById('vehicle-fastag-threshold').value) || 0;
     const isPrimary = document.getElementById('vehicle-primary').checked;
 
     if (!name) {
@@ -879,7 +1276,8 @@ window.saveVehicle = async function() {
 
         const data = {
             userId: user.uid,
-            name, type, regNumber: reg, make, model, currentOdometer: odo, isPrimary
+            fastagProvider, fastagBalance, fastagThreshold, rcExpiry,
+            name, type, regNumber: reg, year, make, model, currentOdometer: odo, isPrimary
         };
 
         if (id) {
@@ -1019,25 +1417,33 @@ window.saveVehicleLog = async function() {
             vehicleUpdateData.averageMileage = totalM / countM;
         }
 
+        // Deduct FASTag Balance ONLY if paid via Wallet
+        if (type === 'toll' && paymentMode === 'fastag_wallet') {
+            vehicleUpdateData.fastagBalance = firebase.firestore.FieldValue.increment(-cost);
+        }
+
         // Update Vehicle if needed
         if (Object.keys(vehicleUpdateData).length > 0) {
             await db.collection('vehicles').doc(vehicleId).update(vehicleUpdateData);
         }
 
-        // Add to Transaction Ledger
-        const transactionData = {
-            userId: user.uid,
-            date: date,
-            amount: cost,
-            type: 'expense',
-            category: type === 'fuel' ? 'Fuel' : 'Vehicle Maintenance',
-            description: description,
-            paymentMode: paymentMode,
-            relatedId: logRef.id,
-            section: 'vehicles',
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
-        await db.collection('transactions').add(transactionData);
+        // Add to Transaction Ledger ONLY if NOT paid via FASTag Wallet
+        // (Because FASTag Wallet expenses are recorded when Recharging, not when spending at toll)
+        if (paymentMode !== 'fastag_wallet') {
+            const transactionData = {
+                userId: user.uid,
+                date: date,
+                amount: cost,
+                type: 'expense',
+                category: type === 'fuel' ? 'Fuel' : (type === 'toll' ? 'Toll & Parking' : 'Vehicle Maintenance'),
+                description: description,
+                paymentMode: paymentMode,
+                relatedId: logRef.id,
+                section: 'vehicles',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            await db.collection('transactions').add(transactionData);
+        }
     }
 
     window.setBtnLoading(btn, false);
@@ -1238,6 +1644,21 @@ window.calculateMaintenanceEvents = async function() {
 
     // 5. Add Document Expiries
     Object.values(vehicles).forEach(v => {
+        // RC Expiry (Root)
+        if (v.rcExpiry) {
+            const expiryDate = new Date(v.rcExpiry);
+            const daysLeft = Math.ceil((expiryDate - new Date()) / (1000 * 60 * 60 * 24));
+            events.push({
+                id: `${v.id}_RC`,
+                title: `RC Expiry`,
+                vehicleName: v.name,
+                date: expiryDate,
+                remainingKm: null,
+                status: daysLeft < 0 ? 'overdue' : (daysLeft < 30 ? 'soon' : 'future'),
+                daysLeft: daysLeft
+            });
+        }
+
         if (v.documents && Array.isArray(v.documents)) {
             v.documents.forEach(d => {
                 const expiryDate = new Date(d.expiry);
@@ -1419,9 +1840,20 @@ window.editVehicle = async function(id) {
         setVal('vehicle-name', data.name || '');
         setVal('vehicle-type', data.type || 'Car');
         setVal('vehicle-reg', data.regNumber || '');
-        setVal('vehicle-make', data.make || '');
-        setVal('vehicle-model', data.model || '');
+        setVal('vehicle-rc-expiry', data.rcExpiry || '');
+        setVal('vehicle-year', data.year || '');
+        
+        // Populate dropdowns with saved values
+        populateVehicleYears();
+        setVal('vehicle-year', data.year || ''); // Set again after population
+        populateVehicleMakes(data.make);
+        populateVehicleModels(data.model);
+
         setVal('vehicle-odometer', data.currentOdometer !== undefined ? data.currentOdometer : 0);
+        setVal('vehicle-fastag-provider', data.fastagProvider || '');
+        setVal('vehicle-fastag-balance', data.fastagBalance !== undefined ? data.fastagBalance : '');
+        setVal('vehicle-fastag-threshold', data.fastagThreshold !== undefined ? data.fastagThreshold : '');
+        toggleFastagBalanceField();
         
         const primaryEl = document.getElementById('vehicle-primary');
         if (primaryEl) primaryEl.checked = data.isPrimary || false;
@@ -1436,6 +1868,78 @@ window.editVehicle = async function(id) {
         if(window.dashboard) window.dashboard.showNotification('Error loading vehicle', 'danger');
     } finally {
         clearTimeout(loadingTimeout);
+        if(window.dashboard) window.dashboard.hideLoading();
+    }
+};
+
+window.showFastagRechargeModal = function(vehicleId) {
+    document.getElementById('recharge-vehicle-id').value = vehicleId;
+    document.getElementById('recharge-amount').value = '';
+    document.getElementById('recharge-date').value = new Date().toISOString().split('T')[0];
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('fastagRechargeModal'));
+    modal.show();
+};
+
+window.saveFastagRecharge = async function() {
+    const vehicleId = document.getElementById('recharge-vehicle-id').value;
+    const amount = parseFloat(document.getElementById('recharge-amount').value);
+    const date = document.getElementById('recharge-date').value;
+    const paymentMode = document.getElementById('recharge-payment-mode').value;
+    const user = auth.currentUser;
+
+    if (!amount || amount <= 0) {
+        if(window.dashboard) window.dashboard.showNotification('Invalid amount', 'warning');
+        return;
+    }
+
+    try {
+        if(window.dashboard) window.dashboard.showLoading();
+        const batch = db.batch();
+        
+        // 1. Update Vehicle Balance
+        const vehicleRef = db.collection('vehicles').doc(vehicleId);
+        batch.update(vehicleRef, {
+            fastagBalance: firebase.firestore.FieldValue.increment(amount),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // 2. Add Vehicle Log (Internal Record)
+        const logRef = db.collection('vehicle_logs').doc();
+        batch.set(logRef, {
+            userId: user.uid,
+            vehicleId: vehicleId,
+            type: 'fastag_recharge',
+            date: date,
+            cost: amount,
+            odometer: 0, // Not relevant for recharge
+            notes: 'FASTag Recharge',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // 3. Add Transaction to Ledger (The Actual Expense)
+        const txRef = db.collection('transactions').doc();
+        batch.set(txRef, {
+            userId: user.uid,
+            date: date,
+            amount: amount,
+            type: 'expense',
+            category: 'Vehicle Maintenance', // or create a specific 'FASTag' category
+            description: 'FASTag Recharge',
+            paymentMode: paymentMode,
+            relatedId: logRef.id,
+            section: 'vehicles',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        await batch.commit();
+        
+        bootstrap.Modal.getInstance(document.getElementById('fastagRechargeModal')).hide();
+        loadVehicleDashboard();
+        if(window.dashboard) window.dashboard.showNotification('Recharge successful', 'success');
+    } catch(e) {
+        console.error(e);
+        if(window.dashboard) window.dashboard.showNotification('Error recharging', 'danger');
+    } finally {
         if(window.dashboard) window.dashboard.hideLoading();
     }
 };
