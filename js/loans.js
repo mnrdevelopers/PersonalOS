@@ -1,74 +1,90 @@
 let currentLoanTypeFilter = 'all';
+let currentLoanView = 'loans'; // 'loans' or 'cards'
+
+const CREDIT_CARD_BANKS = [
+  {"id": "hdfc", "name": "HDFC Bank"},
+  {"id": "sbi", "name": "State Bank of India"},
+  {"id": "icici", "name": "ICICI Bank"},
+  {"id": "axis", "name": "Axis Bank"},
+  {"id": "kotak", "name": "Kotak Mahindra Bank"},
+  {"id": "indusind", "name": "IndusInd Bank"},
+  {"id": "yes", "name": "Yes Bank"},
+  {"id": "rbl", "name": "RBL Bank"},
+  {"id": "idfc", "name": "IDFC First Bank"},
+  {"id": "au", "name": "AU Small Finance Bank"},
+  {"id": "utkarsh", "name": "Utkarsh Small Finance Bank"},
+  {"id": "hsbc", "name": "HSBC Bank"},
+  {"id": "standard_chartered", "name": "Standard Chartered Bank"},
+  {"id": "citi", "name": "Citibank"},
+  {"id": "american_express", "name": "American Express"},
+  {"id": "bank_of_baroda", "name": "Bank of Baroda"},
+  {"id": "pnb", "name": "Punjab National Bank"},
+  {"id": "canara", "name": "Canara Bank"},
+  {"id": "union", "name": "Union Bank of India"},
+  {"id": "federal", "name": "Federal Bank"},
+  {"id": "south_indian", "name": "South Indian Bank"},
+  {"id": "idbi", "name": "IDBI Bank"},
+  {"id": "bandhan", "name": "Bandhan Bank"},
+  {"id": "onecard", "name": "OneCard (Federal/BOB/CSB)"},
+  {"id": "csb", "name": "CSB Bank"},
+  {"id": "slice", "name": "Slice"},
+  {"id": "navi", "name": "Navi"},
+  {"id": "uni", "name": "Uni Cards"}
+];
 
 window.loadLoansSection = async function() {
     const container = document.getElementById('loans-section');
     container.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="fw-bold gradient-text mb-0">Loans & Debts</h2>
-            <button class="btn btn-sm btn-primary" onclick="showAddLoanModal()">
-                <i class="fas fa-plus me-2"></i>Add Loan/Debt
-            </button>
+            <h2 class="fw-bold gradient-text mb-0">Loans & Credit Cards</h2>
+            <div>
+                <button class="btn btn-sm btn-outline-primary me-2" onclick="showAddCreditCardModal()">
+                    <i class="fas fa-credit-card me-2"></i>Add Card
+                </button>
+                <button class="btn btn-sm btn-primary" onclick="showAddLoanModal()">
+                    <i class="fas fa-plus me-2"></i>Add Loan
+                </button>
+            </div>
         </div>
         
         <!-- Stats Row -->
-        <div class="row g-4 mb-5 animate-fade-in">
-            <div class="col-6 col-md-3">
-                <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-danger">
-                    <div class="text-muted small mb-1 fw-medium" id="loan-stat-title-1">Total Borrowed</div>
-                    <div class="d-flex align-items-center justify-content-between">
-                        <h4 class="mb-0 fw-bold text-danger" id="loan-stat-borrowed">₹0</h4>
-                        <i class="fas fa-hand-holding-usd text-danger opacity-25 fa-2x"></i>
-                    </div>
-                </div>
-            </div>
-            <div class="col-6 col-md-3">
-                <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-success">
-                    <div class="text-muted small mb-1 fw-medium" id="loan-stat-title-2">Total Lent</div>
-                    <div class="d-flex align-items-center justify-content-between">
-                        <h4 class="mb-0 fw-bold text-success" id="loan-stat-lent">₹0</h4>
-                        <i class="fas fa-hand-holding-heart text-success opacity-25 fa-2x"></i>
-                    </div>
-                </div>
-            </div>
-            <div class="col-6 col-md-3">
-                <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-primary">
-                    <div class="text-muted small mb-1 fw-medium" id="loan-stat-title-3">Net Position</div>
-                    <div class="d-flex align-items-center justify-content-between">
-                        <h4 class="mb-0 fw-bold text-primary" id="loan-stat-net">₹0</h4>
-                        <i class="fas fa-balance-scale text-primary opacity-25 fa-2x"></i>
-                    </div>
-                </div>
-            </div>
-            <div class="col-6 col-md-3">
-                <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-warning">
-                    <div class="text-muted small mb-1 fw-medium">Monthly EMI</div>
-                    <div class="d-flex align-items-center justify-content-between">
-                        <h4 class="mb-0 fw-bold text-warning" id="loan-stat-emi">₹0</h4>
-                        <i class="fas fa-calendar-check text-warning opacity-25 fa-2x"></i>
-                    </div>
-                </div>
-            </div>
+        <div class="row g-4 mb-5 animate-fade-in" id="loan-stats-container">
+            <!-- Populated dynamically -->
         </div>
 
         <ul class="nav nav-pills mb-4 gap-2">
             <li class="nav-item">
-                <a class="nav-link active" href="javascript:void(0)" onclick="filterLoans('active', this)">Active</a>
+                <a class="nav-link active" href="javascript:void(0)" onclick="switchLoanView('loans', this)">Loans & Debts</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="javascript:void(0)" onclick="filterLoans('closed', this)">Closed</a>
-            </li>
-            <li class="nav-item ms-auto">
-                <select class="form-select" id="loan-type-filter" onchange="filterLoanType(this.value)">
-                    <option value="all">All Types</option>
-                    <option value="borrowed">Liabilities (Borrowed)</option>
-                    <option value="lent">Assets (Lent)</option>
-                    <option value="emi">Product EMIs</option>
-                </select>
+                <a class="nav-link" href="javascript:void(0)" onclick="switchLoanView('cards', this)">Credit Cards</a>
             </li>
         </ul>
 
-        <div class="row g-4" id="loans-grid">
-            <div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>
+        <!-- Loans View -->
+        <div id="loans-view-container">
+            <div class="d-flex justify-content-between mb-3 align-items-center">
+                <ul class="nav nav-pills gap-2 small">
+                    <li class="nav-item"><a class="nav-link active py-1 px-3" href="javascript:void(0)" onclick="filterLoans('active', this)">Active</a></li>
+                    <li class="nav-item"><a class="nav-link py-1 px-3" href="javascript:void(0)" onclick="filterLoans('closed', this)">Closed</a></li>
+                </ul>
+                <select class="form-select form-select-sm w-auto" id="loan-type-filter" onchange="filterLoanType(this.value)">
+                    <option value="all">All Types</option>
+                    <option value="borrowed">Liabilities</option>
+                    <option value="lent">Assets</option>
+                    <option value="emi">EMIs</option>
+                </select>
+            </div>
+            <div class="row g-4" id="loans-grid">
+                <div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>
+            </div>
+        </div>
+
+        <!-- Credit Cards View -->
+        <div id="cards-view-container" class="d-none">
+            <div class="row g-4" id="cards-grid">
+                <div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>
+            </div>
         </div>
         
         <!-- Add Loan Modal -->
@@ -288,8 +304,129 @@ window.loadLoansSection = async function() {
                 </div>
             </div>
         </div>
+
+        <!-- Add Credit Card Modal -->
+        <div class="modal fade" id="addCreditCardModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Add Credit Card</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="cc-form">
+                            <input type="hidden" id="cc-id">
+                            <div class="mb-3">
+                                <label class="form-label">Card Name</label>
+                                <input type="text" class="form-control" id="cc-name" placeholder="e.g. HDFC Regalia" required>
+                            </div>
+                            <div class="row">
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Bank Name</label>
+                                    <select class="form-select" id="cc-bank">
+                                        <option value="">Select Bank</option>
+                                        ${CREDIT_CARD_BANKS.map(b => `<option value="${b.name}">${b.name}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Last 4 Digits</label>
+                                    <input type="text" class="form-control" id="cc-last4" maxlength="4" placeholder="1234">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Total Credit Limit</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">₹</span>
+                                    <input type="number" class="form-control" id="cc-limit" required>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Current Outstanding</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">₹</span>
+                                    <input type="number" class="form-control" id="cc-outstanding" value="0">
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Billing Day</label>
+                                    <input type="number" class="form-control" id="cc-bill-day" min="1" max="31" placeholder="e.g. 15">
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Grace Period (Days)</label>
+                                    <input type="number" class="form-control" id="cc-grace-days" value="20" placeholder="e.g. 20">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Card Color</label>
+                                <input type="color" class="form-control form-control-color w-100" id="cc-color" value="#1f2937">
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="btn-save-cc" onclick="saveCreditCard()">Save Card</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CC Action Modal -->
+        <div class="modal fade" id="ccActionModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="ccActionTitle">Card Action</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="action-cc-id">
+                        <input type="hidden" id="action-type"> <!-- 'spend' or 'pay' -->
+                        <div class="mb-3">
+                            <label class="form-label">Amount</label>
+                            <div class="input-group">
+                                <span class="input-group-text">₹</span>
+                                <input type="number" class="form-control" id="action-amount" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Date</label>
+                            <input type="date" class="form-control" id="action-date" required>
+                        </div>
+                        <div class="mb-3" id="action-desc-div">
+                            <label class="form-label">Description</label>
+                            <input type="text" class="form-control" id="action-desc">
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="action-ledger" checked>
+                            <label class="form-check-label">Record in Transaction Ledger</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="btn-save-cc-action" onclick="processCCAction()">Confirm</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     `;
     await loadLoansGrid('active');
+};
+
+window.switchLoanView = function(view, element) {
+    currentLoanView = view;
+    document.querySelectorAll('#loans-section > .nav-pills .nav-link').forEach(l => l.classList.remove('active'));
+    element.classList.add('active');
+
+    if (view === 'loans') {
+        document.getElementById('loans-view-container').classList.remove('d-none');
+        document.getElementById('cards-view-container').classList.add('d-none');
+        loadLoansGrid('active');
+    } else {
+        document.getElementById('loans-view-container').classList.add('d-none');
+        document.getElementById('cards-view-container').classList.remove('d-none');
+        loadCreditCardsGrid();
+    }
 };
 
 window.updateLoanModalUI = function(type) {
@@ -327,7 +464,6 @@ window.updateLoanModalUI = function(type) {
         if (type === 'lent' || type === 'borrowed') {
             if(contactFields) contactFields.classList.remove('d-none');
             if(contactLabel) {
-                contactLabel.textContent = type === 'lent' ? 'Borrower Mobile Number' : 'Lender UPI ID / Mobile';
                 contactLabel.textContent = type === 'lent' ? 'Borrower Mobile Number' : 'Lender Mobile Number';
             }
         } else {
@@ -369,14 +505,14 @@ window.showAddLoanModal = function() {
 };
 
 window.filterLoans = function(status, element) {
-    document.querySelectorAll('#loans-section .nav-link').forEach(l => l.classList.remove('active'));
+    document.querySelectorAll('#loans-view-container .nav-link').forEach(l => l.classList.remove('active'));
     element.classList.add('active');
     loadLoansGrid(status);
 };
 
 window.filterLoanType = function(type) {
     currentLoanTypeFilter = type;
-    const activeTab = document.querySelector('#loans-section .nav-link.active');
+    const activeTab = document.querySelector('#loans-view-container .nav-link.active');
     const status = activeTab ? activeTab.textContent.toLowerCase() : 'active';
     loadLoansGrid(status);
 };
@@ -522,11 +658,8 @@ window.loadLoansGrid = async function(status = 'active') {
     }
 
     const container = document.getElementById('loans-grid');
-    if (docs.length === 0) {
-        container.innerHTML = `<div class="col-12 text-center text-muted py-5">No ${status} ${currentLoanTypeFilter !== 'all' ? currentLoanTypeFilter : ''} loans found.</div>`;
-        return;
-    }
-
+    const statsContainer = document.getElementById('loan-stats-container');
+    
     // Calculate Stats
     let totalBorrowed = 0;
     let totalLent = 0;
@@ -547,14 +680,50 @@ window.loadLoansGrid = async function(status = 'active') {
         }
     });
 
-    if(document.getElementById('loan-stat-borrowed')) document.getElementById('loan-stat-borrowed').textContent = `₹${totalBorrowed.toFixed(2)}`;
-    if(document.getElementById('loan-stat-lent')) document.getElementById('loan-stat-lent').textContent = `₹${totalLent.toFixed(2)}`;
-    if(document.getElementById('loan-stat-net')) document.getElementById('loan-stat-net').textContent = `₹${(totalLent - totalBorrowed).toFixed(2)}`;
-    if(document.getElementById('loan-stat-emi')) document.getElementById('loan-stat-emi').textContent = `₹${totalEmi.toFixed(2)}`;
-    
-    // Update titles based on status
-    document.getElementById('loan-stat-title-1').textContent = status === 'active' ? 'Outstanding Debt' : 'Total Repaid Debt';
-    document.getElementById('loan-stat-title-2').textContent = status === 'active' ? 'Outstanding Assets' : 'Total Repaid Assets';
+    // Render Stats
+    statsContainer.innerHTML = `
+        <div class="col-6 col-md-3">
+            <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-danger">
+                <div class="text-muted small mb-1 fw-medium">${status === 'active' ? 'Outstanding Debt' : 'Total Repaid Debt'}</div>
+                <div class="d-flex align-items-center justify-content-between">
+                    <h4 class="mb-0 fw-bold text-danger">₹${totalBorrowed.toFixed(0)}</h4>
+                    <i class="fas fa-hand-holding-usd text-danger opacity-25 fa-2x"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-success">
+                <div class="text-muted small mb-1 fw-medium">${status === 'active' ? 'Outstanding Assets' : 'Total Repaid Assets'}</div>
+                <div class="d-flex align-items-center justify-content-between">
+                    <h4 class="mb-0 fw-bold text-success">₹${totalLent.toFixed(0)}</h4>
+                    <i class="fas fa-hand-holding-heart text-success opacity-25 fa-2x"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-primary">
+                <div class="text-muted small mb-1 fw-medium">Net Position</div>
+                <div class="d-flex align-items-center justify-content-between">
+                    <h4 class="mb-0 fw-bold text-primary">₹${(totalLent - totalBorrowed).toFixed(0)}</h4>
+                    <i class="fas fa-balance-scale text-primary opacity-25 fa-2x"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-warning">
+                <div class="text-muted small mb-1 fw-medium">Monthly EMI</div>
+                <div class="d-flex align-items-center justify-content-between">
+                    <h4 class="mb-0 fw-bold text-warning">₹${totalEmi.toFixed(0)}</h4>
+                    <i class="fas fa-calendar-check text-warning opacity-25 fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    `;
+
+    if (docs.length === 0) {
+        container.innerHTML = `<div class="col-12 text-center text-muted py-5">No ${status} ${currentLoanTypeFilter !== 'all' ? currentLoanTypeFilter : ''} loans found.</div>`;
+        return;
+    }
 
     container.innerHTML = '';
     docs.forEach(doc => {
@@ -808,7 +977,7 @@ window.deleteLoan = async function(id) {
 
             await batch.commit();
 
-            const activeTab = document.querySelector('#loans-section .nav-link.active');
+            const activeTab = document.querySelector('#loans-view-container .nav-link.active');
             const status = activeTab ? activeTab.textContent.toLowerCase() : 'active';
             loadLoansGrid(status);
             if(window.dashboard) window.dashboard.showNotification('Loan deleted successfully', 'success');
@@ -1007,8 +1176,6 @@ window.saveChanges = async function() {
             const txRef = db.collection('transactions').doc(transactionId);
             batch.update(txRef, { amount: newAmount, date: newDate });
         } 
-        // If no transactionId, we just update the loan amount, which is correct
-        // as it wasn't linked to the main ledger in the first place.
 
         // Update the repayment
         batch.update(repaymentRef, { amount: newAmount, date: newDate });
@@ -1026,7 +1193,7 @@ window.saveChanges = async function() {
         
         // Refresh views
         viewRepaymentHistory(loanId);
-        const activeTab = document.querySelector('#loans-section .nav-link.active');
+        const activeTab = document.querySelector('#loans-view-container .nav-link.active');
         const status = activeTab ? activeTab.textContent.toLowerCase() : 'active';
         loadLoansGrid(status);
 
@@ -1078,7 +1245,7 @@ window.deleteRepayment = async function(loanId, repaymentId) {
         
         // Refresh views
         viewRepaymentHistory(loanId);
-        const activeTab = document.querySelector('#loans-section .nav-link.active');
+        const activeTab = document.querySelector('#loans-view-container .nav-link.active');
         const status = activeTab ? activeTab.textContent.toLowerCase() : 'active';
         loadLoansGrid(status);
 
@@ -1176,5 +1343,310 @@ window.triggerUpiPayment = async function() {
     } catch (e) {
         console.error("Error triggering UPI:", e);
         if(window.dashboard) window.dashboard.showNotification("Could not trigger UPI app.", 'danger');
+    }
+};
+
+// --- Credit Card Functions ---
+
+window.loadCreditCardsGrid = async function() {
+    const user = auth.currentUser;
+    const container = document.getElementById('cards-grid');
+    const statsContainer = document.getElementById('loan-stats-container');
+    
+    try {
+        const snapshot = await db.collection('credit_cards')
+            .where('userId', '==', user.uid)
+            .orderBy('createdAt', 'desc')
+            .get();
+
+        // Update Stats for Cards
+        let totalLimit = 0;
+        let totalOutstanding = 0;
+        
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            totalLimit += (data.creditLimit || 0);
+            totalOutstanding += (data.currentOutstanding || 0);
+        });
+        
+        // Render Card Stats
+        statsContainer.innerHTML = `
+            <div class="col-6 col-md-4">
+                <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-primary">
+                    <div class="text-muted small mb-1 fw-medium">Total Limit</div>
+                    <h4 class="mb-0 fw-bold text-primary">₹${totalLimit.toFixed(0)}</h4>
+                </div>
+            </div>
+            <div class="col-6 col-md-4">
+                <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-danger">
+                    <div class="text-muted small mb-1 fw-medium">Total Outstanding</div>
+                    <h4 class="mb-0 fw-bold text-danger">₹${totalOutstanding.toFixed(0)}</h4>
+                </div>
+            </div>
+            <div class="col-12 col-md-4">
+                <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-success">
+                    <div class="text-muted small mb-1 fw-medium">Available Credit</div>
+                    <h4 class="mb-0 fw-bold text-success">₹${(totalLimit - totalOutstanding).toFixed(0)}</h4>
+                </div>
+            </div>
+        `;
+
+        if (snapshot.empty) {
+            container.innerHTML = '<div class="col-12 text-center text-muted py-5">No credit cards added.</div>';
+            return;
+        }
+
+        container.innerHTML = '';
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const utilization = Math.min(100, Math.round((data.currentOutstanding / data.creditLimit) * 100));
+            const available = data.creditLimit - data.currentOutstanding;
+            const color = data.color || '#1f2937';
+            
+            // Calculate Due Date
+            let dueDateText = 'N/A';
+            if (data.billingDay && data.gracePeriod) {
+                const today = new Date();
+                const billDate = new Date();
+                billDate.setDate(data.billingDay);
+                
+                // If billing day passed this month, due date is next month
+                // This is a simple approximation
+                if (today.getDate() > data.billingDay) {
+                    billDate.setMonth(billDate.getMonth() + 1);
+                }
+                const dueDate = new Date(billDate);
+                dueDate.setDate(dueDate.getDate() + parseInt(data.gracePeriod));
+                dueDateText = dueDate.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+            }
+
+            const col = document.createElement('div');
+            col.className = 'col-md-6 col-lg-4';
+            col.innerHTML = `
+                <div class="card h-100 border-0 shadow-sm rounded-4 overflow-hidden">
+                    <div class="p-4 text-white position-relative" style="background: linear-gradient(135deg, ${color}, #000000);">
+                        <div class="d-flex justify-content-between align-items-start mb-4">
+                            <div>
+                                <div class="small opacity-75 text-uppercase tracking-wide">${data.bank || 'Bank'}</div>
+                                <h5 class="mb-0 fw-bold">${data.name}</h5>
+                            </div>
+                            <i class="fas fa-wifi opacity-50"></i>
+                        </div>
+                        <div class="mb-4 font-monospace fs-5">
+                            **** **** **** ${data.last4 || 'XXXX'}
+                        </div>
+                        <div class="d-flex justify-content-between align-items-end">
+                            <div>
+                                <div class="small opacity-75">Outstanding</div>
+                                <div class="fw-bold fs-5">₹${data.currentOutstanding.toFixed(2)}</div>
+                            </div>
+                            <div class="text-end">
+                                <div class="small opacity-75">Limit</div>
+                                <div class="fw-bold">₹${data.creditLimit.toFixed(0)}</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Actions Dropdown -->
+                        <div class="position-absolute top-0 end-0 p-3">
+                            <div class="dropdown">
+                                <button class="btn btn-link text-white p-0" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="editCreditCard('${doc.id}')">Edit</a></li>
+                                    <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="deleteCreditCard('${doc.id}')">Delete</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between small text-muted mb-1">
+                            <span>Utilization: ${utilization}%</span>
+                            <span>Available: ₹${available.toFixed(0)}</span>
+                        </div>
+                        <div class="progress mb-3" style="height: 6px;">
+                            <div class="progress-bar ${utilization > 80 ? 'bg-danger' : (utilization > 30 ? 'bg-warning' : 'bg-success')}" 
+                                 role="progressbar" style="width: ${utilization}%"></div>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <small class="text-muted"><i class="far fa-calendar-alt me-1"></i> Due: ${dueDateText}</small>
+                        </div>
+                        <div class="d-grid gap-2 d-flex">
+                            <button class="btn btn-sm btn-outline-danger flex-grow-1" onclick="showCCActionModal('${doc.id}', 'spend')">
+                                <i class="fas fa-shopping-bag me-1"></i> Log Spend
+                            </button>
+                            <button class="btn btn-sm btn-outline-success flex-grow-1" onclick="showCCActionModal('${doc.id}', 'pay')">
+                                <i class="fas fa-check-circle me-1"></i> Pay Bill
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(col);
+        });
+
+    } catch (e) {
+        console.error("Error loading credit cards:", e);
+        container.innerHTML = '<div class="col-12 text-center text-danger">Error loading cards.</div>';
+    }
+};
+
+window.showAddCreditCardModal = function() {
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addCreditCardModal'));
+    document.getElementById('cc-form').reset();
+    document.getElementById('cc-id').value = '';
+    document.getElementById('cc-color').value = '#1f2937';
+    modal.show();
+};
+
+window.saveCreditCard = async function() {
+    const btn = document.getElementById('btn-save-cc');
+    const id = document.getElementById('cc-id').value;
+    const name = document.getElementById('cc-name').value;
+    const bank = document.getElementById('cc-bank').value;
+    const last4 = document.getElementById('cc-last4').value;
+    const limit = parseFloat(document.getElementById('cc-limit').value);
+    const outstanding = parseFloat(document.getElementById('cc-outstanding').value) || 0;
+    const billDay = parseInt(document.getElementById('cc-bill-day').value) || null;
+    const gracePeriod = parseInt(document.getElementById('cc-grace-days').value) || 20;
+    const color = document.getElementById('cc-color').value;
+    const user = auth.currentUser;
+
+    if (!name || !limit) {
+        if(window.dashboard) window.dashboard.showNotification('Please fill required fields', 'warning');
+        return;
+    }
+
+    try {
+        window.setBtnLoading(btn, true);
+        const data = {
+            userId: user.uid,
+            name, bank, last4, 
+            creditLimit: limit, 
+            currentOutstanding: outstanding,
+            billingDay: billDay,
+            gracePeriod,
+            color
+        };
+
+        if (id) {
+            data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection('credit_cards').doc(id).update(data);
+        } else {
+            data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection('credit_cards').add(data);
+        }
+
+        window.setBtnLoading(btn, false);
+        bootstrap.Modal.getInstance(document.getElementById('addCreditCardModal')).hide();
+        loadCreditCardsGrid();
+        if(window.dashboard) window.dashboard.showNotification(id ? 'Card updated' : 'Card added', 'success');
+    } catch (e) {
+        window.setBtnLoading(btn, false);
+        console.error(e);
+        if(window.dashboard) window.dashboard.showNotification('Error saving card', 'danger');
+    }
+};
+
+window.editCreditCard = async function(id) {
+    try {
+        const doc = await db.collection('credit_cards').doc(id).get();
+        if (!doc.exists) return;
+        const data = doc.data();
+        
+        document.getElementById('cc-id').value = id;
+        document.getElementById('cc-name').value = data.name;
+        document.getElementById('cc-bank').value = data.bank || '';
+        document.getElementById('cc-last4').value = data.last4 || '';
+        document.getElementById('cc-limit').value = data.creditLimit;
+        document.getElementById('cc-outstanding').value = data.currentOutstanding;
+        document.getElementById('cc-bill-day').value = data.billingDay || '';
+        document.getElementById('cc-grace-days').value = data.gracePeriod || 20;
+        document.getElementById('cc-color').value = data.color || '#1f2937';
+        
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addCreditCardModal'));
+        modal.show();
+    } catch (e) { console.error(e); }
+};
+
+window.deleteCreditCard = async function(id) {
+    if (!confirm('Delete this credit card?')) return;
+    try {
+        await db.collection('credit_cards').doc(id).delete();
+        loadCreditCardsGrid();
+        if(window.dashboard) window.dashboard.showNotification('Card deleted', 'success');
+    } catch (e) { console.error(e); }
+};
+
+window.showCCActionModal = function(id, type) {
+    document.getElementById('action-cc-id').value = id;
+    document.getElementById('action-type').value = type;
+    document.getElementById('action-amount').value = '';
+    document.getElementById('action-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('action-desc').value = type === 'spend' ? 'Purchase' : 'Bill Payment';
+    document.getElementById('ccActionTitle').textContent = type === 'spend' ? 'Log Spend' : 'Record Payment';
+    
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('ccActionModal'));
+    modal.show();
+};
+
+window.processCCAction = async function() {
+    const btn = document.getElementById('btn-save-cc-action');
+    const id = document.getElementById('action-cc-id').value;
+    const type = document.getElementById('action-type').value;
+    const amount = parseFloat(document.getElementById('action-amount').value);
+    const date = document.getElementById('action-date').value;
+    const desc = document.getElementById('action-desc').value;
+    const recordLedger = document.getElementById('action-ledger').checked;
+    const user = auth.currentUser;
+
+    if (!amount || amount <= 0) return;
+
+    try {
+        window.setBtnLoading(btn, true);
+        const batch = db.batch();
+        const cardRef = db.collection('credit_cards').doc(id);
+        
+        // Update Outstanding
+        const change = type === 'spend' ? amount : -amount;
+        batch.update(cardRef, {
+            currentOutstanding: firebase.firestore.FieldValue.increment(change),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Add to Ledger
+        if (recordLedger) {
+            const cardDoc = await cardRef.get();
+            const cardName = cardDoc.data().name;
+            
+            const txRef = db.collection('transactions').doc();
+            batch.set(txRef, {
+                userId: user.uid,
+                date: date,
+                amount: amount,
+                type: 'expense', // Both spend and payment are outflows usually. 
+                                 // Spend = Expense (Category: Shopping etc). Payment = Transfer/Expense (Category: Bill Payment).
+                                 // For simplicity, let's mark Spend as Expense. 
+                                 // Payment is tricky: It's money leaving bank to pay debt. So also Expense in cash flow terms.
+                category: type === 'spend' ? 'Shopping' : 'Credit Card Bill',
+                description: `${type === 'spend' ? 'CC Spend' : 'Bill Pay'}: ${cardName} - ${desc}`,
+                paymentMode: type === 'spend' ? 'credit-card' : 'bank', // Spend is via CC. Payment is via Bank.
+                relatedId: id,
+                section: 'credit_cards',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+
+        await batch.commit();
+        
+        window.setBtnLoading(btn, false);
+        bootstrap.Modal.getInstance(document.getElementById('ccActionModal')).hide();
+        loadCreditCardsGrid();
+        if(window.dashboard) {
+            window.dashboard.showNotification('Action recorded', 'success');
+            window.dashboard.updateStats();
+        }
+    } catch (e) {
+        window.setBtnLoading(btn, false);
+        console.error(e);
+        if(window.dashboard) window.dashboard.showNotification('Error processing action', 'danger');
     }
 };
