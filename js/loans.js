@@ -167,6 +167,10 @@ window.loadLoansSection = async function() {
                                     <label class="form-label">Duration (Months)</label>
                                     <input type="number" class="form-control" id="loan-duration" min="1" placeholder="Auto-calc EMI" oninput="calculateEMIAmount()">
                                 </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Processing Fees</label>
+                                    <input type="number" class="form-control" id="loan-processing-fee" step="0.01" min="0" placeholder="One-time charges">
+                                </div>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Payment Mode</label>
@@ -217,6 +221,21 @@ window.loadLoansSection = async function() {
                                 <div class="input-group">
                                     <span class="input-group-text">₹</span>
                                     <input type="number" class="form-control" id="repay-amount" step="0.01" min="0" required>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Penalty / Bounce Charges</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">₹</span>
+                                    <input type="number" class="form-control" id="repay-penalty" step="0.01" min="0" value="0">
+                                </div>
+                                <div class="form-text small">Part of the amount above that is a penalty (doesn't reduce loan balance).</div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Processing Fees (if included)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">₹</span>
+                                    <input type="number" class="form-control" id="repay-proc-fee" step="0.01" min="0" value="0">
                                 </div>
                             </div>
                             <div class="mb-3">
@@ -528,6 +547,7 @@ window.saveLoan = async function() {
     const interest = parseFloat(document.getElementById('loan-interest').value) || 0;
     const emi = parseFloat(document.getElementById('loan-emi').value) || 0;
     const duration = parseInt(document.getElementById('loan-duration').value) || 0;
+    const processingFee = parseFloat(document.getElementById('loan-processing-fee').value) || 0;
     const linkLedger = document.getElementById('loan-link-ledger').checked;
     const paymentMode = document.getElementById('loan-payment-mode').value;
     const countryCode = document.getElementById('loan-country-code').value;
@@ -560,22 +580,22 @@ window.saveLoan = async function() {
     try {
         window.setBtnLoading(btn, true);
 
-        const loan = {
+        const loanDataToSave = {
             userId: user.uid,
-            type, name, totalAmount: amount, paidAmount: 0,
+            type, name, totalAmount: amount, 
             startDate, dueDate, interestRate: interest, emiAmount: emi,
             durationMonths: duration,
+            processingFee: processingFee,
+            totalPenalty: 0,
             mobile: fullMobile,
             messageContext: messageContext || '',
             upiId: upiId || '',
             status: 'active',
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
-        let loanRef;
         if (id) {
-            // Update existing loan (logic simplified for now, usually editing amount is complex)
-            await db.collection('loans').doc(id).update({ 
+            // Update existing loan
+            const updatePayload = { 
                 name, 
                 totalAmount: amount,
                 startDate,
@@ -583,11 +603,29 @@ window.saveLoan = async function() {
                 interestRate: interest, 
                 emiAmount: emi, 
                 durationMonths: duration,
+                processingFee: processingFee,
                 type,
                 mobile: fullMobile,
                 upiId: upiId || '',
                 messageContext: messageContext || ''
-            });
+            };
+
+            // If EMI, ensure initialDueDate is consistent with the new dueDate (which represents the NEXT due date)
+            if (type === 'emi' || (type === 'borrowed' && emi > 0)) {
+                const currentDoc = await db.collection('loans').doc(id).get();
+                const currentData = currentDoc.data();
+                const paidAmt = currentData.paidAmount || 0;
+                const emiVal = emi > 0 ? emi : (currentData.emiAmount || 1);
+                const installmentsPaid = Math.floor(paidAmt / emiVal);
+                
+                // Back-calculate initial due date from the user-provided NEXT due date
+                const newInitial = new Date(dueDate);
+                newInitial.setMonth(newInitial.getMonth() - installmentsPaid);
+                updatePayload.initialDueDate = newInitial.toISOString().split('T')[0];
+                updatePayload.dueDateUpdated = true;
+            }
+
+            await db.collection('loans').doc(id).update(updatePayload);
 
             // Update associated transaction
             const txQuery = await db.collection('transactions')
@@ -608,8 +646,16 @@ window.saveLoan = async function() {
                 });
             }
         } else {
-            const docRef = await db.collection('loans').add(loan);
-            loanRef = docRef.id;
+            loanDataToSave.paidAmount = 0;
+            loanDataToSave.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            
+            if (type === 'emi' || (type === 'borrowed' && emi > 0)) {
+                loanDataToSave.initialDueDate = dueDate;
+                loanDataToSave.dueDateUpdated = true;
+            }
+            
+            const docRef = await db.collection('loans').add(loanDataToSave);
+            const loanRef = docRef.id;
 
             if (linkLedger) {
                 const transaction = {
@@ -624,6 +670,21 @@ window.saveLoan = async function() {
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
                 await db.collection('transactions').add(transaction);
+
+                // Add Processing Fee Transaction
+                if (processingFee > 0) {
+                    await db.collection('transactions').add({
+                        userId: user.uid,
+                        loanId: loanRef,
+                        date: startDate,
+                        amount: processingFee,
+                        type: 'expense',
+                        category: 'Loan Fees',
+                        description: `Processing Fee: ${name}`,
+                        paymentMode: paymentMode,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
             }
         }
         
@@ -747,7 +808,7 @@ window.loadLoansGrid = async function(status = 'active') {
         let nextDueDateDisplay = 'No due date';
         let nextDueDateObj = null;
 
-        if (data.type === 'emi' && data.emiAmount > 0) {
+        if ((data.type === 'emi' || data.type === 'borrowed') && data.emiAmount > 0) {
             // For EMI: Start Date + (Paid Installments + 1) months
             const paidInstallments = Math.floor((data.paidAmount || 0) / data.emiAmount);
             const baseDate = data.dueDate ? new Date(data.dueDate) : new Date(data.startDate);
@@ -760,6 +821,24 @@ window.loadLoansGrid = async function(status = 'active') {
             
             nextDueDateObj = nextDate;
             nextDueDateDisplay = nextDate.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+            if (data.dueDateUpdated && data.dueDate) {
+                // If we are tracking updates, trust the DB field
+                nextDueDateObj = new Date(data.dueDate);
+                nextDueDateDisplay = nextDueDateObj.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+            } else {
+                // Legacy calculation for existing loans not yet migrated
+                const paidInstallments = Math.floor((data.paidAmount || 0) / data.emiAmount);
+                const baseDate = data.dueDate ? new Date(data.dueDate) : new Date(data.startDate);
+                
+                // If dueDate is provided, that's the first EMI date. If not, assume 1 month after start.
+                if (!data.dueDate) baseDate.setMonth(baseDate.getMonth() + 1);
+                
+                const nextDate = new Date(baseDate);
+                nextDate.setMonth(baseDate.getMonth() + paidInstallments); // Add months for paid installments
+                
+                nextDueDateObj = nextDate;
+                nextDueDateDisplay = nextDate.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+            }
         } else if (data.dueDate) {
             // For standard loans
             nextDueDateObj = new Date(data.dueDate);
@@ -872,6 +951,11 @@ window.loadLoansGrid = async function(status = 'active') {
                     
                     ${detailsHtml}
                     
+                    ${data.totalPenalty > 0 ? `
+                    <div class="mt-2 small text-danger bg-danger bg-opacity-10 p-2 rounded">
+                        <i class="fas fa-exclamation-circle me-1"></i> Total Penalties Paid: ₹${data.totalPenalty.toFixed(2)}
+                    </div>` : ''}
+
                     ${!isFullyPaid ? `
                     <div class="mt-3 d-flex gap-2 justify-content-end">
                         ${whatsappBtn}
@@ -900,6 +984,7 @@ window.editLoan = async function(id) {
         document.getElementById('loan-interest').value = data.interestRate || '';
         document.getElementById('loan-emi').value = data.emiAmount || '';
         document.getElementById('loan-duration').value = data.durationMonths || '';
+        document.getElementById('loan-processing-fee').value = data.processingFee || '';
         
         // Handle Mobile Number Split
         const mobile = data.mobile || '';
@@ -1019,6 +1104,8 @@ window.saveRepayment = async function() {
     const btn = document.getElementById('btn-save-repayment');
     const loanId = document.getElementById('repay-loan-id').value;
     const amount = parseFloat(document.getElementById('repay-amount').value);
+    const penalty = parseFloat(document.getElementById('repay-penalty').value) || 0;
+    const processingFee = parseFloat(document.getElementById('repay-proc-fee').value) || 0;
     const date = document.getElementById('repay-date').value;
     const linkLedger = document.getElementById('repay-link-ledger').checked;
     const paymentMode = document.getElementById('repay-payment-mode').value;
@@ -1033,40 +1120,110 @@ window.saveRepayment = async function() {
         window.setBtnLoading(btn, true);
         const loanDoc = await db.collection('loans').doc(loanId).get();
         const loanData = loanDoc.data();
-        const newPaidAmount = (loanData.paidAmount || 0) + amount;
+        
+        const effectiveAmount = amount - penalty - processingFee;
+        const newPaidAmount = (loanData.paidAmount || 0) + effectiveAmount;
         const status = newPaidAmount >= loanData.totalAmount ? 'closed' : 'active';
 
-        await db.collection('loans').doc(loanId).update({
+        const updateData = {
             paidAmount: newPaidAmount,
+            totalPenalty: (loanData.totalPenalty || 0) + penalty,
             status: status,
             lastPaymentDate: date
-        });
+        };
+
+        // Auto-update Due Date for EMIs
+        if ((loanData.type === 'emi' || loanData.type === 'borrowed') && loanData.emiAmount > 0 && status === 'active') {
+            // Determine the anchor date (First Due Date)
+            let anchorDate;
+            if (loanData.initialDueDate) {
+                anchorDate = new Date(loanData.initialDueDate);
+            } else {
+                // First time migration: Assume current stored dueDate is the initial one (or calculate from start)
+                // For safety, let's use the logic: StartDate + 1 month if dueDate missing, else dueDate.
+                anchorDate = loanData.dueDate ? new Date(loanData.dueDate) : new Date(loanData.startDate);
+                if (!loanData.dueDate) anchorDate.setMonth(anchorDate.getMonth() + 1);
+                
+                updateData.initialDueDate = anchorDate.toISOString().split('T')[0];
+            }
+
+            const paidInstallments = Math.floor(newPaidAmount / loanData.emiAmount);
+            const nextDate = new Date(anchorDate);
+            nextDate.setMonth(anchorDate.getMonth() + paidInstallments);
+            
+            updateData.dueDate = nextDate.toISOString().split('T')[0];
+            updateData.dueDateUpdated = true; // Flag to tell grid to use this date directly
+        }
+
+        await db.collection('loans').doc(loanId).update(updateData);
         
         let transactionId = null;
+        let penaltyTransactionId = null;
+        let procFeeTransactionId = null;
+
         if (linkLedger) {
             const type = loanData.type === 'lent' ? 'income' : 'expense';
-            const description = `Repayment: ${loanData.name} (${loanData.type === 'emi' ? 'EMI' : 'Loan'})`;
+            const principalAmount = amount - penalty - processingFee;
             
-            const transactionRef = await db.collection('transactions').add({
-                userId: user.uid,
-                loanId: loanId,
-                date: date,
-                amount: amount,
-                type: type,
-                category: 'Loan Repayment',
-                description: description,
-                paymentMode: paymentMode,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            transactionId = transactionRef.id;
+            // 1. Record Principal Repayment
+            if (principalAmount > 0) {
+                const transactionRef = await db.collection('transactions').add({
+                    userId: user.uid,
+                    loanId: loanId,
+                    date: date,
+                    amount: principalAmount,
+                    type: type,
+                    category: 'Loan Repayment',
+                    description: `Repayment: ${loanData.name}`,
+                    paymentMode: paymentMode,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                transactionId = transactionRef.id;
+            }
+
+            // 2. Record Penalty Transaction
+            if (penalty > 0) {
+                const penaltyRef = await db.collection('transactions').add({
+                    userId: user.uid,
+                    loanId: loanId,
+                    date: date,
+                    amount: penalty,
+                    type: type, // Income if lent, Expense if borrowed
+                    category: 'Loan Penalty',
+                    description: `Penalty/Charge: ${loanData.name}`,
+                    paymentMode: paymentMode,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                penaltyTransactionId = penaltyRef.id;
+            }
+
+            // 3. Record Processing Fee Transaction
+            if (processingFee > 0) {
+                const pfRef = await db.collection('transactions').add({
+                    userId: user.uid,
+                    loanId: loanId,
+                    date: date,
+                    amount: processingFee,
+                    type: 'expense',
+                    category: 'Loan Fees',
+                    description: `Processing Fee: ${loanData.name}`,
+                    paymentMode: paymentMode,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                procFeeTransactionId = pfRef.id;
+            }
         }
 
         // Always add to a subcollection for history tracking, linking transaction if created
         await db.collection('loans').doc(loanId).collection('repayments').add({
             userId: user.uid,
             amount: amount,
+            penalty: penalty,
+            processingFee: processingFee,
             date: date,
             transactionId: transactionId, // Will be null if not linked to ledger
+            penaltyTransactionId: penaltyTransactionId,
+            procFeeTransactionId: procFeeTransactionId,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
@@ -1103,11 +1260,24 @@ window.viewRepaymentHistory = async function(loanId) {
         tbody.innerHTML = '';
         snapshot.forEach(doc => {
             const data = doc.data();
+            let amountDisplay = `₹${data.amount.toFixed(2)}`;
+            let details = [];
+            if (data.penalty && data.penalty > 0) {
+                details.push(`<span class="text-danger"><i class="fas fa-exclamation-circle me-1"></i>Penalty: ₹${data.penalty.toFixed(2)}</span>`);
+            }
+            if (data.processingFee && data.processingFee > 0) {
+                details.push(`<span class="text-secondary"><i class="fas fa-file-invoice-dollar me-1"></i>Fee: ₹${data.processingFee.toFixed(2)}</span>`);
+            }
+            
+            if (details.length > 0) {
+                amountDisplay += `<div style="font-size: 0.7rem;">${details.join('<br>')}</div>`;
+            }
+
             tbody.innerHTML += `
                 <tr>
-                    <td>${new Date(data.date).toLocaleDateString()}</td>
-                    <td>₹${data.amount.toFixed(2)}</td>
-                    <td>
+                    <td class="align-middle">${new Date(data.date).toLocaleDateString()}</td>
+                    <td class="align-middle">${amountDisplay}</td>
+                    <td class="align-middle">
                         <button class="btn btn-sm btn-outline-primary" onclick="editRepayment('${loanId}', '${doc.id}')"><i class="fas fa-edit"></i></button>
                         <button class="btn btn-sm btn-outline-danger" onclick="deleteRepayment('${loanId}', '${doc.id}')"><i class="fas fa-trash"></i></button>
                     </td>
@@ -1220,8 +1390,13 @@ window.deleteRepayment = async function(loanId, repaymentId) {
             return;
         }
         const repaymentData = repaymentDoc.data();
-        const amountToDelete = repaymentData.amount;
+        const totalAmount = repaymentData.amount;
+        const penalty = repaymentData.penalty || 0;
+        const processingFee = repaymentData.processingFee || 0;
+        const principal = totalAmount - penalty - processingFee;
         const transactionId = repaymentData.transactionId;
+        const penaltyTransactionId = repaymentData.penaltyTransactionId;
+        const procFeeTransactionId = repaymentData.procFeeTransactionId;
 
         const batch = db.batch();
 
@@ -1230,14 +1405,31 @@ window.deleteRepayment = async function(loanId, repaymentId) {
             const txRef = db.collection('transactions').doc(transactionId);
             batch.delete(txRef);
         }
+        
+        // If a penalty transaction was linked, delete it.
+        if (penaltyTransactionId) {
+            const pTxRef = db.collection('transactions').doc(penaltyTransactionId);
+            batch.delete(pTxRef);
+        }
+
+        // If a processing fee transaction was linked, delete it.
+        if (procFeeTransactionId) {
+            const pfTxRef = db.collection('transactions').doc(procFeeTransactionId);
+            batch.delete(pfTxRef);
+        }
 
         // Delete the repayment
         batch.delete(repaymentRef);
 
-        // Update the loan's paid amount
+        // Update the loan's paid amount and total penalty
         const loanRef = db.collection('loans').doc(loanId);
-        const newPaidAmount = firebase.firestore.FieldValue.increment(-amountToDelete);
-        batch.update(loanRef, { paidAmount: newPaidAmount });
+        const updates = {
+            paidAmount: firebase.firestore.FieldValue.increment(-principal)
+        };
+        if (penalty > 0) {
+            updates.totalPenalty = firebase.firestore.FieldValue.increment(-penalty);
+        }
+        batch.update(loanRef, updates);
 
         await batch.commit();
         
