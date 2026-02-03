@@ -182,7 +182,55 @@ async function loadAggregatedNotifications(filter) {
             header.innerHTML = `<h6 class="fw-bold text-muted border-bottom pb-2">${group} <span class="badge bg-light text-dark border ms-1">${groups[group].length}</span></h6>`;
             container.appendChild(header);
 
-            groups[group].forEach(item => {
+            // Group similar items
+            const items = groups[group];
+            const groupedItems = [];
+            const buckets = { task: [], expiry: [], vehicle: [], other: [] };
+
+            items.forEach(item => {
+                if (buckets[item.type]) buckets[item.type].push(item);
+                else buckets.other.push(item);
+            });
+
+            ['task', 'expiry', 'vehicle'].forEach(type => {
+                if (buckets[type].length > 1) {
+                    const list = buckets[type];
+                    const isHigh = list.some(i => i.priority === 'high');
+                    const titles = list.map(i => i.title);
+                    const displayMsg = titles.slice(0, 3).join(', ') + (titles.length > 3 ? ` +${titles.length - 3} more` : '');
+                    
+                    let sourceLabel = 'Items';
+                    if (type === 'task') sourceLabel = 'Tasks';
+                    else if (type === 'expiry') sourceLabel = 'Expiries';
+                    else if (type === 'vehicle') sourceLabel = 'Vehicle Alerts';
+
+                    groupedItems.push({
+                        type: type,
+                        isSummary: true,
+                        count: list.length,
+                        source: sourceLabel,
+                        title: `${list.length} ${sourceLabel} ${group === 'Today' ? 'Due Today' : ''}`,
+                        message: displayMsg,
+                        date: list[0].date,
+                        priority: isHigh ? 'high' : 'normal',
+                        id: `group-${type}-${Date.now()}`,
+                        raw: { read: false },
+                        items: list
+                    });
+                } else if (buckets[type].length === 1) {
+                    groupedItems.push(buckets[type][0]);
+                }
+            });
+            buckets.other.forEach(i => groupedItems.push(i));
+
+            // Sort grouped items
+            groupedItems.sort((a, b) => {
+                if (a.priority === 'high' && b.priority !== 'high') return -1;
+                if (b.priority === 'high' && a.priority !== 'high') return 1;
+                return b.date - a.date;
+            });
+
+            groupedItems.forEach(item => {
                 let icon = 'fa-bell';
                 let colorClass = 'border-start border-4 border-secondary';
                 let bgIcon = 'bg-secondary';
@@ -199,11 +247,30 @@ async function loadAggregatedNotifications(filter) {
 
                 const div = document.createElement('div');
                 div.className = 'col-md-6 col-lg-4 animate-slide-up';
+                
+                let actionHtml = '';
+                if (!item.isSummary) {
+                    actionHtml = `
+                        <div class="mt-2 pt-2 border-top d-flex justify-content-end gap-2">
+                            <div class="dropdown">
+                                <button class="btn btn-xs btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" style="font-size: 0.7rem;">
+                                    <i class="fas fa-clock me-1"></i>Snooze
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end" style="font-size: 0.8rem;">
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="window.snoozeItem('${item.type}', '${item.id}', 1)">1 Day</a></li>
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="window.snoozeItem('${item.type}', '${item.id}', 3)">3 Days</a></li>
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="window.snoozeItem('${item.type}', '${item.id}', 7)">1 Week</a></li>
+                                </ul>
+                            </div>
+                        </div>`;
+                }
+
                 div.innerHTML = `
                     <div class="card h-100 shadow-sm ${colorClass}">
                         <div class="card-body d-flex align-items-start">
-                            <div class="${bgIcon} bg-opacity-10 text-${bgIcon.replace('bg-', '')} rounded-circle p-3 me-3">
+                            <div class="${bgIcon} bg-opacity-10 text-${bgIcon.replace('bg-', '')} rounded-circle p-3 me-3 position-relative">
                                 <i class="fas ${icon} fa-lg"></i>
+                                ${item.isSummary ? `<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">${item.count}</span>` : ''}
                             </div>
                             <div class="flex-grow-1">
                                 <div class="d-flex justify-content-between">
@@ -212,19 +279,7 @@ async function loadAggregatedNotifications(filter) {
                                 </div>
                                 <p class="mb-1 text-muted small">${item.message}</p>
                                 <small class="text-muted" style="font-size: 0.7rem;">${item.date.toLocaleDateString()} ${item.date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</small>
-                                
-                                <div class="mt-2 pt-2 border-top d-flex justify-content-end gap-2">
-                                    <div class="dropdown">
-                                        <button class="btn btn-xs btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" style="font-size: 0.7rem;">
-                                            <i class="fas fa-clock me-1"></i>Snooze
-                                        </button>
-                                        <ul class="dropdown-menu dropdown-menu-end" style="font-size: 0.8rem;">
-                                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="window.snoozeItem('${item.type}', '${item.id}', 1)">1 Day</a></li>
-                                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="window.snoozeItem('${item.type}', '${item.id}', 3)">3 Days</a></li>
-                                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="window.snoozeItem('${item.type}', '${item.id}', 7)">1 Week</a></li>
-                                        </ul>
-                                    </div>
-                                </div>
+                                ${actionHtml}
                             </div>
                         </div>
                     </div>
