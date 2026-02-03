@@ -445,10 +445,12 @@ class Dashboard {
 
         navContainer.innerHTML = navItems.map((item, index) => `
             <div class="nav-card animate-nav-item" style="animation-delay: ${index * 0.05}s" data-section="${item.id}">
-                <div class="icon-circle" style="background-color: ${item.color}20; color: ${item.color}; box-shadow: 0 4px 10px ${item.color}30;">
-                    <i class="fas ${item.icon}"></i>
+                <div class="nav-card-content">
+                    <div class="icon-circle" style="background-color: ${item.color}20; color: ${item.color}; box-shadow: 0 4px 10px ${item.color}30;">
+                        <i class="fas ${item.icon}"></i>
+                    </div>
+                    <span style="color: ${item.color}; font-weight: 600;">${item.label}</span>
                 </div>
-                <span style="color: ${item.color}; font-weight: 600;">${item.label}</span>
             </div>
         `).join('');
     }
@@ -647,20 +649,67 @@ class Dashboard {
 
     setupNotificationListener() {
         if (!this.currentUser) return;
+        if (this.notificationListener) return; // Prevent duplicate listeners
         
+        let isFirstLoad = true;
+
         // Listen for unread notifications count
-        db.collection('notifications')
+        this.notificationListener = db.collection('notifications')
             .where('userId', '==', this.currentUser.uid)
             .where('read', '==', false)
             .onSnapshot(snapshot => {
                 const count = snapshot.size;
                 const badge = document.getElementById('notification-badge');
+                const btn = document.getElementById('notifications-btn');
+                
                 if (badge) {
-                    badge.textContent = count > 9 ? '9+' : count;
-                    if (count > 0) badge.classList.remove('d-none');
-                    else badge.classList.add('d-none');
+                    const newText = count > 9 ? '9+' : count;
+                    if (badge.textContent != newText) {
+                        badge.classList.remove('bounce-badge');
+                        void badge.offsetWidth; // Trigger reflow
+                        badge.classList.add('bounce-badge');
+                    }
+                    badge.textContent = newText;
+
+                    if (count > 0) {
+                        badge.classList.remove('d-none');
+                        if (btn) btn.classList.add('notification-pulse');
+                    } else {
+                        badge.classList.add('d-none');
+                        if (btn) btn.classList.remove('notification-pulse');
+                    }
                 }
+
+                // Play sound for new notifications (skip initial load)
+                if (!isFirstLoad) {
+                    const hasNew = snapshot.docChanges().some(change => change.type === 'added');
+                    if (hasNew) {
+                        this.playNotificationSound();
+                    }
+                }
+                isFirstLoad = false;
             }, error => console.log("Notification listener error:", error));
+    }
+
+    async playNotificationSound() {
+        try {
+            // Check user setting
+            if (this.currentUser) {
+                const userDoc = await db.collection('users').doc(this.currentUser.uid).get();
+                const settings = userDoc.data()?.settings || {};
+                if (settings.notification_sound === false) return;
+            }
+
+            // Premium glass ping sound
+            const audio = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-positive-interface-beep-221.mp3');
+            audio.volume = 0.4;
+            audio.play().catch(e => {
+                // Autoplay policy might block this if no user interaction yet
+                console.log("Notification sound blocked:", e);
+            });
+        } catch (e) {
+            console.error("Error playing notification sound:", e);
+        }
     }
 
     async showNotificationsModal() {
