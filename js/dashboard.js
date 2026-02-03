@@ -2415,6 +2415,16 @@ class Dashboard {
             today.setHours(0,0,0,0);
             const todayStr = today.toISOString().split('T')[0];
 
+            // Helper to check if we notified today
+            const notifiedToday = (data) => {
+                if (!data.lastAlertDate) return false;
+                const last = data.lastAlertDate.toDate ? data.lastAlertDate.toDate() : new Date(data.lastAlertDate);
+                const now = new Date();
+                return last.getDate() === now.getDate() && 
+                       last.getMonth() === now.getMonth() && 
+                       last.getFullYear() === now.getFullYear();
+            };
+
             // Helper to check if we already notified for this item
             const shouldNotify = async (relatedId) => {
                 const existing = await db.collection('notifications')
@@ -2427,7 +2437,7 @@ class Dashboard {
             };
 
             // Helper to send alert
-            const sendAlert = async (title, message, type, relatedId, priority = 'normal') => {
+            const sendAlert = async (title, message, type, relatedId, priority = 'normal', collection = null) => {
                 if (await shouldNotify(relatedId)) {
                     // DB Notification
                     await db.collection('notifications').add({
@@ -2445,6 +2455,13 @@ class Dashboard {
 
                     // Toast
                     this.showNotification(`${title}: ${message}`, priority === 'high' ? 'danger' : 'info');
+                    
+                    // Update source doc to prevent spam today
+                    if (collection) {
+                        db.collection(collection).doc(relatedId).update({
+                            lastAlertDate: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    }
                 }
             };
 
@@ -2458,6 +2475,8 @@ class Dashboard {
                 
                 tasksSnap.forEach(doc => {
                     const task = doc.data();
+                    if (notifiedToday(task)) return;
+
                     // Simple logic: If due today or overdue
                     const isOverdue = new Date(task.dueDate) < today;
                     sendAlert(
@@ -2465,7 +2484,8 @@ class Dashboard {
                         task.title,
                         'task',
                         doc.id,
-                        task.priority === 'high' ? 'high' : 'normal'
+                        task.priority === 'high' ? 'high' : 'normal',
+                        'reminders'
                     );
                 });
             }
@@ -2478,13 +2498,15 @@ class Dashboard {
                 
                 expirySnap.forEach(doc => {
                     const data = doc.data();
+                    if (notifiedToday(data)) return;
+
                     const expiryDate = new Date(data.expiryDate);
                     const diffTime = expiryDate - today;
                     const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                     const reminderDays = data.reminderDays || 30;
 
                     if (daysRemaining <= reminderDays && daysRemaining >= 0) {
-                        sendAlert('Document Expiring', `${data.title} expires in ${daysRemaining} days`, 'expiry', doc.id, 'high');
+                        sendAlert('Document Expiring', `${data.title} expires in ${daysRemaining} days`, 'expiry', doc.id, 'high', 'expiry_docs');
                     } else if (daysRemaining < 0) {
                         // Optional: Remind once about expired?
                     }
@@ -2493,6 +2515,7 @@ class Dashboard {
 
             // --- 4. Check Loans ---
             if (settings.notifications_loans !== false) {
+                const alertDays = settings.notifications_loans_days !== undefined ? settings.notifications_loans_days : 0;
                 const loansSnap = await db.collection('loans')
                     .where('userId', '==', this.currentUser.uid)
                     .where('status', '==', 'active')
@@ -2500,10 +2523,20 @@ class Dashboard {
                 
                 loansSnap.forEach(doc => {
                     const loan = doc.data();
+                    if (notifiedToday(loan)) return;
+
                     if (loan.dueDate) {
                         const due = new Date(loan.dueDate);
-                        if (due <= today) {
-                            sendAlert('Loan Repayment Due', `Payment for ${loan.name} is due`, 'loan', doc.id, 'high');
+                        const diffTime = due - today;
+                        const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                        if (daysRemaining <= alertDays) {
+                            let msg = `Payment for ${loan.name} is due`;
+                            if (daysRemaining < 0) msg += ` (Overdue by ${Math.abs(daysRemaining)} days)`;
+                            else if (daysRemaining === 0) msg += ` today`;
+                            else msg += ` in ${daysRemaining} days`;
+
+                            sendAlert('Loan Repayment Due', msg, 'loan', doc.id, 'high', 'loans');
                         }
                     }
                 });
@@ -2519,9 +2552,29 @@ class Dashboard {
                 const alertsSnap = await db.collection('service_alerts').where('userId', '==', this.currentUser.uid).get();
                 alertsSnap.forEach(doc => {
                     const alert = doc.data();
+                    if (notifiedToday(alert)) return;
+
                     const vehicle = vehicles[alert.vehicleId];
                     if (vehicle && vehicle.currentOdometer >= alert.dueOdometer - 100) { // Alert 100km before
-                        sendAlert('Vehicle Service Due', `${alert.title} for ${vehicle.name} is due soon`, 'vehicle', doc.id, 'high');
+                        sendAlert('Vehicle Service Due', `${alert.title} for ${vehicle.name} is due soon`, 'vehicle', doc.id, 'high', 'service_alerts');
+                    }
+                });
+            }
+
+            // --- 6. Check Document Limits ---
+            if (settings.notifications_expiry !== false) {
+                const limitsSnap = await db.collection('document_limits')
+                    .where('userId', '==', this.currentUser.uid)
+                    .get();
+
+                limitsSnap.forEach(doc => {
+                    const data = doc.data();
+                    if (notifiedToday(data)) return;
+
+                    const remaining = (data.maxLimit || 0) - (data.usedCount || 0);
+
+                    if (remaining <= 0) {
+                        sendAlert('Limit Reached', `Limit reached for ${data.actionName} on ${data.documentName}`, 'expiry', doc.id, 'high', 'document_limits');
                     }
                 });
             }
