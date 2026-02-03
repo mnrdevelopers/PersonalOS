@@ -5,23 +5,31 @@ window.loadExpirySection = async function() {
     const container = document.getElementById('expiry-section');
     container.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2>Expiry Tracker</h2>
-            <button class="btn btn-primary" onclick="showAddExpiryModal()">
-                <i class="fas fa-plus me-2"></i>Add Document
-            </button>
+            <h2>Document Tracker</h2>
+            <div>
+                <button class="btn btn-outline-primary me-2" onclick="showAddLimitModal()">
+                    <i class="fas fa-history me-2"></i>Track Limit
+                </button>
+                <button class="btn btn-primary" onclick="showAddExpiryModal()">
+                    <i class="fas fa-plus me-2"></i>Add Document
+                </button>
+            </div>
         </div>
         
         <div class="row mb-4">
             <div class="col-md-8">
                 <ul class="nav nav-tabs">
                     <li class="nav-item">
-                        <a class="nav-link active" href="javascript:void(0)" onclick="filterExpiry('all', this)">All</a>
+                        <a class="nav-link active" href="javascript:void(0)" onclick="filterExpiry('all', this)">All Docs</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="javascript:void(0)" onclick="filterExpiry('expiring', this)">Expiring Soon</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="javascript:void(0)" onclick="filterExpiry('expired', this)">Expired</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="javascript:void(0)" onclick="filterExpiry('limits', this)">Update Limits</a>
                     </li>
                 </ul>
             </div>
@@ -130,6 +138,76 @@ window.loadExpirySection = async function() {
                 </div>
             </div>
         </div>
+
+        <!-- Add Limit Modal -->
+        <div class="modal fade" id="addLimitModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Track Update Limit</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="limit-form">
+                            <input type="hidden" id="limit-id">
+                            <div class="mb-3">
+                                <label class="form-label">Document Name</label>
+                                <input type="text" class="form-control" id="limit-doc" placeholder="e.g. Aadhaar Card" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Action / Field</label>
+                                <input type="text" class="form-control" id="limit-action" placeholder="e.g. Name Change" required>
+                            </div>
+                            <div class="row">
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Max Limit</label>
+                                    <input type="number" class="form-control" id="limit-max" min="1" required>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Used So Far</label>
+                                    <input type="number" class="form-control" id="limit-used" min="0" value="0">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Notes</label>
+                                <textarea class="form-control" id="limit-notes" rows="2"></textarea>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" onclick="saveLimit()">Save Tracker</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Record Usage Modal -->
+        <div class="modal fade" id="recordUsageModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Record Update</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="usage-limit-id">
+                        <div class="mb-3">
+                            <label class="form-label">Date of Update</label>
+                            <input type="date" class="form-control" id="usage-date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description / Reason</label>
+                            <input type="text" class="form-control" id="usage-note" placeholder="e.g. Spelling correction">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-success" onclick="confirmLimitUsage()">Record</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     `;
     await loadExpiryGrid();
 };
@@ -144,14 +222,22 @@ window.showAddExpiryModal = function() {
 
 window.searchExpiry = function(query) {
     expirySearchQuery = query.toLowerCase();
-    loadExpiryGrid(currentExpiryFilter);
+    if (currentExpiryFilter === 'limits') {
+        loadLimitsGrid();
+    } else {
+        loadExpiryGrid(currentExpiryFilter);
+    }
 };
 
 window.filterExpiry = function(filter, element) {
     currentExpiryFilter = filter;
     document.querySelectorAll('#expiry-section .nav-link').forEach(l => l.classList.remove('active'));
     element.classList.add('active');
-    loadExpiryGrid(filter);
+    if (filter === 'limits') {
+        loadLimitsGrid();
+    } else {
+        loadExpiryGrid(filter);
+    }
 };
 
 window.saveExpiry = async function() {
@@ -430,4 +516,185 @@ window.getExpiryEvents = async function() {
         });
     });
     return events;
+};
+
+// --- Limits Tracker Functions ---
+
+window.showAddLimitModal = function() {
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addLimitModal'));
+    document.getElementById('limit-form').reset();
+    document.getElementById('limit-id').value = '';
+    modal.show();
+};
+
+window.saveLimit = async function() {
+    const id = document.getElementById('limit-id').value;
+    const docName = document.getElementById('limit-doc').value;
+    const actionName = document.getElementById('limit-action').value;
+    const maxLimit = parseInt(document.getElementById('limit-max').value);
+    const usedCount = parseInt(document.getElementById('limit-used').value) || 0;
+    const notes = document.getElementById('limit-notes').value;
+    const user = auth.currentUser;
+
+    if (!docName || !actionName || !maxLimit) {
+        if(window.dashboard) window.dashboard.showNotification('Please fill required fields', 'warning');
+        return;
+    }
+
+    try {
+        const data = {
+            userId: user.uid,
+            documentName: docName,
+            actionName: actionName,
+            maxLimit: maxLimit,
+            usedCount: usedCount,
+            notes: notes
+        };
+
+        if (id) {
+            data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection('document_limits').doc(id).update(data);
+        } else {
+            data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            data.history = []; // Init history
+            await db.collection('document_limits').add(data);
+        }
+
+        bootstrap.Modal.getInstance(document.getElementById('addLimitModal')).hide();
+        loadLimitsGrid();
+        if(window.dashboard) window.dashboard.showNotification('Tracker saved', 'success');
+    } catch (e) {
+        console.error(e);
+        if(window.dashboard) window.dashboard.showNotification('Error saving tracker', 'danger');
+    }
+};
+
+window.loadLimitsGrid = async function() {
+    const user = auth.currentUser;
+    const container = document.getElementById('expiry-grid');
+    container.innerHTML = '<div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>';
+
+    try {
+        const snapshot = await db.collection('document_limits')
+            .where('userId', '==', user.uid)
+            .orderBy('createdAt', 'desc')
+            .get();
+
+        if (snapshot.empty) {
+            container.innerHTML = '<div class="col-12 text-center text-muted py-5">No limit trackers found. Add one to start tracking updates.</div>';
+            return;
+        }
+
+        container.innerHTML = '';
+        let docs = [];
+        snapshot.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
+
+        if (expirySearchQuery) {
+            docs = docs.filter(d => 
+                d.documentName.toLowerCase().includes(expirySearchQuery) || 
+                d.actionName.toLowerCase().includes(expirySearchQuery)
+            );
+        }
+
+        docs.forEach(data => {
+            const percent = Math.min(100, Math.round((data.usedCount / data.maxLimit) * 100));
+            let barColor = 'bg-success';
+            let borderColor = 'border-success';
+
+            if (percent >= 70) {
+                barColor = 'bg-warning';
+                borderColor = 'border-warning';
+            }
+            if (percent >= 90) {
+                barColor = 'bg-danger';
+                borderColor = 'border-danger';
+            }
+
+            const remaining = data.maxLimit - data.usedCount;
+            const historyHtml = (data.history || []).slice(-3).reverse().map(h => 
+                `<div class="small text-muted border-bottom py-1 d-flex justify-content-between">
+                    <span>${new Date(h.date).toLocaleDateString()}</span>
+                    <span>${h.note || 'Update'}</span>
+                 </div>`
+            ).join('');
+
+            const col = document.createElement('div');
+            col.className = 'col-md-6 col-lg-4';
+            col.innerHTML = `
+                <div class="card h-100 shadow-sm border-start border-4 ${borderColor}">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h5 class="card-title mb-0">${data.documentName}</h5>
+                                <div class="text-muted small">${data.actionName}</div>
+                            </div>
+                            <div class="dropdown">
+                                <button class="btn btn-link text-muted p-0" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="editLimit('${data.id}')">Edit</a></li>
+                                    <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="deleteLimit('${data.id}')">Delete</a></li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between small fw-bold mb-1">
+                                <span>Used: ${data.usedCount} / ${data.maxLimit}</span>
+                                <span class="${remaining === 0 ? 'text-danger' : 'text-success'}">${remaining} Left</span>
+                            </div>
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar ${barColor}" role="progressbar" style="width: ${percent}%"></div>
+                            </div>
+                        </div>
+
+                        ${historyHtml ? `<div class="mb-3 bg-light p-2 rounded">${historyHtml}</div>` : ''}
+
+                        <button class="btn btn-sm btn-outline-primary w-100" onclick="recordLimitUsage('${data.id}')" ${remaining === 0 ? 'disabled' : ''}>
+                            <i class="fas fa-pen-fancy me-2"></i>Record Update
+                        </button>
+                    </div>
+                </div>
+            `;
+            container.appendChild(col);
+        });
+    } catch (e) {
+        console.error(e);
+        container.innerHTML = '<div class="col-12 text-center text-danger">Error loading limits.</div>';
+    }
+};
+
+window.recordLimitUsage = function(id) {
+    document.getElementById('usage-limit-id').value = id;
+    document.getElementById('usage-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('usage-note').value = '';
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('recordUsageModal'));
+    modal.show();
+};
+
+window.confirmLimitUsage = async function() {
+    const id = document.getElementById('usage-limit-id').value;
+    const date = document.getElementById('usage-date').value;
+    const note = document.getElementById('usage-note').value;
+
+    try {
+        const docRef = db.collection('document_limits').doc(id);
+        await docRef.update({
+            usedCount: firebase.firestore.FieldValue.increment(1),
+            history: firebase.firestore.FieldValue.arrayUnion({ date, note }),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        bootstrap.Modal.getInstance(document.getElementById('recordUsageModal')).hide();
+        loadLimitsGrid();
+        if(window.dashboard) window.dashboard.showNotification('Update recorded', 'success');
+    } catch (e) {
+        console.error(e);
+    }
+};
+
+window.deleteLimit = async function(id) {
+    if(confirm('Delete this tracker?')) {
+        await db.collection('document_limits').doc(id).delete();
+        loadLimitsGrid();
+    }
 };
