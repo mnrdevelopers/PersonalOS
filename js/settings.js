@@ -41,6 +41,7 @@ window.loadSettingsSection = async function() {
                                 ${settings.notifications_browser !== false ? 'checked' : ''} onchange="updateSetting('notifications_browser', this.checked)">
                         </div>
                     </div>
+                    ${this.renderToggle('Notification Sounds', 'notification_sound', settings.notification_sound !== false)}
                     ${this.renderToggle('Tasks & Reminders', 'notifications_tasks', settings.notifications_tasks !== false)}
                     ${this.renderToggle('Document Expiry', 'notifications_expiry', settings.notifications_expiry !== false)}
                     ${this.renderToggle('Vehicle Alerts', 'notifications_vehicles', settings.notifications_vehicles !== false)}
