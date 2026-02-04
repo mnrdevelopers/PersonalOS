@@ -1719,6 +1719,18 @@ class Dashboard {
         }
     }
 
+    async populateTransactionCCSelect() {
+        const select = document.getElementById('transaction-credit-card');
+        if (!select) return;
+        
+        const snapshot = await db.collection('credit_cards').where('userId', '==', this.currentUser.uid).get();
+        
+        select.innerHTML = '<option value="" selected disabled>Choose a card...</option>';
+        snapshot.forEach(doc => {
+            select.innerHTML += `<option value="${doc.id}">${doc.data().name} (..${doc.data().last4 || ''})</option>`;
+        });
+    }
+
     showTransactionModal(type = 'income') {
         // Load categories first
         this.loadTransactionCategories().then(() => {
@@ -1735,6 +1747,9 @@ class Dashboard {
             document.getElementById('recurring-transaction').checked = false;
             document.getElementById('recurring-options').classList.add('d-none');
             document.getElementById('transaction-frequency').value = 'monthly';
+            
+            // Populate CCs
+            this.populateTransactionCCSelect();
 
             // Reset button state
             const btn = document.getElementById('save-transaction');
@@ -1823,6 +1838,7 @@ class Dashboard {
             const date = document.getElementById('transaction-date').value;
             const isRecurring = document.getElementById('recurring-transaction').checked;
             const frequency = document.getElementById('transaction-frequency').value;
+            const creditCardId = document.getElementById('transaction-credit-card').value;
             
             if (!type || !amount || !category || !date) {
                 this.showNotification('Please fill all required fields', 'danger');
@@ -1846,7 +1862,8 @@ class Dashboard {
                 userId: this.currentUser.uid,
                 recurring: isRecurring,
                 frequency: isRecurring ? frequency : null,
-                nextDueDate: isRecurring ? this.calculateNextDate(date, frequency) : null
+                nextDueDate: isRecurring ? this.calculateNextDate(date, frequency) : null,
+                relatedId: (paymentMode === 'credit-card' && creditCardId) ? creditCardId : null
             };
             
             if (id) {
@@ -1855,6 +1872,13 @@ class Dashboard {
             } else {
                 transaction.createdAt = firebase.firestore.FieldValue.serverTimestamp();
                 await db.collection('transactions').add(transaction);
+
+                // Handle Credit Card Deduction (Increase Outstanding)
+                if (type === 'expense' && paymentMode === 'credit-card' && creditCardId) {
+                    await db.collection('credit_cards').doc(creditCardId).update({
+                        currentOutstanding: firebase.firestore.FieldValue.increment(amount)
+                    });
+                }
             }
             
             // Close modal
