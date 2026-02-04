@@ -40,6 +40,9 @@ window.loadLoansSection = async function() {
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2 class="fw-bold gradient-text mb-0">Portfolio & Liabilities</h2>
             <div>
+                <button class="btn btn-sm btn-outline-secondary me-2" onclick="showAmortizationCalculator()">
+                    <i class="fas fa-calculator me-2"></i>EMI Calc
+                </button>
                 <button class="btn btn-sm btn-outline-primary me-2" onclick="showAddCreditCardModal()">
                     <i class="fas fa-credit-card me-2"></i>Add Card
                 </button>
@@ -52,22 +55,23 @@ window.loadLoansSection = async function() {
             </div>
         </div>
         
-        <!-- Stats Row -->
-        <div class="row g-4 mb-5 animate-fade-in" id="loan-stats-container">
-            <!-- Populated dynamically -->
-        </div>
-
-        <ul class="nav nav-pills mb-4 gap-2">
+        <!-- Tabs -->
+        <ul class="nav nav-pills mb-4 gap-2 p-1 bg-light rounded-pill d-inline-flex">
             <li class="nav-item">
-                <a class="nav-link active" href="javascript:void(0)" onclick="switchLoanView('loans', this)">Loans & Debts</a>
+                <a class="nav-link active rounded-pill" href="javascript:void(0)" onclick="switchLoanView('loans', this)">Loans & Debts</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="javascript:void(0)" onclick="switchLoanView('investments', this)">Investments</a>
+                <a class="nav-link rounded-pill" href="javascript:void(0)" onclick="switchLoanView('investments', this)">Investments</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="javascript:void(0)" onclick="switchLoanView('cards', this)">Credit Cards</a>
+                <a class="nav-link rounded-pill" href="javascript:void(0)" onclick="switchLoanView('cards', this)">Credit Cards</a>
             </li>
         </ul>
+
+        <!-- Stats Row -->
+        <div class="row g-4 mb-4 animate-fade-in" id="loan-stats-container">
+            <!-- Populated dynamically -->
+        </div>
 
         <!-- Loans View -->
         <div id="loans-view-container">
@@ -487,6 +491,26 @@ window.loadLoansSection = async function() {
             </div>
         </div>
 
+        <!-- Credit Card History Modal -->
+        <div class="modal fade" id="ccHistoryModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Card History</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle">
+                                <thead><tr><th>Date</th><th>Description</th><th class="text-end">Amount</th><th></th></tr></thead>
+                                <tbody id="cc-history-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Add Investment Modal -->
         <div class="modal fade" id="addInvestmentModal" tabindex="-1">
             <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
@@ -594,6 +618,84 @@ window.loadLoansSection = async function() {
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="button" class="btn btn-primary" id="btn-save-inv" onclick="saveInvestment()">Save Investment</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Amortization Calculator Modal -->
+        <div class="modal fade" id="amortizationModal" tabindex="-1">
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="fas fa-calculator me-2"></i>Loan Amortization Calculator</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <label class="form-label">Loan Amount</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">₹</span>
+                                    <input type="number" class="form-control" id="calc-amount" placeholder="e.g. 500000">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Interest Rate (% p.a)</label>
+                                <input type="number" class="form-control" id="calc-rate" placeholder="e.g. 10.5" step="0.1">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Tenure</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="calc-tenure" placeholder="e.g. 5">
+                                    <select class="form-select" id="calc-tenure-type" style="max-width: 100px;">
+                                        <option value="years">Years</option>
+                                        <option value="months">Months</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-12 text-end">
+                                <button class="btn btn-primary px-4" onclick="calculateAmortization()">Calculate</button>
+                            </div>
+                        </div>
+
+                        <div id="calc-results" class="d-none">
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-4">
+                                    <div class="p-3 bg-light rounded text-center border">
+                                        <div class="text-muted small text-uppercase fw-bold">Monthly EMI</div>
+                                        <h3 class="mb-0 text-primary fw-bold" id="calc-result-emi">₹0</h3>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="p-3 bg-light rounded text-center border">
+                                        <div class="text-muted small text-uppercase fw-bold">Total Interest</div>
+                                        <h3 class="mb-0 text-danger fw-bold" id="calc-result-interest">₹0</h3>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="p-3 bg-light rounded text-center border">
+                                        <div class="text-muted small text-uppercase fw-bold">Total Payment</div>
+                                        <h3 class="mb-0 text-dark fw-bold" id="calc-result-total">₹0</h3>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h6 class="fw-bold mb-3">Amortization Schedule</h6>
+                            <div class="table-responsive" style="max-height: 300px;">
+                                <table class="table table-sm table-striped table-hover small">
+                                    <thead class="table-light sticky-top">
+                                        <tr>
+                                            <th>Month</th>
+                                            <th>Principal Paid</th>
+                                            <th>Interest Paid</th>
+                                            <th>Balance</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="calc-schedule-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1888,6 +1990,7 @@ window.loadCreditCardsGrid = async function() {
                             <div class="dropdown">
                                 <button class="btn btn-link text-white p-0" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></button>
                                 <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="viewCreditCardHistory('${doc.id}')">View History</a></li>
                                     <li><a class="dropdown-item" href="javascript:void(0)" onclick="editCreditCard('${doc.id}')">Edit</a></li>
                                     <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="deleteCreditCard('${doc.id}')">Delete</a></li>
                                 </ul>
@@ -2085,6 +2188,79 @@ window.processCCAction = async function() {
         window.setBtnLoading(btn, false);
         console.error(e);
         if(window.dashboard) window.dashboard.showNotification('Error processing action', 'danger');
+    }
+};
+
+window.viewCreditCardHistory = async function(cardId) {
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('ccHistoryModal'));
+    const tbody = document.getElementById('cc-history-body');
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center">Loading...</td></tr>';
+    modal.show();
+
+    try {
+        const user = auth.currentUser;
+        const snapshot = await db.collection('transactions')
+            .where('userId', '==', user.uid)
+            .where('relatedId', '==', cardId)
+            .orderBy('date', 'desc')
+            .orderBy('createdAt', 'desc')
+            .limit(50)
+            .get();
+
+        if (snapshot.empty) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No history found.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = '';
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const isSpend = data.description && data.description.startsWith('CC Spend');
+            const colorClass = isSpend ? 'text-danger' : 'text-success';
+            const sign = isSpend ? '+' : '-';
+            
+            tbody.innerHTML += `
+                <tr>
+                    <td class="small">${new Date(data.date).toLocaleDateString()}</td>
+                    <td class="small text-truncate" style="max-width: 150px;">${data.description}</td>
+                    <td class="text-end ${colorClass} fw-bold small">${sign}₹${data.amount.toFixed(2)}</td>
+                    <td class="text-end">
+                        <button class="btn btn-link text-danger p-0 btn-sm" onclick="deleteCCHistoryItem('${cardId}', '${doc.id}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+    } catch (e) {
+        console.error(e);
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Error loading history.</td></tr>';
+    }
+};
+
+window.deleteCCHistoryItem = async function(cardId, txId) {
+    if (!confirm('Delete this transaction? This will adjust the card outstanding balance.')) return;
+    try {
+        const txRef = db.collection('transactions').doc(txId);
+        const txDoc = await txRef.get();
+        if (!txDoc.exists) return;
+        const data = txDoc.data();
+        const amount = data.amount;
+        const isSpend = data.description && data.description.startsWith('CC Spend');
+        const adjustment = isSpend ? -amount : amount;
+        const batch = db.batch();
+        batch.delete(txRef);
+        batch.update(db.collection('credit_cards').doc(cardId), {
+            currentOutstanding: firebase.firestore.FieldValue.increment(adjustment),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        await batch.commit();
+        viewCreditCardHistory(cardId);
+        loadCreditCardsGrid();
+        if(window.dashboard) window.dashboard.showNotification('Transaction deleted', 'success');
+    } catch (e) {
+        console.error(e);
+        if(window.dashboard) window.dashboard.showNotification('Error deleting item', 'danger');
     }
 };
 
@@ -2571,4 +2747,56 @@ window.deleteInvestment = async function(id) {
         loadInvestmentsGrid();
         if(window.dashboard) window.dashboard.showNotification('Investment deleted', 'success');
     } catch (e) { console.error(e); }
+};
+
+// --- Amortization Calculator Functions ---
+
+window.showAmortizationCalculator = function() {
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('amortizationModal'));
+    modal.show();
+};
+
+window.calculateAmortization = function() {
+    const principal = parseFloat(document.getElementById('calc-amount').value);
+    const rate = parseFloat(document.getElementById('calc-rate').value);
+    const tenure = parseFloat(document.getElementById('calc-tenure').value);
+    const tenureType = document.getElementById('calc-tenure-type').value;
+
+    if (!principal || !rate || !tenure) {
+        if(window.dashboard) window.dashboard.showNotification('Please fill all fields', 'warning');
+        return;
+    }
+
+    let months = tenureType === 'years' ? tenure * 12 : tenure;
+    let monthlyRate = rate / 12 / 100;
+    
+    // EMI Formula
+    let emi = 0;
+    if (rate === 0) {
+        emi = principal / months;
+    } else {
+        emi = (principal * monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1);
+    }
+    
+    let totalPayment = emi * months;
+    let totalInterest = totalPayment - principal;
+
+    document.getElementById('calc-result-emi').textContent = `₹${emi.toFixed(2)}`;
+    document.getElementById('calc-result-interest').textContent = `₹${totalInterest.toFixed(2)}`;
+    document.getElementById('calc-result-total').textContent = `₹${totalPayment.toFixed(2)}`;
+
+    let balance = principal;
+    let scheduleHtml = '';
+    
+    for (let i = 1; i <= months; i++) {
+        let interest = balance * monthlyRate;
+        let principalPaid = emi - interest;
+        if (i === months) { principalPaid = balance; balance = 0; } // Adjust last month
+        else balance -= principalPaid;
+        if (balance < 0) balance = 0;
+
+        scheduleHtml += `<tr><td>${i}</td><td>₹${principalPaid.toFixed(2)}</td><td>₹${interest.toFixed(2)}</td><td>₹${balance.toFixed(2)}</td></tr>`;
+    }
+    document.getElementById('calc-schedule-body').innerHTML = scheduleHtml;
+    document.getElementById('calc-results').classList.remove('d-none');
 };
