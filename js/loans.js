@@ -1,5 +1,5 @@
 let currentLoanTypeFilter = 'all';
-let currentLoanView = 'loans'; // 'loans' or 'cards'
+let currentLoanView = 'loans'; // 'loans', 'cards', or 'investments'
 
 const CREDIT_CARD_BANKS = [
   {"id": "hdfc", "name": "HDFC Bank"},
@@ -32,14 +32,19 @@ const CREDIT_CARD_BANKS = [
   {"id": "uni", "name": "Uni Cards"}
 ];
 
+const METALPRICE_API_KEY = 'goldapi-1tsml7nm4zv-io'; // Enter your API Key here from goldapi.io
+
 window.loadLoansSection = async function() {
     const container = document.getElementById('loans-section');
     container.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="fw-bold gradient-text mb-0">Loans & Credit Cards</h2>
+            <h2 class="fw-bold gradient-text mb-0">Portfolio & Liabilities</h2>
             <div>
                 <button class="btn btn-sm btn-outline-primary me-2" onclick="showAddCreditCardModal()">
                     <i class="fas fa-credit-card me-2"></i>Add Card
+                </button>
+                <button class="btn btn-sm btn-outline-success me-2" onclick="showAddInvestmentModal()">
+                    <i class="fas fa-chart-line me-2"></i>Add Investment
                 </button>
                 <button class="btn btn-sm btn-primary" onclick="showAddLoanModal()">
                     <i class="fas fa-plus me-2"></i>Add Loan
@@ -55,6 +60,9 @@ window.loadLoansSection = async function() {
         <ul class="nav nav-pills mb-4 gap-2">
             <li class="nav-item">
                 <a class="nav-link active" href="javascript:void(0)" onclick="switchLoanView('loans', this)">Loans & Debts</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="javascript:void(0)" onclick="switchLoanView('investments', this)">Investments</a>
             </li>
             <li class="nav-item">
                 <a class="nav-link" href="javascript:void(0)" onclick="switchLoanView('cards', this)">Credit Cards</a>
@@ -76,6 +84,40 @@ window.loadLoansSection = async function() {
                 </select>
             </div>
             <div class="row g-4" id="loans-grid">
+                <div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>
+            </div>
+        </div>
+
+        <!-- Investments View -->
+        <div id="investments-view-container" class="d-none">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm bg-white rounded-4">
+                        <div class="card-body p-4">
+                            <div class="row align-items-center text-center text-md-start">
+                                <div class="col-md-4 mb-3 mb-md-0">
+                                    <div class="text-muted small fw-bold text-uppercase mb-1">Current Value</div>
+                                    <h2 class="mb-0 fw-bold text-primary" id="total-portfolio-value">₹0.00</h2>
+                                </div>
+                                <div class="col-md-4 mb-3 mb-md-0">
+                                    <div class="text-muted small fw-bold text-uppercase mb-1">Invested Amount</div>
+                                    <h3 class="mb-0 fw-bold text-dark" id="total-invested-value">₹0.00</h3>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-muted small fw-bold text-uppercase mb-1">Total Profit/Loss</div>
+                                    <h3 class="mb-0 fw-bold" id="total-profit-value">₹0.00</h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex justify-content-end mb-3">
+                <button class="btn btn-sm btn-outline-warning" onclick="updateAllMetalPrices()" id="btn-update-metals">
+                    <i class="fas fa-sync-alt me-1"></i>Update Gold/Silver Prices
+                </button>
+            </div>
+            <div class="row g-4" id="investments-grid">
                 <div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>
             </div>
         </div>
@@ -183,6 +225,14 @@ window.loadLoansSection = async function() {
                                     <option value="other">Other</option>
                                 </select>
                             </div>
+                            <div class="mb-3 d-none" id="div-loan-cc">
+                                <label class="form-label">Select Credit Card</label>
+                                <select class="form-select" id="loan-credit-card">
+                                    <option value="">Select Card</option>
+                                    <!-- Populated via JS -->
+                                </select>
+                                <div class="form-text small">Amount will be added to card outstanding.</div>
+                            </div>
                             <div class="form-check mb-3">
                                 <input class="form-check-input" type="checkbox" id="loan-link-ledger" checked>
                                 <label class="form-check-label" for="loan-link-ledger" id="label-link-ledger">
@@ -252,6 +302,14 @@ window.loadLoansSection = async function() {
                                     <option value="debit-card">Debit Card</option>
                                     <option value="other">Other</option>
                                 </select>
+                            </div>
+                            <div class="mb-3 d-none" id="div-repay-cc">
+                                <label class="form-label">Select Credit Card</label>
+                                <select class="form-select" id="repay-credit-card">
+                                    <option value="">Select Card</option>
+                                    <!-- Populated via JS -->
+                                </select>
+                                <div class="form-text small">Amount will be added to card outstanding.</div>
                             </div>
                             <div class="form-check mb-3">
                                 <input class="form-check-input" type="checkbox" id="repay-link-ledger" checked>
@@ -428,6 +486,118 @@ window.loadLoansSection = async function() {
                 </div>
             </div>
         </div>
+
+        <!-- Add Investment Modal -->
+        <div class="modal fade" id="addInvestmentModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Add Investment</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="investment-form">
+                            <input type="hidden" id="inv-id">
+                            <div class="mb-3">
+                                <label class="form-label">Investment Type</label>
+                                <select class="form-select" id="inv-type" onchange="toggleInvestmentFields()">
+                                    <option value="mutual_fund">Mutual Fund / SIP</option>
+                                    <option value="stock">Stock / Equity</option>
+                                    <option value="gold">Gold</option>
+                                    <option value="silver">Silver</option>
+                                    <option value="fd">Fixed Deposit</option>
+                                    <option value="real_estate">Real Estate</option>
+                                    <option value="crypto">Crypto</option>
+                                    <option value="other">Other Asset</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Name / Description</label>
+                                <input type="text" class="form-control" id="inv-name" placeholder="e.g. HDFC Top 100, Gold Ring, Bitcoin" required>
+                            </div>
+                            <div class="row">
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Invested Amount</label>
+                                    <input type="number" class="form-control" id="inv-amount" step="0.01" required>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label class="form-label">Current Value</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="inv-current-value" step="0.01" placeholder="Optional">
+                                        <button class="btn btn-outline-secondary" type="button" id="btn-fetch-price" onclick="fetchLiveMetalPrice()" style="display:none;" title="Fetch Live Price">
+                                            <i class="fas fa-sync-alt"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row" id="inv-qty-row">
+                                <div class="col-6 mb-3">
+                                    <label class="form-label" id="inv-qty-label">Quantity (Units/Grams)</label>
+                                    <input type="number" class="form-control" id="inv-quantity" step="0.001">
+                                </div>
+                            </div>
+                            <div class="mb-3 bg-light p-3 rounded border">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="inv-is-sip" onchange="toggleSipFields()">
+                                    <label class="form-check-label fw-bold" for="inv-is-sip">This is a SIP (Systematic Plan)</label>
+                                </div>
+                                <div id="inv-sip-fields" class="mt-3 d-none">
+                                    <div class="row">
+                                        <div class="col-6 mb-2">
+                                            <label class="form-label small">Frequency</label>
+                                            <select class="form-select form-select-sm" id="inv-sip-freq">
+                                                <option value="monthly">Monthly</option>
+                                                <option value="weekly">Weekly</option>
+                                                <option value="daily">Daily</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-6 mb-2">
+                                            <label class="form-label small">SIP Amount</label>
+                                            <input type="number" class="form-control form-control-sm" id="inv-sip-amount">
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label small">Next Due Date</label>
+                                            <input type="date" class="form-control form-control-sm" id="inv-sip-date">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="inv-link-ledger" checked>
+                                <label class="form-check-label" for="inv-link-ledger">Add to Transaction Ledger</label>
+                            </div>
+                            <div id="inv-ledger-fields">
+                                <div class="mb-3">
+                                    <label class="form-label">Payment Mode</label>
+                                    <select class="form-select" id="inv-payment-mode" onchange="toggleLoanCCField('inv')">
+                                        <option value="bank">Bank Transfer</option>
+                                        <option value="upi">UPI</option>
+                                        <option value="credit-card">Credit Card</option>
+                                        <option value="cash">Cash</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3 d-none" id="div-inv-cc">
+                                    <label class="form-label">Select Credit Card</label>
+                                    <select class="form-select" id="inv-credit-card">
+                                        <option value="">Select Card</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Notes</label>
+                                <textarea class="form-control" id="inv-notes" rows="2"></textarea>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="btn-save-inv" onclick="saveInvestment()">Save Investment</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     `;
     await loadLoansGrid('active');
 };
@@ -437,14 +607,47 @@ window.switchLoanView = function(view, element) {
     document.querySelectorAll('#loans-section > .nav-pills .nav-link').forEach(l => l.classList.remove('active'));
     element.classList.add('active');
 
+    const statsContainer = document.getElementById('loan-stats-container');
+
     if (view === 'loans') {
         document.getElementById('loans-view-container').classList.remove('d-none');
+        document.getElementById('investments-view-container').classList.add('d-none');
         document.getElementById('cards-view-container').classList.add('d-none');
+        if (statsContainer) statsContainer.classList.remove('d-none');
         loadLoansGrid('active');
+    } else if (view === 'investments') {
+        document.getElementById('loans-view-container').classList.add('d-none');
+        document.getElementById('investments-view-container').classList.remove('d-none');
+        document.getElementById('cards-view-container').classList.add('d-none');
+        if (statsContainer) statsContainer.classList.add('d-none');
+        loadInvestmentsGrid();
     } else {
         document.getElementById('loans-view-container').classList.add('d-none');
+        document.getElementById('investments-view-container').classList.add('d-none');
         document.getElementById('cards-view-container').classList.remove('d-none');
+        if (statsContainer) statsContainer.classList.remove('d-none');
         loadCreditCardsGrid();
+    }
+};
+
+window.populateLoanCCSelects = async function() {
+    const user = auth.currentUser;
+    const snapshot = await db.collection('credit_cards').where('userId', '==', user.uid).get();
+    const options = '<option value="">Select Card</option>' + 
+        snapshot.docs.map(doc => `<option value="${doc.id}">${doc.data().name} (..${doc.data().last4 || ''})</option>`).join('');
+    
+    ['loan', 'repay', 'inv'].forEach(type => {
+        const el = document.getElementById(`${type}-credit-card`);
+        if(el) el.innerHTML = options;
+    });
+};
+
+window.toggleLoanCCField = function(type) {
+    const mode = document.getElementById(`${type}-payment-mode`).value;
+    const div = document.getElementById(`div-${type}-cc`);
+    if (div) {
+        div.classList.toggle('d-none', mode !== 'credit-card');
+        if (mode === 'credit-card') window.populateLoanCCSelects();
     }
 };
 
@@ -516,6 +719,11 @@ window.showAddLoanModal = function() {
     document.getElementById('loan-message-context').value = '';
     document.getElementById('loan-duration').value = '';
     
+    // Reset Payment Mode & CC
+    document.getElementById('loan-payment-mode').value = 'bank';
+    document.getElementById('loan-payment-mode').onchange = () => toggleLoanCCField('loan');
+    toggleLoanCCField('loan');
+
     // Reset UI
     document.getElementById('type-borrowed').checked = true;
     updateLoanModalUI('borrowed');
@@ -550,6 +758,7 @@ window.saveLoan = async function() {
     const processingFee = parseFloat(document.getElementById('loan-processing-fee').value) || 0;
     const linkLedger = document.getElementById('loan-link-ledger').checked;
     const paymentMode = document.getElementById('loan-payment-mode').value;
+    const creditCardId = document.getElementById('loan-credit-card')?.value;
     const countryCode = document.getElementById('loan-country-code').value;
     const mobileInput = document.getElementById('loan-mobile').value;
     const upiId = document.getElementById('loan-upi-id').value.trim();
@@ -657,6 +866,13 @@ window.saveLoan = async function() {
             const docRef = await db.collection('loans').add(loanDataToSave);
             const loanRef = docRef.id;
 
+            // Handle Credit Card Deduction (Only if I Lent money or paid for EMI)
+            if (paymentMode === 'credit-card' && creditCardId && (type === 'lent' || type === 'emi')) {
+                await db.collection('credit_cards').doc(creditCardId).update({
+                    currentOutstanding: firebase.firestore.FieldValue.increment(amount)
+                });
+            }
+
             if (linkLedger) {
                 const transaction = {
                     userId: user.uid,
@@ -666,6 +882,7 @@ window.saveLoan = async function() {
                     type: type === 'borrowed' ? 'income' : (type === 'lent' ? 'expense' : 'expense'),
                     category: 'Loan',
                     description: `${type === 'borrowed' ? 'Loan from' : (type === 'lent' ? 'Loan to' : 'EMI Purchase:')} ${name}`,
+                    relatedId: creditCardId || null, // Link CC if used
                     paymentMode: paymentMode,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
@@ -711,6 +928,11 @@ window.loadLoansGrid = async function(status = 'active') {
         .where('status', '==', status)
         .orderBy('createdAt', 'desc')
         .get();
+    
+    // Fetch Investments for Stats
+    const invSnapshot = await db.collection('investments')
+        .where('userId', '==', user.uid)
+        .get();
 
     // Client-side filtering for type (since Firestore compound queries with != or multiple filters can be tricky without composite indexes)
     let docs = snapshot.docs;
@@ -721,10 +943,13 @@ window.loadLoansGrid = async function(status = 'active') {
     const container = document.getElementById('loans-grid');
     const statsContainer = document.getElementById('loan-stats-container');
     
+    if (currentLoanView !== 'loans') return;
+
     // Calculate Stats
     let totalBorrowed = 0;
     let totalLent = 0;
     let totalEmi = 0;
+    let totalInvested = 0;
 
     docs.forEach(doc => {
         const data = doc.data();
@@ -741,6 +966,11 @@ window.loadLoansGrid = async function(status = 'active') {
         }
     });
 
+    invSnapshot.forEach(doc => {
+        const data = doc.data();
+        totalInvested += (data.currentValue || data.investedAmount || 0);
+    });
+
     // Render Stats
     statsContainer.innerHTML = `
         <div class="col-6 col-md-3">
@@ -754,9 +984,9 @@ window.loadLoansGrid = async function(status = 'active') {
         </div>
         <div class="col-6 col-md-3">
             <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-success">
-                <div class="text-muted small mb-1 fw-medium">${status === 'active' ? 'Outstanding Assets' : 'Total Repaid Assets'}</div>
+                <div class="text-muted small mb-1 fw-medium">Total Assets</div>
                 <div class="d-flex align-items-center justify-content-between">
-                    <h4 class="mb-0 fw-bold text-success">₹${totalLent.toFixed(0)}</h4>
+                    <h4 class="mb-0 fw-bold text-success">₹${(totalLent + totalInvested).toFixed(0)}</h4>
                     <i class="fas fa-hand-holding-heart text-success opacity-25 fa-2x"></i>
                 </div>
             </div>
@@ -765,7 +995,7 @@ window.loadLoansGrid = async function(status = 'active') {
             <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-primary">
                 <div class="text-muted small mb-1 fw-medium">Net Position</div>
                 <div class="d-flex align-items-center justify-content-between">
-                    <h4 class="mb-0 fw-bold text-primary">₹${(totalLent - totalBorrowed).toFixed(0)}</h4>
+                    <h4 class="mb-0 fw-bold text-primary">₹${((totalLent + totalInvested) - totalBorrowed).toFixed(0)}</h4>
                     <i class="fas fa-balance-scale text-primary opacity-25 fa-2x"></i>
                 </div>
             </div>
@@ -1081,6 +1311,10 @@ window.showRepaymentModal = async function(loanId) {
     document.getElementById('repay-loan-id').value = loanId;
     document.getElementById('repay-date').value = new Date().toISOString().split('T')[0];
     
+    // Reset Payment Mode
+    document.getElementById('repay-payment-mode').onchange = () => toggleLoanCCField('repay');
+    toggleLoanCCField('repay');
+
     // Check if we should show UPI button
     const upiContainer = document.getElementById('upi-pay-container');
     if (upiContainer) {
@@ -1109,6 +1343,7 @@ window.saveRepayment = async function() {
     const date = document.getElementById('repay-date').value;
     const linkLedger = document.getElementById('repay-link-ledger').checked;
     const paymentMode = document.getElementById('repay-payment-mode').value;
+    const creditCardId = document.getElementById('repay-credit-card')?.value;
     const user = auth.currentUser;
 
     if (!amount || !date) {
@@ -1161,6 +1396,13 @@ window.saveRepayment = async function() {
         let penaltyTransactionId = null;
         let procFeeTransactionId = null;
 
+        // Handle Credit Card Deduction (If I am paying back a loan using CC)
+        if (paymentMode === 'credit-card' && creditCardId && loanData.type === 'borrowed') {
+            await db.collection('credit_cards').doc(creditCardId).update({
+                currentOutstanding: firebase.firestore.FieldValue.increment(amount)
+            });
+        }
+
         if (linkLedger) {
             const type = loanData.type === 'lent' ? 'income' : 'expense';
             const principalAmount = amount - penalty - processingFee;
@@ -1176,6 +1418,7 @@ window.saveRepayment = async function() {
                     category: 'Loan Repayment',
                     description: `Repayment: ${loanData.name}`,
                     paymentMode: paymentMode,
+                    relatedId: creditCardId || null,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 transactionId = transactionRef.id;
@@ -1545,6 +1788,8 @@ window.loadCreditCardsGrid = async function() {
     const container = document.getElementById('cards-grid');
     const statsContainer = document.getElementById('loan-stats-container');
     
+    if (currentLoanView !== 'cards') return;
+
     try {
         const snapshot = await db.collection('credit_cards')
             .where('userId', '==', user.uid)
@@ -1841,4 +2086,489 @@ window.processCCAction = async function() {
         console.error(e);
         if(window.dashboard) window.dashboard.showNotification('Error processing action', 'danger');
     }
+};
+
+// --- Investment Functions ---
+
+window.showAddInvestmentModal = function() {
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addInvestmentModal'));
+    document.getElementById('investment-form').reset();
+    document.getElementById('inv-id').value = '';
+    toggleInvestmentFields();
+    toggleLoanCCField('inv'); // Reset CC field
+    toggleSipFields();
+    modal.show();
+};
+
+window.toggleInvestmentFields = function() {
+    const type = document.getElementById('inv-type').value;
+    const qtyLabel = document.getElementById('inv-qty-label');
+    const fetchBtn = document.getElementById('btn-fetch-price');
+    
+    if (type === 'gold' || type === 'silver') {
+        qtyLabel.textContent = 'Weight (Grams)';
+    } else if (type === 'mutual_fund' || type === 'stock' || type === 'crypto') {
+        qtyLabel.textContent = 'Quantity (Units)';
+    } else {
+        qtyLabel.textContent = 'Quantity (Optional)';
+    }
+
+    if (fetchBtn) {
+        fetchBtn.style.display = (type === 'gold' || type === 'silver') ? 'block' : 'none';
+    }
+};
+
+window.toggleSipFields = function() {
+    const isSip = document.getElementById('inv-is-sip').checked;
+    const sipFields = document.getElementById('inv-sip-fields');
+    if (isSip) {
+        sipFields.classList.remove('d-none');
+    } else {
+        sipFields.classList.add('d-none');
+    }
+};
+
+window.fetchLiveMetalPrice = async function() {
+    const type = document.getElementById('inv-type').value;
+    const qty = parseFloat(document.getElementById('inv-quantity').value);
+    const btn = document.getElementById('btn-fetch-price');
+    
+    if (!['gold', 'silver'].includes(type)) return;
+    
+    if (!qty || qty <= 0) {
+        if(window.dashboard) window.dashboard.showNotification('Please enter weight (grams) first', 'warning');
+        return;
+    }
+
+    if (!METALPRICE_API_KEY) {
+         if(window.dashboard) window.dashboard.showNotification('API Key not configured in js/loans.js', 'warning');
+         return;
+    }
+
+    const originalHtml = btn.innerHTML;
+    try {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+        
+        const symbol = type === 'gold' ? 'XAU' : 'XAG';
+        const response = await fetch(`https://www.goldapi.io/api/${symbol}/INR`, {
+            headers: { 'x-access-token': METALPRICE_API_KEY }
+        });
+        
+        const data = await response.json();
+        
+        if (data.error) throw new Error(data.error);
+
+        // GoldAPI returns price for 1 Troy Ounce (31.1035 grams)
+        const pricePerGramINR = data.price / 31.1035;
+        
+        const totalValue = pricePerGramINR * qty;
+        document.getElementById('inv-current-value').value = totalValue.toFixed(2);
+        
+        if(window.dashboard) window.dashboard.showNotification(`Updated ${type} price`, 'success');
+
+    } catch (e) {
+        console.error(e);
+        if(window.dashboard) window.dashboard.showNotification('Failed to fetch price', 'danger');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+    }
+};
+
+window.updateAllMetalPrices = async function() {
+    const btn = document.getElementById('btn-update-metals');
+    const user = auth.currentUser;
+    
+    if (!METALPRICE_API_KEY) {
+         if(window.dashboard) window.dashboard.showNotification('API Key not configured', 'warning');
+         return;
+    }
+
+    try {
+        if(btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Updating...';
+        }
+
+        // 1. Get all metal investments
+        const snapshot = await db.collection('investments')
+            .where('userId', '==', user.uid)
+            .where('type', 'in', ['gold', 'silver'])
+            .get();
+
+        if (snapshot.empty) {
+            if(window.dashboard) window.dashboard.showNotification('No gold/silver investments found', 'info');
+            return;
+        }
+
+        // 2. Fetch Live Rates (GoldAPI requires separate calls)
+        const headers = { 'x-access-token': METALPRICE_API_KEY };
+        
+        const [goldRes, silverRes] = await Promise.all([
+            fetch(`https://www.goldapi.io/api/XAU/INR`, { headers }),
+            fetch(`https://www.goldapi.io/api/XAG/INR`, { headers })
+        ]);
+
+        const goldData = await goldRes.json();
+        const silverData = await silverRes.json();
+        
+        const goldPricePerGram = (goldData.price || 0) / 31.1035;
+        const silverPricePerGram = (silverData.price || 0) / 31.1035;
+
+        // 3. Update Documents
+        const batch = db.batch();
+        let updateCount = 0;
+        let totalValueChange = 0;
+
+        snapshot.forEach(doc => {
+            const inv = doc.data();
+            if (inv.quantity > 0) {
+                let newPrice = 0;
+                if (inv.type === 'gold') newPrice = goldPricePerGram * inv.quantity;
+                else if (inv.type === 'silver') newPrice = silverPricePerGram * inv.quantity;
+                
+                if (newPrice > 0) {
+                    batch.update(doc.ref, { 
+                        currentValue: parseFloat(newPrice.toFixed(2)),
+                        lastPriceUpdate: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    updateCount++;
+
+                    // Live DOM Update (No Refresh)
+                    const valEl = document.getElementById(`inv-val-${doc.id}`);
+                    const profitEl = document.getElementById(`inv-profit-${doc.id}`);
+                    const updatedEl = document.getElementById(`inv-updated-${doc.id}`);
+
+                    if (valEl) {
+                        valEl.textContent = `₹${newPrice.toLocaleString()}`;
+                        // Flash effect
+                        valEl.style.transition = 'color 0.5s';
+                        valEl.style.color = '#198754'; // Success green
+                        setTimeout(() => valEl.style.color = '', 1000);
+                    }
+
+                    if (profitEl) {
+                        const profit = newPrice - (inv.investedAmount || 0);
+                        const profitPercent = inv.investedAmount > 0 ? ((profit / inv.investedAmount) * 100).toFixed(1) : 0;
+                        const profitClass = profit >= 0 ? 'text-success' : 'text-danger';
+                        const profitIcon = profit >= 0 ? 'fa-arrow-up' : 'fa-arrow-down';
+                        
+                        profitEl.className = `${profitClass} fw-bold small`;
+                        profitEl.innerHTML = `<i class="fas ${profitIcon} me-1"></i> ₹${Math.abs(profit).toLocaleString()} (${profitPercent}%)`;
+                    }
+
+                    if (updatedEl) {
+                        updatedEl.textContent = `Price updated: ${new Date().toLocaleDateString()}`;
+                    }
+                }
+            }
+        });
+
+        if (updateCount > 0) {
+            await batch.commit();
+            if(window.dashboard) window.dashboard.showNotification(`Updated ${updateCount} investments`, 'success');
+            // loadInvestmentsGrid(); // Removed to prevent grid reload flicker
+            updateInvestmentSummary();
+            if(window.dashboard) window.dashboard.updateStats(); // Update dashboard stats
+        } else {
+            if(window.dashboard) window.dashboard.showNotification('No updates needed', 'info');
+        }
+
+    } catch (e) {
+        console.error(e);
+        if(window.dashboard) window.dashboard.showNotification('Failed to update prices', 'danger');
+    } finally {
+        if(btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-sync-alt me-1"></i>Update Gold/Silver Prices';
+        }
+    }
+};
+
+window.updateInvestmentSummary = async function() {
+    const user = auth.currentUser;
+    try {
+        const snapshot = await db.collection('investments').where('userId', '==', user.uid).get();
+        let totalInvested = 0;
+        let totalCurrent = 0;
+
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            totalInvested += (data.investedAmount || 0);
+            totalCurrent += (data.currentValue || data.investedAmount || 0);
+        });
+
+        if (document.getElementById('total-portfolio-value')) {
+            const totalProfit = totalCurrent - totalInvested;
+            const profitClass = totalProfit >= 0 ? 'text-success' : 'text-danger';
+            const profitSign = totalProfit >= 0 ? '+' : '';
+            
+            document.getElementById('total-portfolio-value').textContent = `₹${totalCurrent.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}`;
+            document.getElementById('total-invested-value').textContent = `₹${totalInvested.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}`;
+            
+            const profitEl = document.getElementById('total-profit-value');
+            if (profitEl) {
+                profitEl.className = `mb-0 fw-bold ${profitClass}`;
+                profitEl.textContent = `${profitSign}₹${Math.abs(totalProfit).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}`;
+            }
+        }
+    } catch (e) {
+        console.error("Error updating investment summary:", e);
+    }
+};
+
+window.saveInvestment = async function() {
+    const btn = document.getElementById('btn-save-inv');
+    const user = auth.currentUser;
+    const id = document.getElementById('inv-id').value;
+    const type = document.getElementById('inv-type').value;
+    const name = document.getElementById('inv-name').value;
+    const investedAmount = parseFloat(document.getElementById('inv-amount').value);
+    const currentValue = parseFloat(document.getElementById('inv-current-value').value) || investedAmount;
+    const quantity = parseFloat(document.getElementById('inv-quantity').value) || 0;
+    const isSip = document.getElementById('inv-is-sip').checked;
+    const notes = document.getElementById('inv-notes').value;
+    const linkLedger = document.getElementById('inv-link-ledger').checked;
+    const paymentMode = document.getElementById('inv-payment-mode').value;
+    const creditCardId = document.getElementById('inv-credit-card')?.value;
+    
+    if (!name || isNaN(investedAmount)) {
+        if(window.dashboard) window.dashboard.showNotification('Please fill required fields', 'warning');
+        return;
+    }
+
+    const data = {
+        userId: user.uid,
+        type, name, investedAmount, currentValue, quantity, isSip, notes
+    };
+
+    if (isSip) {
+        data.sipFrequency = document.getElementById('inv-sip-freq').value;
+        data.sipAmount = parseFloat(document.getElementById('inv-sip-amount').value) || 0;
+        data.sipNextDate = document.getElementById('inv-sip-date').value;
+    }
+
+    try {
+        window.setBtnLoading(btn, true);
+        let invRefId = id;
+
+        if (id) {
+            data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection('investments').doc(id).update(data);
+        } else {
+            data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            const docRef = await db.collection('investments').add(data);
+            invRefId = docRef.id;
+
+            // Handle Credit Card Deduction
+            if (paymentMode === 'credit-card' && creditCardId) {
+                await db.collection('credit_cards').doc(creditCardId).update({
+                    currentOutstanding: firebase.firestore.FieldValue.increment(investedAmount)
+                });
+            }
+
+            // Add to Ledger
+            if (linkLedger) {
+                await db.collection('transactions').add({
+                    userId: user.uid,
+                    date: new Date().toISOString().split('T')[0],
+                    amount: investedAmount,
+                    type: 'expense',
+                    category: 'Investment',
+                    description: `Investment: ${name}`,
+                    paymentMode: paymentMode,
+                    relatedId: invRefId, // Link to investment
+                    section: 'investments',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
+        }
+        
+        window.setBtnLoading(btn, false);
+        bootstrap.Modal.getInstance(document.getElementById('addInvestmentModal')).hide();
+        loadInvestmentsGrid();
+        if(window.dashboard) window.dashboard.showNotification('Investment saved', 'success');
+    } catch (e) {
+        window.setBtnLoading(btn, false);
+        console.error(e);
+        if(window.dashboard) window.dashboard.showNotification('Error saving investment', 'danger');
+    }
+};
+
+window.loadInvestmentsGrid = async function() {
+    const user = auth.currentUser;
+    const container = document.getElementById('investments-grid');
+    
+    try {
+        const snapshot = await db.collection('investments')
+            .where('userId', '==', user.uid)
+            .orderBy('createdAt', 'desc')
+            .get();
+
+        if (snapshot.empty) {
+            container.innerHTML = '<div class="col-12 text-center text-muted py-5">No investments found. Start building your portfolio!</div>';
+            if (document.getElementById('total-portfolio-value')) {
+                document.getElementById('total-portfolio-value').textContent = '₹0.00';
+                document.getElementById('total-invested-value').textContent = '₹0.00';
+                document.getElementById('total-profit-value').textContent = '₹0.00';
+            }
+            return;
+        }
+
+        container.innerHTML = '';
+        let totalInvested = 0;
+        let totalCurrent = 0;
+
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            totalInvested += (data.investedAmount || 0);
+            totalCurrent += (data.currentValue || data.investedAmount || 0);
+            
+            const profit = (data.currentValue || 0) - (data.investedAmount || 0);
+            const profitClass = profit >= 0 ? 'text-success' : 'text-danger';
+            const profitIcon = profit >= 0 ? 'fa-arrow-up' : 'fa-arrow-down';
+            const profitPercent = data.investedAmount > 0 ? ((profit / data.investedAmount) * 100).toFixed(1) : 0;
+
+            let icon = 'fa-chart-line';
+            let color = 'primary';
+            let typeLabel = 'Investment';
+
+            switch(data.type) {
+                case 'gold': icon = 'fa-ring'; color = 'warning'; typeLabel = 'Gold'; break;
+                case 'silver': icon = 'fa-coins'; color = 'secondary'; typeLabel = 'Silver'; break;
+                case 'mutual_fund': icon = 'fa-chart-pie'; color = 'success'; typeLabel = 'Mutual Fund'; break;
+                case 'stock': icon = 'fa-chart-bar'; color = 'info'; typeLabel = 'Stock'; break;
+                case 'fd': icon = 'fa-university'; color = 'dark'; typeLabel = 'Fixed Deposit'; break;
+                case 'crypto': icon = 'fa-bitcoin'; color = 'warning'; typeLabel = 'Crypto'; break;
+                case 'real_estate': icon = 'fa-building'; color = 'primary'; typeLabel = 'Real Estate'; break;
+            }
+
+            let sipBadge = '';
+            if (data.isSip) {
+                sipBadge = `<span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 ms-2"><i class="fas fa-sync-alt me-1"></i>SIP</span>`;
+            }
+
+            let lastUpdateInfo = '';
+            if ((data.type === 'gold' || data.type === 'silver') && data.lastPriceUpdate) {
+                const d = data.lastPriceUpdate.toDate ? data.lastPriceUpdate.toDate() : new Date(data.lastPriceUpdate);
+                lastUpdateInfo = `<div class="text-end mt-1" style="font-size: 0.65rem; color: #aaa;" id="inv-updated-${doc.id}">Price updated: ${d.toLocaleDateString()}</div>`;
+            }
+
+            const col = document.createElement('div');
+            col.className = 'col-md-6 col-lg-4';
+            col.innerHTML = `
+                <div class="card h-100 border-0 shadow-sm rounded-4">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-${color} bg-opacity-10 text-${color} rounded-circle p-3 me-3">
+                                    <i class="fas ${icon} fa-lg"></i>
+                                </div>
+                                <div>
+                                    <h5 class="mb-0 fw-bold">${data.name}</h5>
+                                    <div class="small text-muted">${typeLabel} ${sipBadge}</div>
+                                </div>
+                            </div>
+                            <div class="dropdown">
+                                <button class="btn btn-link text-muted p-0" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="editInvestment('${doc.id}')">Edit</a></li>
+                                    <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="deleteInvestment('${doc.id}')">Delete</a></li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <div class="p-2 bg-light rounded">
+                                    <div class="small text-muted">Invested</div>
+                                    <div class="fw-bold">₹${data.investedAmount.toLocaleString()}</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="p-2 bg-light rounded">
+                                    <div class="small text-muted">Current Value</div>
+                                    <div class="fw-bold" id="inv-val-${doc.id}">₹${data.currentValue.toLocaleString()}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="${profitClass} fw-bold small" id="inv-profit-${doc.id}">
+                                <i class="fas ${profitIcon} me-1"></i> ₹${Math.abs(profit).toLocaleString()} (${profitPercent}%)
+                            </div>
+                            ${data.quantity ? `<div class="small text-muted">${data.quantity} ${data.type === 'gold' || data.type === 'silver' ? 'g' : 'units'}</div>` : ''}
+                        </div>
+                        ${lastUpdateInfo}
+
+                        ${data.isSip ? `
+                        <div class="mt-3 pt-3 border-top small">
+                            <div class="d-flex justify-content-between text-muted">
+                                <span><i class="fas fa-clock me-1"></i> ${data.sipFrequency} SIP</span>
+                                <span class="fw-bold text-dark">₹${data.sipAmount}</span>
+                            </div>
+                        </div>` : ''}
+                    </div>
+                </div>
+            `;
+            container.appendChild(col);
+        });
+
+        // Update Summary
+        if (document.getElementById('total-portfolio-value')) {
+            const totalProfit = totalCurrent - totalInvested;
+            const profitClass = totalProfit >= 0 ? 'text-success' : 'text-danger';
+            const profitSign = totalProfit >= 0 ? '+' : '';
+            
+            document.getElementById('total-portfolio-value').textContent = `₹${totalCurrent.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}`;
+            document.getElementById('total-invested-value').textContent = `₹${totalInvested.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}`;
+            
+            const profitEl = document.getElementById('total-profit-value');
+            profitEl.className = `mb-0 fw-bold ${profitClass}`;
+            profitEl.textContent = `${profitSign}₹${Math.abs(totalProfit).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}`;
+        }
+    } catch (e) {
+        console.error(e);
+        container.innerHTML = '<div class="col-12 text-center text-danger">Error loading investments.</div>';
+    }
+};
+
+window.editInvestment = async function(id) {
+    try {
+        const doc = await db.collection('investments').doc(id).get();
+        if (!doc.exists) return;
+        const data = doc.data();
+        
+        document.getElementById('inv-id').value = id;
+        document.getElementById('inv-type').value = data.type;
+        document.getElementById('inv-name').value = data.name;
+        document.getElementById('inv-amount').value = data.investedAmount;
+        document.getElementById('inv-current-value').value = data.currentValue;
+        document.getElementById('inv-quantity').value = data.quantity || '';
+        document.getElementById('inv-notes').value = data.notes || '';
+        
+        const isSip = data.isSip || false;
+        document.getElementById('inv-is-sip').checked = isSip;
+        toggleSipFields();
+        
+        if (isSip) {
+            document.getElementById('inv-sip-freq').value = data.sipFrequency || 'monthly';
+            document.getElementById('inv-sip-amount').value = data.sipAmount || '';
+            document.getElementById('inv-sip-date').value = data.sipNextDate || '';
+        }
+        
+        toggleInvestmentFields();
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addInvestmentModal'));
+        modal.show();
+    } catch (e) { console.error(e); }
+};
+
+window.deleteInvestment = async function(id) {
+    if (!confirm('Delete this investment record?')) return;
+    try {
+        await db.collection('investments').doc(id).delete();
+        loadInvestmentsGrid();
+        if(window.dashboard) window.dashboard.showNotification('Investment deleted', 'success');
+    } catch (e) { console.error(e); }
 };
