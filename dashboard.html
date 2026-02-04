@@ -651,6 +651,14 @@
                                 <option value="other">Other</option>
                             </select>
                         </div>
+                        <div class="mb-3 d-none" id="credit-card-select-container">
+                            <label class="form-label">Select Credit Card</label>
+                            <select class="form-select" id="transaction-credit-card">
+                                <option value="" selected disabled>Choose a card...</option>
+                                <!-- Credit cards will be loaded dynamically via JS -->
+                            </select>
+                            <div class="form-text text-muted">Expense will be added to this card's outstanding balance.</div>
+                        </div>
                         <div class="mb-3">
                             <label class="form-label">Category</label>
                             <select class="form-select" id="transaction-category" required>
@@ -684,6 +692,81 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-primary" id="save-transaction">Save Transaction</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Loan/Debt/Investment Modal -->
+    <div class="modal fade" id="addLoanModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Loan, Debt or Investment</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="loan-form">
+                        <input type="hidden" id="loan-id">
+                        <div class="mb-3">
+                            <label class="form-label">Type</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="loan-type" id="type-lent" value="lent" checked>
+                                <label class="btn btn-outline-success" for="type-lent">
+                                    <i class="fas fa-hand-holding-usd me-1"></i> Lent / Invested
+                                </label>
+                                <input type="radio" class="btn-check" name="loan-type" id="type-borrowed" value="borrowed">
+                                <label class="btn btn-outline-danger" for="type-borrowed">
+                                    <i class="fas fa-hand-holding me-1"></i> Borrowed (Debt)
+                                </label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Person / Entity Name</label>
+                            <input type="text" class="form-control" id="loan-person" required placeholder="Who is this with?">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Amount</label>
+                            <div class="input-group">
+                                <span class="input-group-text">₹</span>
+                                <input type="number" class="form-control" id="loan-amount" step="0.01" min="0" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <label class="form-label">Interest Rate (%)</label>
+                                <input type="number" class="form-control" id="loan-interest" step="0.1" min="0" value="0">
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label">Due Date</label>
+                                <input type="date" class="form-control" id="loan-due-date">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" id="loan-notes" rows="2"></textarea>
+                        </div>
+                        <hr>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="loan-add-transaction" checked>
+                            <label class="form-check-label" for="loan-add-transaction">Add to Transaction Ledger</label>
+                        </div>
+                        <div id="loan-transaction-details">
+                            <div class="mb-3">
+                                <label class="form-label">Payment Mode (for ledger)</label>
+                                <select class="form-select" id="loan-payment-mode">
+                                    <option value="cash">Cash</option>
+                                    <option value="bank">Bank Transfer</option>
+                                    <option value="upi">UPI</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="save-loan">Save Record</button>
                 </div>
             </div>
         </div>
@@ -1032,5 +1115,38 @@
     <script src="js/vehicles.js"></script>
     <script src="js/groceries.js"></script>
     <script src="js/pwa.js"></script>
+    <script>
+        // UI Logic for Transaction Modal - Credit Card Selection
+        document.addEventListener('DOMContentLoaded', function() {
+            const transactionMode = document.getElementById('transaction-mode');
+            const creditCardContainer = document.getElementById('credit-card-select-container');
+            
+            if (transactionMode && creditCardContainer) {
+                transactionMode.addEventListener('change', function() {
+                    if (this.value === 'credit-card') {
+                        creditCardContainer.classList.remove('d-none');
+                        document.getElementById('transaction-credit-card').required = true;
+                    } else {
+                        creditCardContainer.classList.add('d-none');
+                        document.getElementById('transaction-credit-card').required = false;
+                    }
+                });
+            }
+
+            // UI Logic for Loan Modal - Transaction Toggle
+            const loanAddTransaction = document.getElementById('loan-add-transaction');
+            const loanTransactionDetails = document.getElementById('loan-transaction-details');
+            
+            if (loanAddTransaction && loanTransactionDetails) {
+                loanAddTransaction.addEventListener('change', function() {
+                    if (this.checked) {
+                        loanTransactionDetails.classList.remove('d-none');
+                    } else {
+                        loanTransactionDetails.classList.add('d-none');
+                    }
+                });
+            }
+        });
+    </script>
 </body>
 </html>
