@@ -315,6 +315,7 @@ window.loadVehiclesSection = async function() {
                                     <option value="fastag_wallet">FASTag Wallet</option>
                                     <option value="upi" selected>UPI</option>
                                     <option value="card">Card</option>
+                                    <option value="wallet">Wallet</option>
                                     <option value="bank">Bank Transfer</option>
                                 </select>
                             </div>
@@ -322,6 +323,12 @@ window.loadVehiclesSection = async function() {
                             <!-- Fuel Specific Fields -->
                             <div id="fuel-fields">
                                 <div class="row">
+                            <div class="mb-3 d-none" id="log-wallet-container">
+                                <label class="form-label">Select Wallet</label>
+                                <select class="form-select" id="log-wallet">
+                                    <option value="">Select Wallet</option>
+                                </select>
+                            </div>
                                     <div class="col-6 mb-3">
                                         <label class="form-label">Fuel Price / L</label>
                                         <input type="number" class="form-control" id="log-price-unit" step="0.01" onchange="calculateFuelQty()">
@@ -1134,6 +1141,23 @@ window.toggleLogFields = function() {
     } else if (paymentSelect.value === 'fastag_wallet') {
         paymentSelect.value = 'upi'; // Reset if changing away from toll
     }
+    
+    // Handle Wallet Select Visibility
+    const paymentMode = document.getElementById('log-payment-mode');
+    const walletContainer = document.getElementById('log-wallet-container');
+    
+    paymentMode.onchange = async function() {
+        if (this.value === 'wallet') {
+            walletContainer.classList.remove('d-none');
+            // Populate wallets (reuse logic or fetch here)
+            const snapshot = await db.collection('wallets').where('userId', '==', auth.currentUser.uid).get();
+            const select = document.getElementById('log-wallet');
+            select.innerHTML = '<option value="">Select Wallet</option>' + 
+                snapshot.docs.map(doc => `<option value="${doc.id}">${doc.data().name} (₹${doc.data().balance})</option>`).join('');
+        } else {
+            walletContainer.classList.add('d-none');
+        }
+    };
 };
 
 window.updateLogOdometerPlaceholder = function() {
@@ -1309,6 +1333,7 @@ window.saveVehicleLog = async function() {
     const cost = parseFloat(document.getElementById('log-cost').value);
     const notes = document.getElementById('log-notes').value;
     const paymentMode = document.getElementById('log-payment-mode').value;
+    const walletId = document.getElementById('log-wallet')?.value;
     
     // Fuel specific
     const quantity = parseFloat(document.getElementById('log-quantity').value) || 0;
@@ -1420,6 +1445,13 @@ window.saveVehicleLog = async function() {
         // Deduct FASTag Balance ONLY if paid via Wallet
         if (type === 'toll' && paymentMode === 'fastag_wallet') {
             vehicleUpdateData.fastagBalance = firebase.firestore.FieldValue.increment(-cost);
+        }
+
+        // Deduct Generic Wallet Balance
+        if (paymentMode === 'wallet' && walletId) {
+            await db.collection('wallets').doc(walletId).update({
+                balance: firebase.firestore.FieldValue.increment(-cost)
+            });
         }
 
         // Update Vehicle if needed
