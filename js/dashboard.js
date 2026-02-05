@@ -1731,6 +1731,18 @@ class Dashboard {
         });
     }
 
+    async populateTransactionWalletSelect() {
+        const select = document.getElementById('transaction-wallet');
+        if (!select) return;
+        
+        const snapshot = await db.collection('wallets').where('userId', '==', this.currentUser.uid).get();
+        
+        select.innerHTML = '<option value="" selected disabled>Choose a wallet...</option>';
+        snapshot.forEach(doc => {
+            select.innerHTML += `<option value="${doc.id}">${doc.data().name} (₹${doc.data().balance})</option>`;
+        });
+    }
+
     showTransactionModal(type = 'income') {
         // Load categories first
         this.loadTransactionCategories().then(() => {
@@ -1750,6 +1762,7 @@ class Dashboard {
             
             // Populate CCs
             this.populateTransactionCCSelect();
+            this.populateTransactionWalletSelect();
 
             // Reset button state
             const btn = document.getElementById('save-transaction');
@@ -1839,6 +1852,7 @@ class Dashboard {
             const isRecurring = document.getElementById('recurring-transaction').checked;
             const frequency = document.getElementById('transaction-frequency').value;
             const creditCardId = document.getElementById('transaction-credit-card').value;
+            const walletId = document.getElementById('transaction-wallet').value;
             
             if (!type || !amount || !category || !date) {
                 this.showNotification('Please fill all required fields', 'danger');
@@ -1863,7 +1877,7 @@ class Dashboard {
                 recurring: isRecurring,
                 frequency: isRecurring ? frequency : null,
                 nextDueDate: isRecurring ? this.calculateNextDate(date, frequency) : null,
-                relatedId: (paymentMode === 'credit-card' && creditCardId) ? creditCardId : null
+                relatedId: (paymentMode === 'credit-card' && creditCardId) ? creditCardId : ((paymentMode === 'wallet' && walletId) ? walletId : null)
             };
             
             if (id) {
@@ -1877,6 +1891,13 @@ class Dashboard {
                 if (type === 'expense' && paymentMode === 'credit-card' && creditCardId) {
                     await db.collection('credit_cards').doc(creditCardId).update({
                         currentOutstanding: firebase.firestore.FieldValue.increment(amount)
+                    });
+                }
+
+                // Handle Wallet Deduction
+                if (type === 'expense' && paymentMode === 'wallet' && walletId) {
+                    await db.collection('wallets').doc(walletId).update({
+                        balance: firebase.firestore.FieldValue.increment(-amount)
                     });
                 }
             }
