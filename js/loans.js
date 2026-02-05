@@ -1,5 +1,5 @@
 let currentLoanTypeFilter = 'all';
-let currentLoanView = 'loans'; // 'loans', 'cards', or 'investments'
+let currentLoanView = 'loans'; // 'loans', 'cards', 'investments', or 'wallets'
 
 const CREDIT_CARD_BANKS = [
   {"id": "hdfc", "name": "HDFC Bank"},
@@ -38,21 +38,7 @@ window.loadLoansSection = async function() {
     const container = document.getElementById('loans-section');
     container.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="fw-bold gradient-text mb-0">Portfolio & Liabilities</h2>
-            <div>
-                <button class="btn btn-sm btn-outline-secondary me-2" onclick="showAmortizationCalculator()">
-                    <i class="fas fa-calculator me-2"></i>EMI Calc
-                </button>
-                <button class="btn btn-sm btn-outline-primary me-2" onclick="showAddCreditCardModal()">
-                    <i class="fas fa-credit-card me-2"></i>Add Card
-                </button>
-                <button class="btn btn-sm btn-outline-success me-2" onclick="showAddInvestmentModal()">
-                    <i class="fas fa-chart-line me-2"></i>Add Investment
-                </button>
-                <button class="btn btn-sm btn-primary" onclick="showAddLoanModal()">
-                    <i class="fas fa-plus me-2"></i>Add Loan
-                </button>
-            </div>
+            <h2 class="fw-bold gradient-text mb-0">Finance</h2>
         </div>
         
         <!-- Tabs -->
@@ -64,9 +50,17 @@ window.loadLoansSection = async function() {
                 <a class="nav-link rounded-pill" href="javascript:void(0)" onclick="switchLoanView('investments', this)">Investments</a>
             </li>
             <li class="nav-item">
+                <a class="nav-link rounded-pill" href="javascript:void(0)" onclick="switchLoanView('wallets', this)">Wallets</a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link rounded-pill" href="javascript:void(0)" onclick="switchLoanView('cards', this)">Credit Cards</a>
             </li>
         </ul>
+
+        <!-- Dynamic Toolbar -->
+        <div id="finance-toolbar" class="d-flex justify-content-end gap-2 mb-4">
+            <!-- Buttons will be injected here based on active tab -->
+        </div>
 
         <!-- Stats Row -->
         <div class="row g-4 mb-4 animate-fade-in" id="loan-stats-container">
@@ -94,33 +88,6 @@ window.loadLoansSection = async function() {
 
         <!-- Investments View -->
         <div id="investments-view-container" class="d-none">
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="card border-0 shadow-sm bg-white rounded-4">
-                        <div class="card-body p-4">
-                            <div class="row align-items-center text-center text-md-start">
-                                <div class="col-md-4 mb-3 mb-md-0">
-                                    <div class="text-muted small fw-bold text-uppercase mb-1">Current Value</div>
-                                    <h2 class="mb-0 fw-bold text-primary" id="total-portfolio-value">₹0.00</h2>
-                                </div>
-                                <div class="col-md-4 mb-3 mb-md-0">
-                                    <div class="text-muted small fw-bold text-uppercase mb-1">Invested Amount</div>
-                                    <h3 class="mb-0 fw-bold text-dark" id="total-invested-value">₹0.00</h3>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="text-muted small fw-bold text-uppercase mb-1">Total Profit/Loss</div>
-                                    <h3 class="mb-0 fw-bold" id="total-profit-value">₹0.00</h3>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="d-flex justify-content-end mb-3">
-                <button class="btn btn-sm btn-outline-warning" onclick="updateAllMetalPrices()" id="btn-update-metals">
-                    <i class="fas fa-sync-alt me-1"></i>Update Gold/Silver Prices
-                </button>
-            </div>
             <div class="row g-4" id="investments-grid">
                 <div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>
             </div>
@@ -129,6 +96,13 @@ window.loadLoansSection = async function() {
         <!-- Credit Cards View -->
         <div id="cards-view-container" class="d-none">
             <div class="row g-4" id="cards-grid">
+                <div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>
+            </div>
+        </div>
+
+        <!-- Wallets View -->
+        <div id="wallets-view-container" class="d-none">
+            <div class="row g-4" id="wallets-grid">
                 <div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>
             </div>
         </div>
@@ -225,6 +199,7 @@ window.loadLoansSection = async function() {
                                     <option value="bank">Bank Transfer</option>
                                     <option value="upi">UPI</option>
                                     <option value="credit-card">Credit Card</option>
+                                    <option value="wallet">Wallet</option>
                                     <option value="debit-card">Debit Card</option>
                                     <option value="other">Other</option>
                                 </select>
@@ -236,6 +211,12 @@ window.loadLoansSection = async function() {
                                     <!-- Populated via JS -->
                                 </select>
                                 <div class="form-text small">Amount will be added to card outstanding.</div>
+                            </div>
+                            <div class="mb-3 d-none" id="div-loan-wallet">
+                                <label class="form-label">Select Wallet</label>
+                                <select class="form-select" id="loan-wallet">
+                                    <option value="">Select Wallet</option>
+                                </select>
                             </div>
                             <div class="form-check mb-3">
                                 <input class="form-check-input" type="checkbox" id="loan-link-ledger" checked>
@@ -303,6 +284,7 @@ window.loadLoansSection = async function() {
                                     <option value="bank">Bank Transfer</option>
                                     <option value="upi">UPI</option>
                                     <option value="credit-card">Credit Card</option>
+                                    <option value="wallet">Wallet</option>
                                     <option value="debit-card">Debit Card</option>
                                     <option value="other">Other</option>
                                 </select>
@@ -314,6 +296,12 @@ window.loadLoansSection = async function() {
                                     <!-- Populated via JS -->
                                 </select>
                                 <div class="form-text small">Amount will be added to card outstanding.</div>
+                            </div>
+                            <div class="mb-3 d-none" id="div-repay-wallet">
+                                <label class="form-label">Select Wallet</label>
+                                <select class="form-select" id="repay-wallet">
+                                    <option value="">Select Wallet</option>
+                                </select>
                             </div>
                             <div class="form-check mb-3">
                                 <input class="form-check-input" type="checkbox" id="repay-link-ledger" checked>
@@ -477,6 +465,21 @@ window.loadLoansSection = async function() {
                         <div class="mb-3" id="action-desc-div">
                             <label class="form-label">Description</label>
                             <input type="text" class="form-control" id="action-desc">
+                            </div>
+                            <div class="mb-3 d-none" id="div-action-source">
+                                <label class="form-label">Payment Source</label>
+                                <select class="form-select" id="action-payment-mode" onchange="toggleLoanPaymentFields('action')">
+                                    <option value="bank">Bank Transfer</option>
+                                    <option value="upi">UPI</option>
+                                    <option value="wallet">Wallet</option>
+                                    <option value="cash">Cash</option>
+                                </select>
+                            </div>
+                            <div class="mb-3 d-none" id="div-action-wallet">
+                                <label class="form-label">Select Wallet</label>
+                                <select class="form-select" id="action-wallet">
+                                    <option value="">Select Wallet</option>
+                                </select>
                         </div>
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="action-ledger" checked>
@@ -700,56 +703,321 @@ window.loadLoansSection = async function() {
                 </div>
             </div>
         </div>
+
+        <!-- Add Wallet Modal -->
+        <div class="modal fade" id="addWalletModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Add Wallet</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="wallet-form">
+                            <input type="hidden" id="wallet-id">
+                            <div class="mb-3">
+                                <label class="form-label">Wallet Name</label>
+                                <input type="text" class="form-control" id="wallet-name" placeholder="e.g. Paytm, IRCTC" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Current Balance</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">₹</span>
+                                    <input type="number" class="form-control" id="wallet-balance" step="0.01" required>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="btn-save-wallet" onclick="saveWallet()">Save Wallet</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transfer Wallet Modal -->
+        <div class="modal fade" id="transferWalletModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Transfer Money</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="transfer-form">
+                            <div class="mb-3">
+                                <label class="form-label">Transfer Type</label>
+                                <select class="form-select" id="transfer-type" onchange="toggleTransferType()">
+                                    <option value="bank_to_wallet">Bank to Wallet</option>
+                                    <option value="wallet_to_wallet">Wallet to Wallet</option>
+                                </select>
+                            </div>
+                            <div class="mb-3 d-none" id="div-source-wallet">
+                                <label class="form-label">From Wallet</label>
+                                <select class="form-select" id="transfer-source-wallet">
+                                    <option value="">Select Source Wallet</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" id="label-dest-wallet">To Wallet</label>
+                                <select class="form-select" id="transfer-dest-wallet">
+                                    <option value="">Select Destination Wallet</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Amount</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">₹</span>
+                                    <input type="number" class="form-control" id="transfer-amount" step="0.01" min="0" required>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Date</label>
+                                <input type="date" class="form-control" id="transfer-date" required>
+                            </div>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="transfer-ledger" checked>
+                                <label class="form-check-label">Record in Ledger</label>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="btn-save-transfer" onclick="saveWalletTransfer()">Transfer</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Withdraw Investment Modal -->
+        <div class="modal fade" id="withdrawInvestmentModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Withdraw Investment</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="withdraw-form">
+                            <input type="hidden" id="withdraw-id">
+                            <div class="mb-3">
+                                <label class="form-label">Withdrawal Amount</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">₹</span>
+                                    <input type="number" class="form-control" id="withdraw-amount" step="0.01" required>
+                                </div>
+                            </div>
+                            <div class="mb-3" id="div-withdraw-qty">
+                                <label class="form-label">Quantity Sold (Optional)</label>
+                                <input type="number" class="form-control" id="withdraw-quantity" step="0.001">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Date</label>
+                                <input type="date" class="form-control" id="withdraw-date" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Deposit To</label>
+                                <select class="form-select" id="withdraw-to" onchange="toggleWithdrawalFields()">
+                                    <option value="bank">Bank Account</option>
+                                    <option value="wallet">Wallet</option>
+                                    <option value="cash">Cash</option>
+                                </select>
+                            </div>
+                            <div class="mb-3 d-none" id="div-withdraw-wallet">
+                                <label class="form-label">Select Wallet</label>
+                                <select class="form-select" id="withdraw-wallet">
+                                    <option value="">Select Wallet</option>
+                                </select>
+                            </div>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="withdraw-close">
+                                <label class="form-check-label" for="withdraw-close">
+                                    Close/Delete this investment (Fully withdrawn)
+                                </label>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="btn-save-withdraw" onclick="saveWithdrawal()">Confirm Withdrawal</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Deposit Investment Modal -->
+        <div class="modal fade" id="depositInvestmentModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Deposit / Add Funds</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="deposit-form">
+                            <input type="hidden" id="deposit-id">
+                            <div class="mb-3">
+                                <label class="form-label">Amount to Invest</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">₹</span>
+                                    <input type="number" class="form-control" id="deposit-amount" step="0.01" required>
+                                </div>
+                            </div>
+                            <div class="mb-3" id="div-deposit-qty">
+                                <label class="form-label">Quantity / Units (Optional)</label>
+                                <input type="number" class="form-control" id="deposit-quantity" step="0.001">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Date</label>
+                                <input type="date" class="form-control" id="deposit-date" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Payment Mode</label>
+                                <select class="form-select" id="deposit-payment-mode" onchange="toggleDepositFields()">
+                                    <option value="bank">Bank Transfer</option>
+                                    <option value="upi">UPI</option>
+                                    <option value="wallet">Wallet</option>
+                                    <option value="credit-card">Credit Card</option>
+                                    <option value="cash">Cash</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="mb-3 d-none" id="div-deposit-wallet">
+                                <label class="form-label">Select Wallet</label>
+                                <select class="form-select" id="deposit-wallet">
+                                    <option value="">Select Wallet</option>
+                                </select>
+                            </div>
+                            <div class="mb-3 d-none" id="div-deposit-credit-card">
+                                <label class="form-label">Select Credit Card</label>
+                                <select class="form-select" id="deposit-credit-card">
+                                    <option value="">Select Card</option>
+                                </select>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-success" id="btn-save-deposit" onclick="saveDeposit()">Confirm Deposit</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     `;
     await loadLoansGrid('active');
 };
 
 window.switchLoanView = function(view, element) {
     currentLoanView = view;
-    document.querySelectorAll('#loans-section > .nav-pills .nav-link').forEach(l => l.classList.remove('active'));
-    element.classList.add('active');
+    if(element) {
+        document.querySelectorAll('#loans-section > .nav-pills .nav-link').forEach(l => l.classList.remove('active'));
+        element.classList.add('active');
+    }
 
-    const statsContainer = document.getElementById('loan-stats-container');
+    // Update Toolbar Buttons
+    const toolbar = document.getElementById('finance-toolbar');
+    if(toolbar) {
+        let buttons = '';
+        if (view === 'loans') {
+            buttons = `
+                <button class="btn btn-sm btn-outline-secondary" onclick="showAmortizationCalculator()">
+                    <i class="fas fa-calculator me-2"></i>EMI Calc
+                </button>
+                <button class="btn btn-sm btn-primary" onclick="showAddLoanModal()">
+                    <i class="fas fa-plus me-2"></i>Add Loan
+                </button>
+            `;
+        } else if (view === 'investments') {
+            buttons = `
+                <button class="btn btn-sm btn-outline-warning" onclick="updateAllMetalPrices()" id="btn-update-metals">
+                    <i class="fas fa-sync-alt me-1"></i>Update Prices
+                </button>
+                <button class="btn btn-sm btn-success" onclick="showAddInvestmentModal()">
+                    <i class="fas fa-chart-line me-2"></i>Add Investment
+                </button>
+            `;
+        } else if (view === 'wallets') {
+            buttons = `
+                <button class="btn btn-sm btn-outline-secondary" onclick="showTransferWalletModal()">
+                    <i class="fas fa-exchange-alt me-2"></i>Transfer
+                </button>
+                <button class="btn btn-sm btn-info text-white" onclick="showAddWalletModal()">
+                    <i class="fas fa-wallet me-2"></i>Add Wallet
+                </button>
+            `;
+        } else if (view === 'cards') {
+            buttons = `
+                <button class="btn btn-sm btn-primary" onclick="showAddCreditCardModal()">
+                    <i class="fas fa-credit-card me-2"></i>Add Card
+                </button>
+            `;
+        }
+        toolbar.innerHTML = buttons;
+    }
 
+    // Toggle Views
     if (view === 'loans') {
         document.getElementById('loans-view-container').classList.remove('d-none');
         document.getElementById('investments-view-container').classList.add('d-none');
         document.getElementById('cards-view-container').classList.add('d-none');
-        if (statsContainer) statsContainer.classList.remove('d-none');
+        document.getElementById('wallets-view-container').classList.add('d-none');
         loadLoansGrid('active');
     } else if (view === 'investments') {
         document.getElementById('loans-view-container').classList.add('d-none');
         document.getElementById('investments-view-container').classList.remove('d-none');
         document.getElementById('cards-view-container').classList.add('d-none');
-        if (statsContainer) statsContainer.classList.add('d-none');
+        document.getElementById('wallets-view-container').classList.add('d-none');
         loadInvestmentsGrid();
-    } else {
+    } else if (view === 'cards') {
         document.getElementById('loans-view-container').classList.add('d-none');
         document.getElementById('investments-view-container').classList.add('d-none');
         document.getElementById('cards-view-container').classList.remove('d-none');
-        if (statsContainer) statsContainer.classList.remove('d-none');
+        document.getElementById('wallets-view-container').classList.add('d-none');
         loadCreditCardsGrid();
+    } else {
+        document.getElementById('loans-view-container').classList.add('d-none');
+        document.getElementById('investments-view-container').classList.add('d-none');
+        document.getElementById('cards-view-container').classList.add('d-none');
+        document.getElementById('wallets-view-container').classList.remove('d-none');
+        loadWalletsGrid();
     }
 };
 
-window.populateLoanCCSelects = async function() {
+window.populateLoanPaymentSelects = async function() {
     const user = auth.currentUser;
-    const snapshot = await db.collection('credit_cards').where('userId', '==', user.uid).get();
-    const options = '<option value="">Select Card</option>' + 
-        snapshot.docs.map(doc => `<option value="${doc.id}">${doc.data().name} (..${doc.data().last4 || ''})</option>`).join('');
+    const ccSnapshot = await db.collection('credit_cards').where('userId', '==', user.uid).get();
+    const walletSnapshot = await db.collection('wallets').where('userId', '==', user.uid).get();
     
-    ['loan', 'repay', 'inv'].forEach(type => {
-        const el = document.getElementById(`${type}-credit-card`);
-        if(el) el.innerHTML = options;
+    const ccOptions = '<option value="">Select Card</option>' + 
+        ccSnapshot.docs.map(doc => `<option value="${doc.id}">${doc.data().name} (..${doc.data().last4 || ''})</option>`).join('');
+    
+    const walletOptions = '<option value="">Select Wallet</option>' + 
+        walletSnapshot.docs.map(doc => `<option value="${doc.id}">${doc.data().name} (₹${doc.data().balance})</option>`).join('');
+    
+    ['loan', 'repay', 'inv', 'withdraw', 'deposit', 'action'].forEach(type => {
+        const ccEl = document.getElementById(`${type}-credit-card`);
+        if(ccEl) ccEl.innerHTML = ccOptions;
+        
+        const walletEl = document.getElementById(`${type}-wallet`);
+        if(walletEl) walletEl.innerHTML = walletOptions;
     });
 };
 
-window.toggleLoanCCField = function(type) {
+window.toggleLoanPaymentFields = function(type) {
     const mode = document.getElementById(`${type}-payment-mode`).value;
-    const div = document.getElementById(`div-${type}-cc`);
-    if (div) {
-        div.classList.toggle('d-none', mode !== 'credit-card');
-        if (mode === 'credit-card') window.populateLoanCCSelects();
+    const ccDiv = document.getElementById(`div-${type}-cc`);
+    const walletDiv = document.getElementById(`div-${type}-wallet`);
+    
+    if (ccDiv) ccDiv.classList.add('d-none');
+    if (walletDiv) walletDiv.classList.add('d-none');
+
+    if (mode === 'credit-card') {
+        if (ccDiv) ccDiv.classList.remove('d-none');
+        window.populateLoanPaymentSelects();
+    } else if (mode === 'wallet') {
+        if (walletDiv) walletDiv.classList.remove('d-none');
+        window.populateLoanPaymentSelects();
     }
 };
 
@@ -823,8 +1091,8 @@ window.showAddLoanModal = function() {
     
     // Reset Payment Mode & CC
     document.getElementById('loan-payment-mode').value = 'bank';
-    document.getElementById('loan-payment-mode').onchange = () => toggleLoanCCField('loan');
-    toggleLoanCCField('loan');
+    document.getElementById('loan-payment-mode').onchange = () => toggleLoanPaymentFields('loan');
+    toggleLoanPaymentFields('loan');
 
     // Reset UI
     document.getElementById('type-borrowed').checked = true;
@@ -861,6 +1129,7 @@ window.saveLoan = async function() {
     const linkLedger = document.getElementById('loan-link-ledger').checked;
     const paymentMode = document.getElementById('loan-payment-mode').value;
     const creditCardId = document.getElementById('loan-credit-card')?.value;
+    const walletId = document.getElementById('loan-wallet')?.value;
     const countryCode = document.getElementById('loan-country-code').value;
     const mobileInput = document.getElementById('loan-mobile').value;
     const upiId = document.getElementById('loan-upi-id').value.trim();
@@ -975,6 +1244,20 @@ window.saveLoan = async function() {
                 });
             }
 
+            // Handle Wallet Deduction (Only if I Lent money or paid for EMI)
+            if (paymentMode === 'wallet' && walletId && (type === 'lent' || type === 'emi')) {
+                await db.collection('wallets').doc(walletId).update({
+                    balance: firebase.firestore.FieldValue.increment(-amount)
+                });
+            }
+
+            // Handle Wallet Addition (If I Borrowed money into a Wallet)
+            if (paymentMode === 'wallet' && walletId && type === 'borrowed') {
+                await db.collection('wallets').doc(walletId).update({
+                    balance: firebase.firestore.FieldValue.increment(amount)
+                });
+            }
+
             if (linkLedger) {
                 const transaction = {
                     userId: user.uid,
@@ -984,7 +1267,7 @@ window.saveLoan = async function() {
                     type: type === 'borrowed' ? 'income' : (type === 'lent' ? 'expense' : 'expense'),
                     category: 'Loan',
                     description: `${type === 'borrowed' ? 'Loan from' : (type === 'lent' ? 'Loan to' : 'EMI Purchase:')} ${name}`,
-                    relatedId: creditCardId || null, // Link CC if used
+                    relatedId: (paymentMode === 'credit-card' ? creditCardId : (paymentMode === 'wallet' ? walletId : null)),
                     paymentMode: paymentMode,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
@@ -1414,8 +1697,8 @@ window.showRepaymentModal = async function(loanId) {
     document.getElementById('repay-date').value = new Date().toISOString().split('T')[0];
     
     // Reset Payment Mode
-    document.getElementById('repay-payment-mode').onchange = () => toggleLoanCCField('repay');
-    toggleLoanCCField('repay');
+    document.getElementById('repay-payment-mode').onchange = () => toggleLoanPaymentFields('repay');
+    toggleLoanPaymentFields('repay');
 
     // Check if we should show UPI button
     const upiContainer = document.getElementById('upi-pay-container');
@@ -1446,6 +1729,7 @@ window.saveRepayment = async function() {
     const linkLedger = document.getElementById('repay-link-ledger').checked;
     const paymentMode = document.getElementById('repay-payment-mode').value;
     const creditCardId = document.getElementById('repay-credit-card')?.value;
+    const walletId = document.getElementById('repay-wallet')?.value;
     const user = auth.currentUser;
 
     if (!amount || !date) {
@@ -1505,6 +1789,20 @@ window.saveRepayment = async function() {
             });
         }
 
+        // Handle Wallet Deduction (If I am paying back a loan using Wallet)
+        if (paymentMode === 'wallet' && walletId && loanData.type === 'borrowed') {
+            await db.collection('wallets').doc(walletId).update({
+                balance: firebase.firestore.FieldValue.increment(-amount)
+            });
+        }
+
+        // Handle Wallet Addition (If I am receiving repayment for a Lent loan into Wallet)
+        if (paymentMode === 'wallet' && walletId && loanData.type === 'lent') {
+            await db.collection('wallets').doc(walletId).update({
+                balance: firebase.firestore.FieldValue.increment(amount)
+            });
+        }
+
         if (linkLedger) {
             const type = loanData.type === 'lent' ? 'income' : 'expense';
             const principalAmount = amount - penalty - processingFee;
@@ -1520,7 +1818,7 @@ window.saveRepayment = async function() {
                     category: 'Loan Repayment',
                     description: `Repayment: ${loanData.name}`,
                     paymentMode: paymentMode,
-                    relatedId: creditCardId || null,
+                    relatedId: (paymentMode === 'credit-card' ? creditCardId : (paymentMode === 'wallet' ? walletId : null)),
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 transactionId = transactionRef.id;
@@ -2121,10 +2419,26 @@ window.showCCActionModal = function(id, type) {
     document.getElementById('action-type').value = type;
     document.getElementById('action-amount').value = '';
     document.getElementById('action-date').value = new Date().toISOString().split('T')[0];
-    document.getElementById('action-desc').value = type === 'spend' ? 'Purchase' : 'Bill Payment';
     document.getElementById('ccActionTitle').textContent = type === 'spend' ? 'Log Spend' : 'Record Payment';
     
+    const sourceDiv = document.getElementById('div-action-source');
+    const descInput = document.getElementById('action-desc');
+    
+    if (type === 'pay') {
+        sourceDiv.classList.remove('d-none');
+        descInput.value = 'Bill Payment';
+        // Reset payment mode to bank by default
+        document.getElementById('action-payment-mode').value = 'bank';
+    } else {
+        sourceDiv.classList.add('d-none');
+        descInput.value = 'Purchase';
+    }
+    
+    // Reset wallet field visibility
+    window.toggleLoanPaymentFields('action');
+    
     const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('ccActionModal'));
+    window.populateLoanPaymentSelects(); // Ensure wallets are loaded
     modal.show();
 };
 
@@ -2135,6 +2449,8 @@ window.processCCAction = async function() {
     const amount = parseFloat(document.getElementById('action-amount').value);
     const date = document.getElementById('action-date').value;
     const desc = document.getElementById('action-desc').value;
+    const paymentMode = document.getElementById('action-payment-mode').value;
+    const walletId = document.getElementById('action-wallet').value;
     const recordLedger = document.getElementById('action-ledger').checked;
     const user = auth.currentUser;
 
@@ -2152,6 +2468,13 @@ window.processCCAction = async function() {
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
+        // Handle Wallet Deduction for Bill Payment
+        if (type === 'pay' && paymentMode === 'wallet' && walletId) {
+            await db.collection('wallets').doc(walletId).update({
+                balance: firebase.firestore.FieldValue.increment(-amount)
+            });
+        }
+
         // Add to Ledger
         if (recordLedger) {
             const cardDoc = await cardRef.get();
@@ -2168,8 +2491,8 @@ window.processCCAction = async function() {
                                  // Payment is tricky: It's money leaving bank to pay debt. So also Expense in cash flow terms.
                 category: type === 'spend' ? 'Shopping' : 'Credit Card Bill',
                 description: `${type === 'spend' ? 'CC Spend' : 'Bill Pay'}: ${cardName} - ${desc}`,
-                paymentMode: type === 'spend' ? 'credit-card' : 'bank', // Spend is via CC. Payment is via Bank.
-                relatedId: id,
+                paymentMode: type === 'spend' ? 'credit-card' : paymentMode, // Spend is via CC. Payment is via selected mode.
+                relatedId: id, // Always link to Card ID for history visibility
                 section: 'credit_cards',
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
@@ -2246,8 +2569,11 @@ window.deleteCCHistoryItem = async function(cardId, txId) {
         if (!txDoc.exists) return;
         const data = txDoc.data();
         const amount = data.amount;
-        const isSpend = data.description && data.description.startsWith('CC Spend');
+        
+        const isBillPayment = data.category === 'Credit Card Bill' || (data.description && data.description.includes('Bill Pay'));
+        const isSpend = data.paymentMode === 'credit-card' && !isBillPayment;
         const adjustment = isSpend ? -amount : amount;
+        
         const batch = db.batch();
         batch.delete(txRef);
         batch.update(db.collection('credit_cards').doc(cardId), {
@@ -2264,6 +2590,265 @@ window.deleteCCHistoryItem = async function(cardId, txId) {
     }
 };
 
+// --- Wallet Functions ---
+
+window.loadWalletsGrid = async function() {
+    const user = auth.currentUser;
+    const container = document.getElementById('wallets-grid');
+    const statsContainer = document.getElementById('loan-stats-container');
+
+    if (currentLoanView !== 'wallets') return;
+
+    try {
+        const snapshot = await db.collection('wallets')
+            .where('userId', '==', user.uid)
+            .orderBy('updatedAt', 'desc')
+            .get();
+
+        let totalBalance = 0;
+        snapshot.forEach(doc => totalBalance += (doc.data().balance || 0));
+
+        // Update Stats
+        statsContainer.innerHTML = `
+            <div class="col-12 col-md-4">
+                <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-info">
+                    <div class="text-muted small mb-1 fw-medium">Total Wallet Balance</div>
+                    <h4 class="mb-0 fw-bold text-info">₹${totalBalance.toFixed(2)}</h4>
+                </div>
+            </div>
+        `;
+
+        if (snapshot.empty) {
+            container.innerHTML = '<div class="col-12 text-center text-muted py-5">No wallets added.</div>';
+            return;
+        }
+
+        container.innerHTML = '';
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const col = document.createElement('div');
+            col.className = 'col-md-6 col-lg-4';
+            col.innerHTML = `
+                <div class="card h-100 border-0 shadow-sm rounded-4">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-info bg-opacity-10 text-info rounded-circle p-3 me-3">
+                                    <i class="fas fa-wallet fa-lg"></i>
+                                </div>
+                                <div>
+                                    <h5 class="mb-0 fw-bold">${data.name}</h5>
+                                    <small class="text-muted">Wallet</small>
+                                </div>
+                            </div>
+                            <div class="dropdown">
+                                <button class="btn btn-link text-muted p-0" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="editWallet('${doc.id}')">Edit</a></li>
+                                    <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="deleteWallet('${doc.id}')">Delete</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                        <h3 class="fw-bold mb-0">₹${(data.balance || 0).toFixed(2)}</h3>
+                        <div class="small text-muted mt-2">Last updated: ${data.updatedAt ? new Date(data.updatedAt.toDate()).toLocaleDateString() : 'N/A'}</div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(col);
+        });
+
+    } catch (e) {
+        console.error("Error loading wallets:", e);
+        container.innerHTML = '<div class="col-12 text-center text-danger">Error loading wallets.</div>';
+    }
+};
+
+window.showAddWalletModal = function() {
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addWalletModal'));
+    document.getElementById('wallet-form').reset();
+    document.getElementById('wallet-id').value = '';
+    modal.show();
+};
+
+window.saveWallet = async function() {
+    const btn = document.getElementById('btn-save-wallet');
+    const id = document.getElementById('wallet-id').value;
+    const name = document.getElementById('wallet-name').value;
+    const balance = parseFloat(document.getElementById('wallet-balance').value);
+    const user = auth.currentUser;
+
+    if (!name || isNaN(balance)) {
+        if(window.dashboard) window.dashboard.showNotification('Please fill required fields', 'warning');
+        return;
+    }
+
+    try {
+        window.setBtnLoading(btn, true);
+        const data = {
+            userId: user.uid,
+            name, balance,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        if (id) {
+            await db.collection('wallets').doc(id).update(data);
+        } else {
+            data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection('wallets').add(data);
+        }
+
+        window.setBtnLoading(btn, false);
+        bootstrap.Modal.getInstance(document.getElementById('addWalletModal')).hide();
+        loadWalletsGrid();
+        if(window.dashboard) window.dashboard.showNotification(id ? 'Wallet updated' : 'Wallet added', 'success');
+    } catch (e) {
+        window.setBtnLoading(btn, false);
+        console.error(e);
+        if(window.dashboard) window.dashboard.showNotification('Error saving wallet', 'danger');
+    }
+};
+
+window.editWallet = async function(id) {
+    try {
+        const doc = await db.collection('wallets').doc(id).get();
+        if (!doc.exists) return;
+        const data = doc.data();
+        
+        document.getElementById('wallet-id').value = id;
+        document.getElementById('wallet-name').value = data.name;
+        document.getElementById('wallet-balance').value = data.balance;
+        
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addWalletModal'));
+        modal.show();
+    } catch (e) { console.error(e); }
+};
+
+window.deleteWallet = async function(id) {
+    if (!confirm('Delete this wallet?')) return;
+    try {
+        await db.collection('wallets').doc(id).delete();
+        loadWalletsGrid();
+        if(window.dashboard) window.dashboard.showNotification('Wallet deleted', 'success');
+    } catch (e) { console.error(e); }
+};
+
+window.showTransferWalletModal = async function() {
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('transferWalletModal'));
+    document.getElementById('transfer-form').reset();
+    document.getElementById('transfer-date').value = new Date().toISOString().split('T')[0];
+    
+    // Populate Wallets
+    const user = auth.currentUser;
+    const snapshot = await db.collection('wallets').where('userId', '==', user.uid).get();
+    let options = '<option value="">Select Wallet</option>';
+    snapshot.forEach(doc => {
+        options += `<option value="${doc.id}">${doc.data().name} (₹${doc.data().balance})</option>`;
+    });
+    
+    document.getElementById('transfer-source-wallet').innerHTML = options;
+    document.getElementById('transfer-dest-wallet').innerHTML = options;
+    
+    toggleTransferType();
+    modal.show();
+};
+
+window.toggleTransferType = function() {
+    const type = document.getElementById('transfer-type').value;
+    const sourceDiv = document.getElementById('div-source-wallet');
+    
+    if (type === 'wallet_to_wallet') {
+        sourceDiv.classList.remove('d-none');
+    } else {
+        sourceDiv.classList.add('d-none');
+    }
+};
+
+window.saveWalletTransfer = async function() {
+    const btn = document.getElementById('btn-save-transfer');
+    const type = document.getElementById('transfer-type').value;
+    const sourceId = document.getElementById('transfer-source-wallet').value;
+    const destId = document.getElementById('transfer-dest-wallet').value;
+    const amount = parseFloat(document.getElementById('transfer-amount').value);
+    const date = document.getElementById('transfer-date').value;
+    const recordLedger = document.getElementById('transfer-ledger').checked;
+    const user = auth.currentUser;
+
+    if (!destId || !amount || amount <= 0) {
+        if(window.dashboard) window.dashboard.showNotification('Please fill required fields', 'warning');
+        return;
+    }
+
+    if (type === 'wallet_to_wallet') {
+        if (!sourceId) {
+            if(window.dashboard) window.dashboard.showNotification('Select source wallet', 'warning');
+            return;
+        }
+        if (sourceId === destId) {
+            if(window.dashboard) window.dashboard.showNotification('Source and destination cannot be same', 'warning');
+            return;
+        }
+    }
+
+    try {
+        window.setBtnLoading(btn, true);
+        const batch = db.batch();
+        
+        // Destination Update
+        const destRef = db.collection('wallets').doc(destId);
+        batch.update(destRef, {
+            balance: firebase.firestore.FieldValue.increment(amount),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        let description = '';
+        let paymentMode = 'wallet';
+        
+        if (type === 'wallet_to_wallet') {
+            // Source Update
+            const sourceRef = db.collection('wallets').doc(sourceId);
+            batch.update(sourceRef, {
+                balance: firebase.firestore.FieldValue.increment(-amount),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            
+            const sourceName = document.getElementById('transfer-source-wallet').options[document.getElementById('transfer-source-wallet').selectedIndex].text.split(' (')[0];
+            const destName = document.getElementById('transfer-dest-wallet').options[document.getElementById('transfer-dest-wallet').selectedIndex].text.split(' (')[0];
+            description = `Transfer: ${sourceName} -> ${destName}`;
+        } else {
+            const destName = document.getElementById('transfer-dest-wallet').options[document.getElementById('transfer-dest-wallet').selectedIndex].text.split(' (')[0];
+            description = `Bank Transfer to ${destName}`;
+            paymentMode = 'bank';
+        }
+
+        if (recordLedger) {
+            const txRef = db.collection('transactions').doc();
+            batch.set(txRef, {
+                userId: user.uid,
+                date: date,
+                amount: amount,
+                type: 'transfer', // Neutral type for transfers
+                category: 'Transfer',
+                description: description,
+                paymentMode: paymentMode,
+                relatedId: destId,
+                section: 'wallets',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+
+        await batch.commit();
+        
+        window.setBtnLoading(btn, false);
+        bootstrap.Modal.getInstance(document.getElementById('transferWalletModal')).hide();
+        loadWalletsGrid();
+        if(window.dashboard) window.dashboard.showNotification('Transfer successful', 'success');
+    } catch (e) {
+        window.setBtnLoading(btn, false);
+        console.error(e);
+        if(window.dashboard) window.dashboard.showNotification('Error processing transfer', 'danger');
+    }
+};
+
 // --- Investment Functions ---
 
 window.showAddInvestmentModal = function() {
@@ -2271,7 +2856,7 @@ window.showAddInvestmentModal = function() {
     document.getElementById('investment-form').reset();
     document.getElementById('inv-id').value = '';
     toggleInvestmentFields();
-    toggleLoanCCField('inv'); // Reset CC field
+    toggleLoanPaymentFields('inv'); // Reset CC field
     toggleSipFields();
     modal.show();
 };
@@ -2508,6 +3093,7 @@ window.saveInvestment = async function() {
     const linkLedger = document.getElementById('inv-link-ledger').checked;
     const paymentMode = document.getElementById('inv-payment-mode').value;
     const creditCardId = document.getElementById('inv-credit-card')?.value;
+    const walletId = document.getElementById('inv-wallet')?.value;
     
     if (!name || isNaN(investedAmount)) {
         if(window.dashboard) window.dashboard.showNotification('Please fill required fields', 'warning');
@@ -2544,6 +3130,13 @@ window.saveInvestment = async function() {
                 });
             }
 
+            // Handle Wallet Deduction
+            if (paymentMode === 'wallet' && walletId) {
+                await db.collection('wallets').doc(walletId).update({
+                    balance: firebase.firestore.FieldValue.increment(-investedAmount)
+                });
+            }
+
             // Add to Ledger
             if (linkLedger) {
                 await db.collection('transactions').add({
@@ -2554,7 +3147,8 @@ window.saveInvestment = async function() {
                     category: 'Investment',
                     description: `Investment: ${name}`,
                     paymentMode: paymentMode,
-                    relatedId: invRefId, // Link to investment
+                    relatedId: (paymentMode === 'credit-card' && creditCardId) ? creditCardId : invRefId,
+                    investmentId: invRefId,
                     section: 'investments',
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
@@ -2575,6 +3169,7 @@ window.saveInvestment = async function() {
 window.loadInvestmentsGrid = async function() {
     const user = auth.currentUser;
     const container = document.getElementById('investments-grid');
+    const statsContainer = document.getElementById('loan-stats-container');
     
     try {
         const snapshot = await db.collection('investments')
@@ -2582,17 +3177,6 @@ window.loadInvestmentsGrid = async function() {
             .orderBy('createdAt', 'desc')
             .get();
 
-        if (snapshot.empty) {
-            container.innerHTML = '<div class="col-12 text-center text-muted py-5">No investments found. Start building your portfolio!</div>';
-            if (document.getElementById('total-portfolio-value')) {
-                document.getElementById('total-portfolio-value').textContent = '₹0.00';
-                document.getElementById('total-invested-value').textContent = '₹0.00';
-                document.getElementById('total-profit-value').textContent = '₹0.00';
-            }
-            return;
-        }
-
-        container.innerHTML = '';
         let totalInvested = 0;
         let totalCurrent = 0;
 
@@ -2600,6 +3184,42 @@ window.loadInvestmentsGrid = async function() {
             const data = doc.data();
             totalInvested += (data.investedAmount || 0);
             totalCurrent += (data.currentValue || data.investedAmount || 0);
+        });
+
+        const totalProfit = totalCurrent - totalInvested;
+        const profitClass = totalProfit >= 0 ? 'text-success' : 'text-danger';
+
+        // Render Stats
+        statsContainer.innerHTML = `
+            <div class="col-12 col-md-4">
+                <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-primary">
+                    <div class="text-muted small mb-1 fw-medium">Current Portfolio Value</div>
+                    <h4 class="mb-0 fw-bold text-primary">₹${totalCurrent.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</h4>
+                </div>
+            </div>
+            <div class="col-6 col-md-4">
+                <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-secondary">
+                    <div class="text-muted small mb-1 fw-medium">Invested Amount</div>
+                    <h4 class="mb-0 fw-bold text-secondary">₹${totalInvested.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</h4>
+                </div>
+            </div>
+            <div class="col-6 col-md-4">
+                <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 ${totalProfit >= 0 ? 'border-success' : 'border-danger'}">
+                    <div class="text-muted small mb-1 fw-medium">Total Profit/Loss</div>
+                    <h4 class="mb-0 fw-bold ${profitClass}">₹${totalProfit.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</h4>
+                </div>
+            </div>
+        `;
+
+        if (snapshot.empty) {
+            container.innerHTML = '<div class="col-12 text-center text-muted py-5">No investments found. Start building your portfolio!</div>';
+            return;
+        }
+
+        container.innerHTML = '';
+
+        snapshot.forEach(doc => {
+            const data = doc.data();
             
             const profit = (data.currentValue || 0) - (data.investedAmount || 0);
             const profitClass = profit >= 0 ? 'text-success' : 'text-danger';
@@ -2685,25 +3305,20 @@ window.loadInvestmentsGrid = async function() {
                                 <span class="fw-bold text-dark">₹${data.sipAmount}</span>
                             </div>
                         </div>` : ''}
+
+                        <div class="d-flex gap-2 mt-3">
+                            <button class="btn btn-sm btn-outline-success flex-grow-1" onclick="showDepositInvestmentModal('${doc.id}')">
+                                <i class="fas fa-plus-circle me-1"></i>Deposit
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger flex-grow-1" onclick="showWithdrawInvestmentModal('${doc.id}')">
+                                <i class="fas fa-minus-circle me-1"></i>Withdraw
+                            </button>
+                        </div>
                     </div>
                 </div>
             `;
             container.appendChild(col);
         });
-
-        // Update Summary
-        if (document.getElementById('total-portfolio-value')) {
-            const totalProfit = totalCurrent - totalInvested;
-            const profitClass = totalProfit >= 0 ? 'text-success' : 'text-danger';
-            const profitSign = totalProfit >= 0 ? '+' : '';
-            
-            document.getElementById('total-portfolio-value').textContent = `₹${totalCurrent.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}`;
-            document.getElementById('total-invested-value').textContent = `₹${totalInvested.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}`;
-            
-            const profitEl = document.getElementById('total-profit-value');
-            profitEl.className = `mb-0 fw-bold ${profitClass}`;
-            profitEl.textContent = `${profitSign}₹${Math.abs(totalProfit).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}`;
-        }
     } catch (e) {
         console.error(e);
         container.innerHTML = '<div class="col-12 text-center text-danger">Error loading investments.</div>';
@@ -2738,6 +3353,234 @@ window.editInvestment = async function(id) {
         const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addInvestmentModal'));
         modal.show();
     } catch (e) { console.error(e); }
+};
+
+window.showWithdrawInvestmentModal = function(id) {
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('withdrawInvestmentModal'));
+    document.getElementById('withdraw-form').reset();
+    document.getElementById('withdraw-id').value = id;
+    document.getElementById('withdraw-date').value = new Date().toISOString().split('T')[0];
+    toggleWithdrawalFields();
+    window.populateLoanPaymentSelects(); // Ensure wallets are loaded
+    modal.show();
+};
+
+window.toggleWithdrawalFields = function() {
+    const mode = document.getElementById('withdraw-to').value;
+    const walletDiv = document.getElementById('div-withdraw-wallet');
+    if (mode === 'wallet') {
+        walletDiv.classList.remove('d-none');
+    } else {
+        walletDiv.classList.add('d-none');
+    }
+};
+
+window.saveWithdrawal = async function() {
+    const btn = document.getElementById('btn-save-withdraw');
+    const id = document.getElementById('withdraw-id').value;
+    const amount = parseFloat(document.getElementById('withdraw-amount').value);
+    const qty = parseFloat(document.getElementById('withdraw-quantity').value) || 0;
+    const date = document.getElementById('withdraw-date').value;
+    const mode = document.getElementById('withdraw-to').value;
+    const walletId = document.getElementById('withdraw-wallet').value;
+    const closeInv = document.getElementById('withdraw-close').checked;
+    const user = auth.currentUser;
+
+    if (!amount || amount <= 0) {
+        if(window.dashboard) window.dashboard.showNotification('Invalid amount', 'warning');
+        return;
+    }
+
+    try {
+        window.setBtnLoading(btn, true);
+        const invRef = db.collection('investments').doc(id);
+        const invDoc = await invRef.get();
+        
+        if (!invDoc.exists) throw new Error("Investment not found");
+        const invData = invDoc.data();
+
+        const batch = db.batch();
+
+        // 1. Update Investment
+        if (closeInv) {
+            batch.delete(invRef);
+        } else {
+            const updates = {
+                currentValue: firebase.firestore.FieldValue.increment(-amount),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            
+            if (qty > 0) {
+                updates.quantity = firebase.firestore.FieldValue.increment(-qty);
+                // Proportional reduction of invested amount based on quantity
+                const oldQty = invData.quantity || 0;
+                if (oldQty > 0) {
+                    const ratio = qty / oldQty;
+                    const reduction = (invData.investedAmount || 0) * ratio;
+                    updates.investedAmount = firebase.firestore.FieldValue.increment(-reduction);
+                } else {
+                    // Fallback to value based if quantity wasn't tracked before
+                    const oldVal = invData.currentValue || amount;
+                    const ratio = amount / oldVal;
+                    const reduction = (invData.investedAmount || 0) * ratio;
+                    updates.investedAmount = firebase.firestore.FieldValue.increment(-reduction);
+                }
+            } else {
+                // Proportional reduction based on value if no quantity
+                const oldVal = invData.currentValue || amount; // Avoid div by zero
+                const ratio = amount / oldVal;
+                const reduction = (invData.investedAmount || 0) * ratio;
+                updates.investedAmount = firebase.firestore.FieldValue.increment(-reduction);
+            }
+            batch.update(invRef, updates);
+        }
+
+        // 2. Add Transaction (Income)
+        const txRef = db.collection('transactions').doc();
+        batch.set(txRef, {
+            userId: user.uid,
+            date: date,
+            amount: amount,
+            type: 'income',
+            category: 'Investment Return',
+            description: `Withdrawal from ${invData.name}`,
+            paymentMode: mode,
+            relatedId: id, // Link to investment ID even if deleted (for history)
+            section: 'investments',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // 3. Update Wallet if selected
+        if (mode === 'wallet' && walletId) {
+            const walletRef = db.collection('wallets').doc(walletId);
+            batch.update(walletRef, {
+                balance: firebase.firestore.FieldValue.increment(amount),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+
+        await batch.commit();
+        
+        window.setBtnLoading(btn, false);
+        bootstrap.Modal.getInstance(document.getElementById('withdrawInvestmentModal')).hide();
+        loadInvestmentsGrid();
+        if(window.dashboard) {
+            window.dashboard.showNotification('Withdrawal successful', 'success');
+            window.dashboard.updateStats();
+        }
+    } catch (e) {
+        window.setBtnLoading(btn, false);
+        console.error(e);
+        if(window.dashboard) window.dashboard.showNotification('Error processing withdrawal', 'danger');
+    }
+};
+
+window.showDepositInvestmentModal = function(id) {
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('depositInvestmentModal'));
+    document.getElementById('deposit-form').reset();
+    document.getElementById('deposit-id').value = id;
+    document.getElementById('deposit-date').value = new Date().toISOString().split('T')[0];
+    toggleDepositFields();
+    window.populateLoanPaymentSelects();
+    modal.show();
+};
+
+window.toggleDepositFields = function() {
+    const mode = document.getElementById('deposit-payment-mode').value;
+    const walletDiv = document.getElementById('div-deposit-wallet');
+    const ccDiv = document.getElementById('div-deposit-credit-card');
+    
+    walletDiv.classList.add('d-none');
+    ccDiv.classList.add('d-none');
+
+    if (mode === 'wallet') {
+        walletDiv.classList.remove('d-none');
+    } else if (mode === 'credit-card') {
+        ccDiv.classList.remove('d-none');
+    }
+};
+
+window.saveDeposit = async function() {
+    const btn = document.getElementById('btn-save-deposit');
+    const id = document.getElementById('deposit-id').value;
+    const amount = parseFloat(document.getElementById('deposit-amount').value);
+    const qty = parseFloat(document.getElementById('deposit-quantity').value) || 0;
+    const date = document.getElementById('deposit-date').value;
+    const mode = document.getElementById('deposit-payment-mode').value;
+    const walletId = document.getElementById('deposit-wallet').value;
+    const creditCardId = document.getElementById('deposit-credit-card').value;
+    const user = auth.currentUser;
+
+    if (!amount || amount <= 0) {
+        if(window.dashboard) window.dashboard.showNotification('Invalid amount', 'warning');
+        return;
+    }
+
+    try {
+        window.setBtnLoading(btn, true);
+        const invRef = db.collection('investments').doc(id);
+        const invDoc = await invRef.get();
+        if (!invDoc.exists) throw new Error("Investment not found");
+        const invData = invDoc.data();
+
+        const batch = db.batch();
+
+        // 1. Update Investment
+        batch.update(invRef, {
+            investedAmount: firebase.firestore.FieldValue.increment(amount),
+            currentValue: firebase.firestore.FieldValue.increment(amount), // Assuming value increases by deposit amount
+            quantity: firebase.firestore.FieldValue.increment(qty),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // 2. Add Transaction (Expense)
+        const txRef = db.collection('transactions').doc();
+        batch.set(txRef, {
+            userId: user.uid,
+            date: date,
+            amount: amount,
+            type: 'expense',
+            category: 'Investment',
+            description: `Deposit to ${invData.name}`,
+            paymentMode: mode,
+            relatedId: (mode === 'credit-card' && creditCardId) ? creditCardId : id,
+            investmentId: id,
+            section: 'investments',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // 3. Deduct from Wallet if selected
+        if (mode === 'wallet' && walletId) {
+            const walletRef = db.collection('wallets').doc(walletId);
+            batch.update(walletRef, {
+                balance: firebase.firestore.FieldValue.increment(-amount),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+
+        // 4. Add to Credit Card Outstanding if selected
+        if (mode === 'credit-card' && creditCardId) {
+            const ccRef = db.collection('credit_cards').doc(creditCardId);
+            batch.update(ccRef, {
+                currentOutstanding: firebase.firestore.FieldValue.increment(amount),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+
+        await batch.commit();
+        
+        window.setBtnLoading(btn, false);
+        bootstrap.Modal.getInstance(document.getElementById('depositInvestmentModal')).hide();
+        loadInvestmentsGrid();
+        if(window.dashboard) {
+            window.dashboard.showNotification('Deposit successful', 'success');
+            window.dashboard.updateStats();
+        }
+    } catch (e) {
+        window.setBtnLoading(btn, false);
+        console.error(e);
+        if(window.dashboard) window.dashboard.showNotification('Error processing deposit', 'danger');
+    }
 };
 
 window.deleteInvestment = async function(id) {
