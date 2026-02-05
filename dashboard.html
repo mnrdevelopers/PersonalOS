@@ -198,7 +198,7 @@
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="#" data-section="loans">
-                            <i class="fas fa-hand-holding-usd me-2"></i> Loans & Debts
+                            <i class="fas fa-hand-holding-usd me-2"></i> Finance
                         </a>
                     </li>
                     <li class="nav-item">
@@ -530,7 +530,9 @@
 
             <!-- Loans Section -->
             <section id="loans-section" class="content-section d-none">
-                <!-- Content will be loaded dynamically -->
+                <div class="loan-container">
+                    <!-- Content will be loaded dynamically -->
+                </div>
             </section>
 
             <!-- Habits Section -->
@@ -647,6 +649,7 @@
                                 <option value="bank">Bank Transfer</option>
                                 <option value="upi">UPI</option>
                                 <option value="credit-card">Credit Card</option>
+                                <option value="wallet">Wallet</option>
                                 <option value="debit-card">Debit Card</option>
                                 <option value="other">Other</option>
                             </select>
@@ -658,6 +661,13 @@
                                 <!-- Credit cards will be loaded dynamically via JS -->
                             </select>
                             <div class="form-text text-muted">Expense will be added to this card's outstanding balance.</div>
+                        </div>
+                        <div class="mb-3 d-none" id="wallet-select-container">
+                            <label class="form-label">Select Wallet</label>
+                            <select class="form-select" id="transaction-wallet">
+                                <option value="" selected disabled>Choose a wallet...</option>
+                                <!-- Wallets will be loaded dynamically via JS -->
+                            </select>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Category</label>
@@ -1120,15 +1130,21 @@
         document.addEventListener('DOMContentLoaded', function() {
             const transactionMode = document.getElementById('transaction-mode');
             const creditCardContainer = document.getElementById('credit-card-select-container');
+            const walletContainer = document.getElementById('wallet-select-container');
             
-            if (transactionMode && creditCardContainer) {
+            if (transactionMode) {
                 transactionMode.addEventListener('change', function() {
+                    if (creditCardContainer) creditCardContainer.classList.add('d-none');
+                    if (walletContainer) walletContainer.classList.add('d-none');
+                    document.getElementById('transaction-credit-card').required = false;
+                    document.getElementById('transaction-wallet').required = false;
+
                     if (this.value === 'credit-card') {
-                        creditCardContainer.classList.remove('d-none');
+                        if (creditCardContainer) creditCardContainer.classList.remove('d-none');
                         document.getElementById('transaction-credit-card').required = true;
-                    } else {
-                        creditCardContainer.classList.add('d-none');
-                        document.getElementById('transaction-credit-card').required = false;
+                    } else if (this.value === 'wallet') {
+                        if (walletContainer) walletContainer.classList.remove('d-none');
+                        document.getElementById('transaction-wallet').required = true;
                     }
                 });
             }
