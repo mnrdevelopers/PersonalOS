@@ -46,7 +46,6 @@ window.loadTransactionsSection = async function() {
                 </div>
             </div>
         </div>
-
         <div class="row g-2 mb-4">
             <div class="col-md-4">
                 <div class="input-group input-group-sm">
@@ -107,6 +106,7 @@ window.loadTransactionsSection = async function() {
         </div>
     `;
 
+    if (window.refreshCategoryIcons) await window.refreshCategoryIcons();
     await loadLedgerData();
 };
 
@@ -123,10 +123,14 @@ async function loadLedgerData() {
 
         transactionsSnap.forEach(doc => {
             const data = doc.data();
+            // Extract category name for icon lookup
+            const categoryName = data.category || 'Other';
+            const icon = window.getCategoryIcon ? window.getCategoryIcon(categoryName) : '🏷️';
+            
             ledgerAllEntries.push({
                 date: data.date,
                 createdAt: data.createdAt,
-                description: `${data.category}: ${data.description || 'Transaction'}`,
+                description: `${icon} ${data.category}: ${data.description || 'Transaction'}`,
                 credit: data.type === 'income' ? data.amount : 0,
                 debit: data.type === 'expense' ? data.amount : 0,
                 mode: data.paymentMode || 'N/A',
@@ -199,10 +203,12 @@ function applyLedgerFilters() {
     // Update Stats
     let totalCredit = 0;
     let totalDebit = 0;
+    
     ledgerFilteredEntries.forEach(entry => {
         totalCredit += entry.credit;
         totalDebit += entry.debit;
     });
+
 
     if(document.getElementById('ledger-stats-credit')) document.getElementById('ledger-stats-credit').textContent = `₹${totalCredit.toFixed(2)}`;
     if(document.getElementById('ledger-stats-debit')) document.getElementById('ledger-stats-debit').textContent = `₹${totalDebit.toFixed(2)}`;
