@@ -1,23 +1,30 @@
 let currentGroceryTab = 'list'; // list, inventory, history
 let groceryItems = [];
+let groceryLogs = [];
 let groceryCart = new Set(); // IDs of items selected for checkout
 let grocerySearchQuery = '';
 let groceryFilterCategory = 'all';
+let groceryFilterStatus = 'all';
+let grocerySpendMonth = '';
+let grocerySpendProduct = '';
+let grocerySpendProductSearchQuery = '';
+let groceryHistoryMonthFilter = 'all';
+let groceryHistoryStoreFilter = 'all';
 
 const GROCERY_CATEGORIES = {
-    'Fruits & Vegetables': '🥦',
-    'Dairy, Bread & Eggs': '🍞',
-    'Masalas & Spices': '🌶️',
-    'Flours & Grains': '🌾',
-    'Oils & Ghee': '🪔',
-    'Meat & Fish': '🥩',
-    'Snacks & Biscuits': '🍪',
-    'Beverages': '🥤',
-    'Cleaning & Household': '🧼',
-    'Personal Care': '🧴',
-    'Baby Care': '👶',
-    'Pet Care': '🐾',
-    'Other': '📦'
+    'Fruits & Vegetables': 'FV',
+    'Dairy, Bread & Eggs': 'DBE',
+    'Masalas & Spices': 'MS',
+    'Flours & Grains': 'FG',
+    'Oils & Ghee': 'OG',
+    'Meat & Fish': 'MF',
+    'Snacks & Biscuits': 'SB',
+    'Beverages': 'BV',
+    'Cleaning & Household': 'CH',
+    'Personal Care': 'PC',
+    'Baby Care': 'BC',
+    'Pet Care': 'PT',
+    'Other': 'OT'
 };
 
 const GROCERY_UNITS = ['pcs', 'kg', 'g', 'l', 'ml', 'dozen', 'pack', 'bottle', 'box', 'can'];
@@ -60,11 +67,180 @@ const CATALOG_MAPPING = {
     "Pet Supplies": "Pet Care"
 };
 
-async function calculateAndDisplayGroceryStats() {
+function getCurrentMonthKey() {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    return `${now.getFullYear()}-${month}`;
+}
+
+function formatMonthKey(monthKey) {
+    if (!monthKey || !monthKey.includes('-')) return monthKey || 'Unknown';
+    const [year, month] = monthKey.split('-');
+    const d = new Date(Number(year), Number(month) - 1, 1);
+    return d.toLocaleString(undefined, { month: 'long', year: 'numeric' });
+}
+
+function getItemSpendValue(item) {
+    if (typeof item.totalCost === 'number') return item.totalCost;
+    const qty = Number(item.quantity) || 0;
+    const price = Number(item.pricePerUnit) || 0;
+    return qty * price;
+}
+
+async function loadGroceryLogsData() {
     const user = auth.currentUser;
     if (!user) return;
 
+    const logsSnap = await db.collection('grocery_logs')
+        .where('userId', '==', user.uid)
+        .orderBy('date', 'desc')
+        .limit(300)
+        .get();
+
+    groceryLogs = logsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
+
+function populateGroceryInsightControls() {
+    const monthSelect = document.getElementById('grocery-spend-month');
+    const productSelect = document.getElementById('grocery-spend-product');
+    const productSearchInput = document.getElementById('grocery-spend-product-search');
+    const historyMonthSelect = document.getElementById('grocery-history-month');
+    const historyStoreSelect = document.getElementById('grocery-history-store');
+    if (!monthSelect || !productSelect || !historyMonthSelect || !historyStoreSelect) return;
+
+    const monthKeys = [...new Set(
+        groceryLogs
+            .map(log => (log.date || '').slice(0, 7))
+            .filter(Boolean)
+    )].sort((a, b) => b.localeCompare(a));
+
+    const currentMonthKey = getCurrentMonthKey();
+    if (!grocerySpendMonth) grocerySpendMonth = monthKeys.includes(currentMonthKey) ? currentMonthKey : (monthKeys[0] || currentMonthKey);
+    if (!monthKeys.includes(grocerySpendMonth) && monthKeys.length > 0) grocerySpendMonth = monthKeys[0];
+
+    monthSelect.innerHTML = monthKeys.length
+        ? monthKeys.map(k => `<option value="${k}" ${k === grocerySpendMonth ? 'selected' : ''}>${formatMonthKey(k)}</option>`).join('')
+        : `<option value="${currentMonthKey}">${formatMonthKey(currentMonthKey)}</option>`;
+
+    historyMonthSelect.innerHTML = `<option value="all">All Months</option>` +
+        monthKeys.map(k => `<option value="${k}" ${k === groceryHistoryMonthFilter ? 'selected' : ''}>${formatMonthKey(k)}</option>`).join('');
+
+    if (productSearchInput) {
+        productSearchInput.value = grocerySpendProductSearchQuery;
+    }
+    refreshGrocerySpendProductOptions();
+
+    const stores = [...new Set(
+        groceryLogs
+            .map(log => (log.store || '').trim())
+            .filter(Boolean)
+    )].sort((a, b) => a.localeCompare(b));
+    if (groceryHistoryStoreFilter !== 'all' && !stores.includes(groceryHistoryStoreFilter)) {
+        groceryHistoryStoreFilter = 'all';
+    }
+    historyStoreSelect.innerHTML = `<option value="all">All Stores</option>` +
+        stores.map(store => `<option value="${store}" ${store === groceryHistoryStoreFilter ? 'selected' : ''}>${store}</option>`).join('');
+}
+
+function refreshGrocerySpendProductOptions() {
+    const productSelect = document.getElementById('grocery-spend-product');
+    if (!productSelect) return;
+
+    const monthLogs = groceryLogs.filter(log => (log.date || '').startsWith(grocerySpendMonth));
+    const purchasedProducts = [...new Set(
+        monthLogs.flatMap(log => (log.items || []).map(item => (item.name || '').trim()))
+            .filter(Boolean)
+    )].sort((a, b) => a.localeCompare(b));
+
+    let visibleProducts = purchasedProducts;
+    if (grocerySpendProductSearchQuery) {
+        const q = grocerySpendProductSearchQuery.toLowerCase();
+        visibleProducts = purchasedProducts.filter(name => name.toLowerCase().includes(q));
+    }
+
+    if (!purchasedProducts.includes(grocerySpendProduct)) {
+        grocerySpendProduct = purchasedProducts[0] || '';
+    }
+    if (visibleProducts.length > 0 && !visibleProducts.includes(grocerySpendProduct)) {
+        grocerySpendProduct = visibleProducts[0];
+    }
+
+    productSelect.innerHTML = visibleProducts.length
+        ? visibleProducts.map(name => `<option value="${name}" ${name === grocerySpendProduct ? 'selected' : ''}>${name}</option>`).join('')
+        : '<option value="">No purchased products</option>';
+}
+
+window.updateGrocerySpendAnalytics = function() {
+    const monthSelect = document.getElementById('grocery-spend-month');
+    const productSelect = document.getElementById('grocery-spend-product');
+    if (monthSelect) grocerySpendMonth = monthSelect.value;
+    refreshGrocerySpendProductOptions();
+    if (productSelect) grocerySpendProduct = productSelect.value;
+
+    const monthLogs = groceryLogs.filter(log => (log.date || '').startsWith(grocerySpendMonth));
+    const monthTotal = monthLogs.reduce((sum, log) => sum + (Number(log.totalAmount) || 0), 0);
+
+    let productSpend = 0;
+    let productQty = 0;
+    let productLogCount = 0;
+    monthLogs.forEach(log => {
+        let hasMatchInLog = false;
+        (log.items || []).forEach(item => {
+            const itemName = item.name || '';
+            if (itemName === grocerySpendProduct) {
+                productSpend += getItemSpendValue(item);
+                productQty += Number(item.quantity) || 0;
+                hasMatchInLog = true;
+            }
+        });
+        if (hasMatchInLog) productLogCount += 1;
+    });
+
+    const monthEl = document.getElementById('grocery-monthly-selected');
+    const spendEl = document.getElementById('grocery-product-spend');
+    const qtyEl = document.getElementById('grocery-product-qty');
+    const avgEl = document.getElementById('grocery-product-avg');
+
+    if (monthEl) monthEl.textContent = `Rs ${monthTotal.toFixed(2)}`;
+    if (spendEl) spendEl.textContent = `Rs ${productSpend.toFixed(2)}`;
+    if (qtyEl) qtyEl.textContent = `${productQty.toFixed(1)}`;
+    if (avgEl) {
+        const divisor = productLogCount;
+        const avg = divisor > 0 ? (productSpend / divisor) : 0;
+        avgEl.textContent = `Rs ${avg.toFixed(2)}`;
+    }
+};
+
+window.searchGrocerySpendProduct = function(query) {
+    grocerySpendProductSearchQuery = (query || '').trim();
+    refreshGrocerySpendProductOptions();
+    updateGrocerySpendAnalytics();
+};
+
+window.filterGroceriesByStatus = function(status) {
+    groceryFilterStatus = status;
+    renderGroceryView();
+};
+
+window.filterGroceryHistoryByMonth = function(monthKey) {
+    groceryHistoryMonthFilter = monthKey;
+    if (currentGroceryTab === 'history') loadGroceryHistory();
+};
+
+window.filterGroceryHistoryByStore = function(store) {
+    groceryHistoryStoreFilter = store;
+    if (currentGroceryTab === 'history') loadGroceryHistory();
+};
+
+window.resetGroceryHistoryFilters = function() {
+    groceryHistoryMonthFilter = 'all';
+    groceryHistoryStoreFilter = 'all';
+    const monthSelect = document.getElementById('grocery-history-month');
+    const storeSelect = document.getElementById('grocery-history-store');
+    if (monthSelect) monthSelect.value = 'all';
+    if (storeSelect) storeSelect.value = 'all';
+    if (currentGroceryTab === 'history') loadGroceryHistory();
+};
 
 window.autoSelectCategory = function(itemName) {
     if (!itemName) return;
@@ -121,7 +297,7 @@ window.loadGroceriesSection = async function() {
 
         <!-- Stats Row -->
         <div class="row g-4 mb-4">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="card border-0 shadow-sm h-100 bg-primary bg-opacity-10">
                     <div class="card-body">
                         <h6 class="text-primary fw-bold text-uppercase small">To Buy</h6>
@@ -129,19 +305,27 @@ window.loadGroceriesSection = async function() {
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="card border-0 shadow-sm h-100 bg-success bg-opacity-10">
                     <div class="card-body">
                         <h6 class="text-success fw-bold text-uppercase small">Monthly Spend</h6>
-                        <h3 class="mb-0" id="stat-month-spend">₹0.00</h3>
+                        <h3 class="mb-0" id="stat-month-spend">Rs 0.00</h3>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="card border-0 shadow-sm h-100 bg-warning bg-opacity-10">
                     <div class="card-body">
                         <h6 class="text-warning fw-bold text-uppercase small text-dark">In Stock</h6>
                         <h3 class="mb-0 text-dark" id="stat-in-stock">0 Items</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm h-100 bg-info bg-opacity-10">
+                    <div class="card-body">
+                        <h6 class="text-info fw-bold text-uppercase small">Avg Basket</h6>
+                        <h3 class="mb-0" id="stat-avg-basket">Rs 0.00</h3>
                     </div>
                 </div>
             </div>
@@ -153,18 +337,64 @@ window.loadGroceriesSection = async function() {
             <div class="row g-3" id="top-items-list"></div>
         </div>
 
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                    <h6 class="mb-0 fw-bold text-uppercase small text-muted">Monthly Product Spend</h6>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <select class="form-select form-select-sm w-auto" id="grocery-spend-month" onchange="updateGrocerySpendAnalytics()" style="width: 170px;"></select>
+                        <input type="text" class="form-control form-control-sm w-auto" id="grocery-spend-product-search" placeholder="Search product..." oninput="searchGrocerySpendProduct(this.value)" style="width: 180px;">
+                        <select class="form-select form-select-sm w-auto" id="grocery-spend-product" onchange="updateGrocerySpendAnalytics()" style="width: 190px;"></select>
+                    </div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-3 col-6">
+                        <div class="p-3 rounded bg-light h-100">
+                            <div class="small text-muted">Month Total</div>
+                            <div class="fw-bold fs-5" id="grocery-monthly-selected">Rs 0.00</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="p-3 rounded bg-light h-100">
+                            <div class="small text-muted">Product Spend</div>
+                            <div class="fw-bold fs-5 text-primary" id="grocery-product-spend">Rs 0.00</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="p-3 rounded bg-light h-100">
+                            <div class="small text-muted">Qty Bought</div>
+                            <div class="fw-bold fs-5" id="grocery-product-qty">0.0</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="p-3 rounded bg-light h-100">
+                            <div class="small text-muted">Avg / Bill</div>
+                            <div class="fw-bold fs-5" id="grocery-product-avg">Rs 0.00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Search & Filter -->
         <div class="row g-2 mb-3">
-            <div class="col-md-8">
+            <div class="col-md-6">
                 <div class="input-group">
                     <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
                     <input type="text" class="form-control" placeholder="Search items..." onkeyup="searchGroceries(this.value)">
                 </div>
             </div>
-            <div class="col-md-4">
-                <select class="form-select" onchange="filterGroceriesByCategory(this.value)">
+            <div class="col-md-3">
+                <select class="form-select" id="grocery-category-filter" onchange="filterGroceriesByCategory(this.value)">
                     <option value="all">All Categories</option>
                     ${Object.keys(GROCERY_CATEGORIES).map(cat => `<option value="${cat}">${GROCERY_CATEGORIES[cat]} ${cat}</option>`).join('')}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="grocery-status-filter" onchange="filterGroceriesByStatus(this.value)">
+                    <option value="all">All Status</option>
+                    <option value="to_buy">To Buy</option>
+                    <option value="in_stock">In Stock</option>
                 </select>
             </div>
         </div>
@@ -181,6 +411,29 @@ window.loadGroceriesSection = async function() {
             </li>
         </ul>
 
+        <div id="grocery-history-filters" class="card border-0 shadow-sm mt-3 d-none">
+            <div class="card-body p-3">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label small text-muted mb-1">History Month</label>
+                        <select class="form-select form-select-sm" id="grocery-history-month" onchange="filterGroceryHistoryByMonth(this.value)">
+                            <option value="all">All Months</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small text-muted mb-1">Store</label>
+                        <select class="form-select form-select-sm" id="grocery-history-store" onchange="filterGroceryHistoryByStore(this.value)">
+                            <option value="all">All Stores</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <button class="btn btn-outline-secondary btn-sm w-100" onclick="resetGroceryHistoryFilters()">
+                            <i class="fas fa-undo me-1"></i>Reset History Filters
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
         <div id="grocery-content" class="row g-3">
             <div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>
         </div>
@@ -258,8 +511,8 @@ window.loadGroceriesSection = async function() {
                                     <tr>
                                         <th>Item</th>
                                         <th style="width: 150px;">Qty & Unit</th>
-                                        <th style="width: 120px;">Price/Unit (₹)</th>
-                                        <th style="width: 120px;" class="text-end">Total (₹)</th>
+                                        <th style="width: 120px;">Price/Unit (Rs)</th>
+                                        <th style="width: 120px;" class="text-end">Total (Rs)</th>
                                     </tr>
                                 </thead>
                                 <tbody id="checkout-items-body">
@@ -268,7 +521,7 @@ window.loadGroceriesSection = async function() {
                                 <tfoot>
                                     <tr>
                                         <td colspan="3" class="text-end fw-bold">Grand Total:</td>
-                                        <td class="fw-bold text-primary text-end" id="checkout-total">₹0.00</td>
+                                        <td class="fw-bold text-primary text-end" id="checkout-total">Rs 0.00</td>
                                     </tr>
                                 </tfoot>
                             </table>
@@ -319,7 +572,7 @@ window.loadGroceriesSection = async function() {
                                 <input type="text" class="form-control" id="edit-log-store">
                             </div>
                             <div class="mb-3">
-                                <label class="form-label">Total Amount (₹)</label>
+                                <label class="form-label">Total Amount (Rs)</label>
                                 <input type="number" class="form-control" id="edit-log-total" step="0.01">
                                 <div class="form-text">Updating this will update the linked transaction.</div>
                             </div>
@@ -341,11 +594,13 @@ window.switchGroceryTab = function(tab, element) {
     currentGroceryTab = tab;
     document.querySelectorAll('#groceries-section .nav-link').forEach(l => l.classList.remove('active'));
     element.classList.add('active');
+    const historyFilters = document.getElementById('grocery-history-filters');
+    if (historyFilters) historyFilters.classList.toggle('d-none', tab !== 'history');
     renderGroceryView();
 };
 
 window.searchGroceries = function(query) {
-    grocerySearchQuery = query.toLowerCase();
+    grocerySearchQuery = (query || '').trim().toLowerCase();
     renderGroceryView();
 };
 
@@ -361,23 +616,20 @@ async function calculateAndDisplayGroceryStats() {
     // Calculate local stats from groceryItems array
     const toBuyCount = groceryItems.filter(i => i.status === 'to_buy').length;
     const inStockCount = groceryItems.filter(i => i.status === 'in_stock').length;
-    
+
     document.getElementById('stat-to-buy').textContent = `${toBuyCount} Items`;
     document.getElementById('stat-in-stock').textContent = `${inStockCount} Items`;
 
-    // Calculate Monthly Spend from DB
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0,0,0,0);
-    
-    const logsSnap = await db.collection('grocery_logs')
-        .where('userId', '==', user.uid)
-        .where('date', '>=', startOfMonth.toISOString().split('T')[0])
-        .get();
-        
+    // Monthly spend and average basket from loaded logs
+    const currentMonthKey = getCurrentMonthKey();
+    const monthLogs = groceryLogs.filter(log => (log.date || '').startsWith(currentMonthKey));
     let monthSpend = 0;
-    logsSnap.forEach(doc => monthSpend += (doc.data().totalAmount || 0));
-    document.getElementById('stat-month-spend').textContent = `₹${monthSpend.toFixed(2)}`;
+    monthLogs.forEach(log => monthSpend += (Number(log.totalAmount) || 0));
+    document.getElementById('stat-month-spend').textContent = `Rs ${monthSpend.toFixed(2)}`;
+
+    const avgBasket = monthLogs.length > 0 ? (monthSpend / monthLogs.length) : 0;
+    const avgBasketEl = document.getElementById('stat-avg-basket');
+    if (avgBasketEl) avgBasketEl.textContent = `Rs ${avgBasket.toFixed(2)}`;
 }
 
 window.loadGroceryData = async function() {
@@ -396,8 +648,11 @@ window.loadGroceryData = async function() {
             groceryItems.push({ id: doc.id, ...doc.data() });
         });
 
+        await loadGroceryLogsData();
+        populateGroceryInsightControls();
         await calculateAndDisplayGroceryStats();
         await loadTopItems();
+        updateGrocerySpendAnalytics();
         renderGroceryView();
 
     } catch (e) {
@@ -415,9 +670,10 @@ window.renderGroceryView = function() {
 
     // Apply Filters
     let filteredItems = groceryItems.filter(item => {
-        const matchesSearch = item.name.toLowerCase().includes(grocerySearchQuery);
+        const matchesSearch = (item.name || '').toLowerCase().includes(grocerySearchQuery);
         const matchesCategory = groceryFilterCategory === 'all' || item.category === groceryFilterCategory;
-        return matchesSearch && matchesCategory;
+        const matchesStatus = groceryFilterStatus === 'all' || item.status === groceryFilterStatus;
+        return matchesSearch && matchesCategory && matchesStatus;
     });
 
     if (currentGroceryTab === 'list') {
@@ -443,14 +699,14 @@ window.renderGroceryView = function() {
 
         let html = '';
         for (const [cat, items] of Object.entries(grouped)) {
-            const icon = GROCERY_CATEGORIES[cat] || '📦';
+            const icon = GROCERY_CATEGORIES[cat] || 'OT';
             html += `
                 <div class="col-12 mb-2">
                     <h6 class="fw-bold text-muted border-bottom pb-2 mt-2">${icon} ${cat}</h6>
                 </div>
             `;
             items.forEach(item => {
-                const lastPrice = item.lastCost ? `₹${item.lastCost}` : '-';
+                const lastPrice = item.lastCost ? `Rs ${item.lastCost}` : '-';
                 const duration = item.typicalDuration ? `${item.typicalDuration} days` : 'New';
                 const unitText = item.unit ? ` / ${item.unit}` : '';
 
@@ -509,7 +765,7 @@ window.renderGroceryView = function() {
 
         let html = '';
         inStock.forEach(item => {
-            const icon = GROCERY_CATEGORIES[item.category] || '📦';
+            const icon = GROCERY_CATEGORIES[item.category] || 'OT';
             
             // Calculate days since purchase
             let daysHeld = 0;
@@ -656,6 +912,8 @@ window.saveGroceryItem = async function() {
         groceryItems.sort((a, b) => a.name.localeCompare(b.name));
         
         bootstrap.Modal.getInstance(document.getElementById('addGroceryItemModal')).hide();
+        populateGroceryInsightControls();
+        updateGrocerySpendAnalytics();
         renderGroceryView(); // Re-render with local data
         await calculateAndDisplayGroceryStats(); // Update stats
 
@@ -715,6 +973,8 @@ window.deleteGroceryItem = async function(id) {
         // Remove from local array
         groceryItems = groceryItems.filter(i => i.id !== id);
         
+        populateGroceryInsightControls();
+        updateGrocerySpendAnalytics();
         renderGroceryView();
         await calculateAndDisplayGroceryStats();
         
@@ -754,7 +1014,7 @@ window.initiateCheckout = function() {
                     </div>
                 </td>
                 <td><input type="number" class="form-control form-control-sm checkout-input" data-field="price" placeholder="0.00" step="0.01" oninput="calculateCheckoutTotal()"></td>
-                <td class="text-end fw-medium" data-field="total">₹0.00</td>
+                <td class="text-end fw-medium" data-field="total">Rs 0.00</td>
             `;
             tbody.appendChild(tr);
         }
@@ -771,11 +1031,11 @@ window.calculateCheckoutTotal = function() {
         const price = parseFloat(tr.querySelector('[data-field="price"]').value) || 0;
         const lineTotal = qty * price;
         
-        tr.querySelector('[data-field="total"]').textContent = `₹${lineTotal.toFixed(2)}`;
+        tr.querySelector('[data-field="total"]').textContent = `Rs ${lineTotal.toFixed(2)}`;
         grandTotal += lineTotal;
     });
     
-    document.getElementById('checkout-total').textContent = `₹${grandTotal.toFixed(2)}`;
+    document.getElementById('checkout-total').textContent = `Rs ${grandTotal.toFixed(2)}`;
     return grandTotal;
 };
 
@@ -903,23 +1163,34 @@ window.consumeItem = async function(id) {
 window.loadGroceryHistory = async function() {
     const container = document.getElementById('grocery-content');
     const user = auth.currentUser;
-    
-    const snapshot = await db.collection('grocery_logs')
-        .where('userId', '==', user.uid)
-        .orderBy('date', 'desc')
-        .limit(20)
-        .get();
+    if (!user) return;
 
-    if (snapshot.empty) {
+    let logs = [...groceryLogs];
+    if (groceryHistoryMonthFilter !== 'all') {
+        logs = logs.filter(log => (log.date || '').startsWith(groceryHistoryMonthFilter));
+    }
+    if (groceryHistoryStoreFilter !== 'all') {
+        logs = logs.filter(log => (log.store || '').trim() === groceryHistoryStoreFilter);
+    }
+    if (grocerySearchQuery) {
+        const q = grocerySearchQuery;
+        logs = logs.filter(log => {
+            const inStore = (log.store || '').toLowerCase().includes(q);
+            const inItems = (log.items || []).some(item => (item.name || '').toLowerCase().includes(q));
+            return inStore || inItems;
+        });
+    }
+
+    if (logs.length === 0) {
         container.innerHTML = '<div class="col-12 text-center text-muted py-5">No purchase history found.</div>';
         return;
     }
 
     let html = '<div class="col-12"><div class="list-group">';
-    snapshot.forEach(doc => {
-        const data = doc.data();
+    logs.slice(0, 50).forEach(data => {
+        const docId = data.id;
         const itemCount = data.items ? data.items.length : 0;
-        
+
         html += `
             <div class="list-group-item p-3 mb-2 border rounded-3">
                 <div class="d-flex justify-content-between align-items-center">
@@ -927,42 +1198,41 @@ window.loadGroceryHistory = async function() {
                         <h6 class="mb-1 fw-bold">${data.store || 'Supermarket'}</h6>
                         <div class="small text-muted">
                             <i class="far fa-calendar me-1"></i> ${new Date(data.date).toLocaleDateString()} 
-                            <span class="mx-2">•</span> 
+                            <span class="mx-2">|</span> 
                             <i class="fas fa-shopping-basket me-1"></i> ${itemCount} items
                         </div>
                     </div>
                     <div class="text-end">
-                        <h5 class="mb-0 text-success">₹${data.totalAmount.toFixed(2)}</h5>
+                        <h5 class="mb-0 text-success">Rs ${(data.totalAmount || 0).toFixed(2)}</h5>
                         <div class="d-flex align-items-center justify-content-end gap-2">
-                            <button class="btn btn-sm btn-link text-decoration-none p-0" type="button" data-bs-toggle="collapse" data-bs-target="#log-${doc.id}" aria-expanded="false">
+                            <button class="btn btn-sm btn-link text-decoration-none p-0" type="button" data-bs-toggle="collapse" data-bs-target="#log-${docId}" aria-expanded="false">
                                 Details <i class="fas fa-chevron-down small"></i>
                             </button>
                             <div class="dropdown">
                                 <button class="btn btn-link text-muted p-0" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></button>
                                 <ul class="dropdown-menu dropdown-menu-end">
-                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="editGroceryLog('${doc.id}')">Edit</a></li>
-                                    <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="deleteGroceryLog('${doc.id}')">Delete</a></li>
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="editGroceryLog('${docId}')">Edit</a></li>
+                                    <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="deleteGroceryLog('${docId}')">Delete</a></li>
                                 </ul>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="collapse mt-2" id="log-${doc.id}">
+                <div class="collapse mt-2" id="log-${docId}">
                     <div class="card card-body bg-light border-0 small">
                         <ul class="list-unstyled mb-0">
-                            ${data.items.map(i => {
+                            ${(data.items || []).map(i => {
                                 const qty = i.quantity || 1;
                                 const unit = i.unit || 'pcs';
-                                const total = i.totalCost || i.cost || 0; // Handle old and new format
-                                const pricePer = i.pricePerUnit ? `@ ₹${i.pricePerUnit.toFixed(2)}/${unit}` : '';
-
+                                const total = getItemSpendValue(i);
+                                const pricePer = i.pricePerUnit ? `@ Rs ${i.pricePerUnit.toFixed(2)}/${unit}` : '';
                                 return `
                                     <li class="d-flex justify-content-between border-bottom py-1">
                                         <div>
-                                            ${i.name} 
+                                            ${i.name}
                                             <span class="text-muted" style="font-size: 0.8em;">(${qty} ${unit} ${pricePer})</span>
                                         </div>
-                                        <span>₹${total.toFixed(2)}</span>
+                                        <span>Rs ${total.toFixed(2)}</span>
                                     </li>
                                 `;
                             }).join('')}
@@ -1044,9 +1314,12 @@ window.deleteGroceryLog = async function(id) {
         txSnap.forEach(doc => batch.delete(doc.ref));
 
         await batch.commit();
-        
+        await loadGroceryLogsData();
+        populateGroceryInsightControls();
         await loadGroceryHistory();
         await calculateAndDisplayGroceryStats();
+        await loadTopItems();
+        updateGrocerySpendAnalytics();
         if (window.dashboard) window.dashboard.showNotification('Purchase log deleted', 'success');
     } catch (e) {
         console.error(e);
@@ -1111,8 +1384,12 @@ window.saveGroceryLogEdit = async function() {
         await batch.commit();
         
         bootstrap.Modal.getInstance(document.getElementById('editGroceryLogModal')).hide();
+        await loadGroceryLogsData();
+        populateGroceryInsightControls();
         await loadGroceryHistory();
         await calculateAndDisplayGroceryStats();
+        await loadTopItems();
+        updateGrocerySpendAnalytics();
         
         window.setBtnLoading(btn, false);
         if (window.dashboard) window.dashboard.showNotification('Log updated', 'success');
@@ -1124,17 +1401,8 @@ window.saveGroceryLogEdit = async function() {
 };
 
 window.loadTopItems = async function() {
-    const user = auth.currentUser;
-    // Fetch logs (limit to last 50 for performance)
-    const logsSnap = await db.collection('grocery_logs')
-        .where('userId', '==', user.uid)
-        .orderBy('date', 'desc')
-        .limit(50)
-        .get();
-
     const itemCounts = {};
-    logsSnap.forEach(doc => {
-        const data = doc.data();
+    groceryLogs.slice(0, 80).forEach(data => {
         if (data.items && Array.isArray(data.items)) {
             data.items.forEach(item => {
                 const name = item.name;
@@ -1168,3 +1436,5 @@ window.loadTopItems = async function() {
         </div>
     `).join('');
 };
+
+
