@@ -1078,8 +1078,7 @@ window.calculateEMIAmount = function() {
     }
 };
 
-window.showAddLoanModal = function() {
-    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addLoanModal'));
+window.resetLoanForm = function() {
     document.getElementById('loan-form').reset();
     document.getElementById('loan-id').value = '';
     document.getElementById('loan-start-date').value = new Date().toISOString().split('T')[0];
@@ -1088,15 +1087,20 @@ window.showAddLoanModal = function() {
     document.getElementById('loan-upi-id').value = '';
     document.getElementById('loan-message-context').value = '';
     document.getElementById('loan-duration').value = '';
-    
-    // Reset Payment Mode & CC
+
+    // Reset payment mode and dependent fields
     document.getElementById('loan-payment-mode').value = 'bank';
     document.getElementById('loan-payment-mode').onchange = () => toggleLoanPaymentFields('loan');
     toggleLoanPaymentFields('loan');
 
-    // Reset UI
+    // Default to borrowed UI for fresh form
     document.getElementById('type-borrowed').checked = true;
     updateLoanModalUI('borrowed');
+};
+
+window.showAddLoanModal = function() {
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addLoanModal'));
+    window.resetLoanForm();
     
     modal.show();
 };
@@ -1113,6 +1117,107 @@ window.filterLoanType = function(type) {
     const status = activeTab ? activeTab.textContent.toLowerCase() : 'active';
     loadLoansGrid(status);
 };
+
+function normalizeLoanAccountName(name) {
+    return (name || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ');
+}
+
+async function findMatchingActiveLoanAccount(userId, type, name) {
+    if (!userId || !name || (type !== 'lent' && type !== 'borrowed')) return null;
+
+    const snapshot = await db.collection('loans')
+        .where('userId', '==', userId)
+        .where('type', '==', type)
+        .where('status', '==', 'active')
+        .get();
+
+    const normalizedTarget = normalizeLoanAccountName(name);
+    const match = snapshot.docs.find(doc => {
+        const data = doc.data();
+        return normalizeLoanAccountName(data.name) === normalizedTarget;
+    });
+
+    return match || null;
+}
+
+function buildLoanStatusPayload(loanData, newPaidAmount, paymentDate = '') {
+    const clampedPaid = Math.max(0, newPaidAmount || 0);
+    const totalAmount = Number(loanData.totalAmount) || 0;
+    // Khata-style running accounts: keep lent/borrowed entries active even at zero due.
+    const isRunningKhataType = loanData.type === 'lent' || loanData.type === 'borrowed';
+    const status = (!isRunningKhataType && clampedPaid >= totalAmount) ? 'closed' : 'active';
+
+    const payload = {
+        paidAmount: clampedPaid,
+        status: status
+    };
+
+    if (paymentDate) {
+        payload.lastPaymentDate = paymentDate;
+    } else if (clampedPaid <= 0) {
+        payload.lastPaymentDate = null;
+    }
+
+    if ((loanData.type === 'emi' || loanData.type === 'borrowed') && loanData.emiAmount > 0 && status === 'active') {
+        let anchorDate;
+        if (loanData.initialDueDate) {
+            anchorDate = new Date(loanData.initialDueDate);
+        } else {
+            anchorDate = loanData.dueDate ? new Date(loanData.dueDate) : new Date(loanData.startDate);
+            if (!loanData.dueDate) anchorDate.setMonth(anchorDate.getMonth() + 1);
+            payload.initialDueDate = anchorDate.toISOString().split('T')[0];
+        }
+
+        const paidInstallments = Math.floor(clampedPaid / loanData.emiAmount);
+        const nextDate = new Date(anchorDate);
+        nextDate.setMonth(anchorDate.getMonth() + paidInstallments);
+        payload.dueDate = nextDate.toISOString().split('T')[0];
+        payload.dueDateUpdated = true;
+    }
+
+    return payload;
+}
+
+async function applyCarryForwardToOppositeLoan(userId, loanData, carryForwardAmount, date) {
+    if (!userId || !loanData || !carryForwardAmount || carryForwardAmount <= 0) return null;
+    if (loanData.type !== 'lent' && loanData.type !== 'borrowed') return null;
+
+    const oppositeType = loanData.type === 'lent' ? 'borrowed' : 'lent';
+    const matchDoc = await findMatchingActiveLoanAccount(userId, oppositeType, loanData.name);
+
+    if (matchDoc) {
+        await db.collection('loans').doc(matchDoc.id).update({
+            totalAmount: firebase.firestore.FieldValue.increment(carryForwardAmount),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        return matchDoc.id;
+    }
+
+    const payload = {
+        userId: userId,
+        type: oppositeType,
+        name: loanData.name,
+        totalAmount: carryForwardAmount,
+        paidAmount: 0,
+        startDate: date || new Date().toISOString().split('T')[0],
+        dueDate: '',
+        interestRate: 0,
+        emiAmount: 0,
+        durationMonths: 0,
+        processingFee: 0,
+        totalPenalty: 0,
+        mobile: loanData.mobile || '',
+        messageContext: loanData.messageContext || '',
+        upiId: loanData.upiId || '',
+        status: 'active',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    const newRef = await db.collection('loans').add(payload);
+    return newRef.id;
+}
 
 window.saveLoan = async function() {
     const btn = document.getElementById('btn-save-loan');
@@ -1226,6 +1331,46 @@ window.saveLoan = async function() {
                 });
             }
         } else {
+            let loanRef = null;
+
+            // Khata-style behavior:
+            // For lent/borrowed, append to existing active account for same person+type.
+            if (type === 'lent' || type === 'borrowed') {
+                const existingAccountDoc = await findMatchingActiveLoanAccount(user.uid, type, name);
+                if (existingAccountDoc) {
+                    loanRef = existingAccountDoc.id;
+                    const existingData = existingAccountDoc.data();
+
+                    const mergePayload = {
+                        totalAmount: firebase.firestore.FieldValue.increment(amount),
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+
+                    if (startDate && (!existingData.startDate || startDate < existingData.startDate)) {
+                        mergePayload.startDate = startDate;
+                    }
+                    if (dueDate) {
+                        mergePayload.dueDate = dueDate;
+                    }
+                    if (interest > 0) {
+                        mergePayload.interestRate = interest;
+                    }
+                    if (fullMobile) {
+                        mergePayload.mobile = fullMobile;
+                    }
+                    if (upiId) {
+                        mergePayload.upiId = upiId;
+                    }
+                    if (messageContext) {
+                        mergePayload.messageContext = messageContext;
+                    }
+
+                    await db.collection('loans').doc(loanRef).update(mergePayload);
+                }
+            }
+
+            // Create a fresh loan account if no active match was found.
+            if (!loanRef) {
             loanDataToSave.paidAmount = 0;
             loanDataToSave.createdAt = firebase.firestore.FieldValue.serverTimestamp();
             
@@ -1235,7 +1380,8 @@ window.saveLoan = async function() {
             }
             
             const docRef = await db.collection('loans').add(loanDataToSave);
-            const loanRef = docRef.id;
+            loanRef = docRef.id;
+            }
 
             // Handle Credit Card Deduction (Only if I Lent money or paid for EMI)
             if (paymentMode === 'credit-card' && creditCardId && (type === 'lent' || type === 'emi')) {
@@ -1303,6 +1449,42 @@ window.saveLoan = async function() {
         window.setBtnLoading(btn, false);
         console.error("Error saving loan:", error);
         if(window.dashboard) window.dashboard.showNotification('Error saving loan', 'danger');
+    }
+};
+
+window.openLoanTopUpModal = async function(loanId) {
+    try {
+        const loanDoc = await db.collection('loans').doc(loanId).get();
+        if (!loanDoc.exists) return;
+        const data = loanDoc.data();
+
+        // Open as a NEW entry so khata-merge logic appends to same account.
+        window.resetLoanForm();
+        document.getElementById('loan-id').value = '';
+        document.getElementById('loan-name').value = data.name || '';
+        document.getElementById('loan-amount').value = '';
+        document.getElementById('loan-start-date').value = new Date().toISOString().split('T')[0];
+        document.getElementById('loan-due-date').value = data.dueDate || '';
+        document.getElementById('loan-interest').value = data.interestRate || '';
+        document.getElementById('loan-emi').value = data.emiAmount || '';
+        document.getElementById('loan-duration').value = data.durationMonths || '';
+        document.getElementById('loan-processing-fee').value = 0;
+        document.getElementById('loan-upi-id').value = data.upiId || '';
+        document.getElementById('loan-message-context').value = data.messageContext || '';
+
+        const typeRadio = document.querySelector(`input[name="loan-type"][value="${data.type}"]`);
+        if (typeRadio) typeRadio.checked = true;
+        updateLoanModalUI(data.type);
+
+        if (data.mobile) {
+            document.getElementById('loan-mobile').value = data.mobile;
+        }
+
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addLoanModal'));
+        modal.show();
+    } catch (e) {
+        console.error("Error opening top-up modal:", e);
+        if(window.dashboard) window.dashboard.showNotification('Unable to open member record', 'danger');
     }
 };
 
@@ -1418,6 +1600,9 @@ window.loadLoansGrid = async function(status = 'active') {
         
         const remainingAmount = data.totalAmount - data.paidAmount;
         const isFullyPaid = data.paidAmount >= data.totalAmount;
+        const dueLabel = data.type === 'lent' ? 'Due from Member' : 'Due to Member';
+        const isRunningKhataType = data.type === 'lent' || data.type === 'borrowed';
+        const showActionButtons = status === 'active' && (isRunningKhataType || !isFullyPaid);
         
         // Calculate Next Due Date Logic
         let nextDueDateDisplay = 'No due date';
@@ -1509,7 +1694,7 @@ window.loadLoansGrid = async function(status = 'active') {
         }
 
         let whatsappBtn = '';
-        if (data.type === 'lent' && !isFullyPaid) {
+        if (data.type === 'lent' && status === 'active') {
             const safeName = (data.name || '').replace(/"/g, '&quot;');
             const safeMobile = (data.mobile || '').replace(/"/g, '&quot;');
             const safeContext = (data.messageContext || '').replace(/"/g, '&quot;');
@@ -1547,7 +1732,7 @@ window.loadLoansGrid = async function(status = 'active') {
                     
                     <div class="d-flex justify-content-between align-items-end mb-3">
                         <div>
-                            <small class="text-muted d-block">Outstanding</small>
+                            <small class="text-muted d-block">${dueLabel}</small>
                             <h3 class="mb-0 fw-bold text-primary">₹${remainingAmount.toFixed(2)}</h3>
                         </div>
                         <div class="text-end">
@@ -1571,12 +1756,34 @@ window.loadLoansGrid = async function(status = 'active') {
                         <i class="fas fa-exclamation-circle me-1"></i> Total Penalties Paid: ₹${data.totalPenalty.toFixed(2)}
                     </div>` : ''}
 
-                    ${!isFullyPaid ? `
-                    <div class="mt-3 d-flex gap-2 justify-content-end">
+                    ${showActionButtons ? `
+                    <div class="mt-3 d-flex gap-2 justify-content-end flex-wrap">
                         ${whatsappBtn}
-                        <button class="btn btn-sm btn-primary px-3" onclick="showRepaymentModal('${doc.id}')">
-                            <i class="fas fa-plus-circle me-1"></i>Record Payment
-                        </button>
+                        ${data.type === 'lent' ? `
+                            <button class="btn btn-sm btn-success px-3" onclick="showRepaymentModal('${doc.id}')">
+                                <i class="fas fa-arrow-down me-1"></i>Payment In
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger px-3" onclick="openLoanTopUpModal('${doc.id}')">
+                                <i class="fas fa-arrow-up me-1"></i>Payment Out
+                            </button>
+                            <button class="btn btn-sm btn-outline-warning px-2" onclick="closeLoanAccount('${doc.id}')" title="Close Account">
+                                <i class="fas fa-check-circle"></i>
+                            </button>
+                        ` : data.type === 'borrowed' ? `
+                            <button class="btn btn-sm btn-success px-3" onclick="openLoanTopUpModal('${doc.id}')">
+                                <i class="fas fa-arrow-down me-1"></i>Payment In
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger px-3" onclick="showRepaymentModal('${doc.id}')">
+                                <i class="fas fa-arrow-up me-1"></i>Payment Out
+                            </button>
+                            <button class="btn btn-sm btn-outline-warning px-2" onclick="closeLoanAccount('${doc.id}')" title="Close Account">
+                                <i class="fas fa-check-circle"></i>
+                            </button>
+                        ` : `
+                            <button class="btn btn-sm btn-primary px-3" onclick="showRepaymentModal('${doc.id}')">
+                                <i class="fas fa-plus-circle me-1"></i>Record Payment
+                            </button>
+                        `}
                     </div>` : '<div class="mt-3 text-end text-success fw-bold"><i class="fas fa-check-circle me-1"></i>Closed</div>'}
                 </div>
             </div>
@@ -1690,6 +1897,27 @@ window.deleteLoan = async function(id) {
     }
 };
 
+window.closeLoanAccount = async function(id) {
+    if (!confirm('Move this account to Closed section?')) return;
+
+    try {
+        if(window.dashboard) window.dashboard.showLoading();
+        await db.collection('loans').doc(id).update({
+            status: 'closed',
+            closedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        loadLoansGrid('active');
+        if(window.dashboard) window.dashboard.showNotification('Account moved to Closed', 'success');
+    } catch (error) {
+        console.error("Error closing loan account:", error);
+        if(window.dashboard) window.dashboard.showNotification('Error closing account', 'danger');
+    } finally {
+        if(window.dashboard) window.dashboard.hideLoading();
+    }
+};
+
 window.showRepaymentModal = async function(loanId) {
     const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('repaymentModal'));
     document.getElementById('repayment-form').reset();
@@ -1736,6 +1964,10 @@ window.saveRepayment = async function() {
         if(window.dashboard) window.dashboard.showNotification('Please enter amount and date', 'warning');
         return;
     }
+    if ((amount - penalty - processingFee) <= 0) {
+        if(window.dashboard) window.dashboard.showNotification('Amount must be greater than penalty + processing fee', 'warning');
+        return;
+    }
 
     try {
         window.setBtnLoading(btn, true);
@@ -1743,40 +1975,19 @@ window.saveRepayment = async function() {
         const loanData = loanDoc.data();
         
         const effectiveAmount = amount - penalty - processingFee;
-        const newPaidAmount = (loanData.paidAmount || 0) + effectiveAmount;
-        const status = newPaidAmount >= loanData.totalAmount ? 'closed' : 'active';
-
-        const updateData = {
-            paidAmount: newPaidAmount,
-            totalPenalty: (loanData.totalPenalty || 0) + penalty,
-            status: status,
-            lastPaymentDate: date
-        };
-
-        // Auto-update Due Date for EMIs
-        if ((loanData.type === 'emi' || loanData.type === 'borrowed') && loanData.emiAmount > 0 && status === 'active') {
-            // Determine the anchor date (First Due Date)
-            let anchorDate;
-            if (loanData.initialDueDate) {
-                anchorDate = new Date(loanData.initialDueDate);
-            } else {
-                // First time migration: Assume current stored dueDate is the initial one (or calculate from start)
-                // For safety, let's use the logic: StartDate + 1 month if dueDate missing, else dueDate.
-                anchorDate = loanData.dueDate ? new Date(loanData.dueDate) : new Date(loanData.startDate);
-                if (!loanData.dueDate) anchorDate.setMonth(anchorDate.getMonth() + 1);
-                
-                updateData.initialDueDate = anchorDate.toISOString().split('T')[0];
-            }
-
-            const paidInstallments = Math.floor(newPaidAmount / loanData.emiAmount);
-            const nextDate = new Date(anchorDate);
-            nextDate.setMonth(anchorDate.getMonth() + paidInstallments);
-            
-            updateData.dueDate = nextDate.toISOString().split('T')[0];
-            updateData.dueDateUpdated = true; // Flag to tell grid to use this date directly
-        }
+        const outstandingBefore = Math.max(0, (loanData.totalAmount || 0) - (loanData.paidAmount || 0));
+        const appliedPrincipal = Math.min(effectiveAmount, outstandingBefore);
+        const carryForwardAmount = Math.max(0, effectiveAmount - appliedPrincipal);
+        const newPaidAmount = (loanData.paidAmount || 0) + appliedPrincipal;
+        const updateData = buildLoanStatusPayload(loanData, newPaidAmount, date);
+        updateData.totalPenalty = (loanData.totalPenalty || 0) + penalty;
 
         await db.collection('loans').doc(loanId).update(updateData);
+
+        let carryForwardLoanId = null;
+        if (carryForwardAmount > 0) {
+            carryForwardLoanId = await applyCarryForwardToOppositeLoan(user.uid, loanData, carryForwardAmount, date);
+        }
         
         let transactionId = null;
         let penaltyTransactionId = null;
@@ -1861,6 +2072,9 @@ window.saveRepayment = async function() {
         await db.collection('loans').doc(loanId).collection('repayments').add({
             userId: user.uid,
             amount: amount,
+            appliedPrincipal: appliedPrincipal,
+            carryForwardAmount: carryForwardAmount,
+            carryForwardLoanId: carryForwardLoanId,
             penalty: penalty,
             processingFee: processingFee,
             date: date,
@@ -1873,7 +2087,12 @@ window.saveRepayment = async function() {
         window.setBtnLoading(btn, false);
         bootstrap.Modal.getOrCreateInstance(document.getElementById('repaymentModal')).hide();
         loadLoansGrid('active');
-        if(window.dashboard) window.dashboard.showNotification('Repayment recorded!', 'success');
+        if(window.dashboard) {
+            const note = carryForwardAmount > 0
+                ? `Repayment recorded. Carry-forward due created: ₹${carryForwardAmount.toFixed(2)}`
+                : 'Repayment recorded!';
+            window.dashboard.showNotification(note, 'success');
+        }
     } catch (error) {
         window.setBtnLoading(btn, false);
         console.error("Error saving repayment:", error);
@@ -1910,6 +2129,9 @@ window.viewRepaymentHistory = async function(loanId) {
             }
             if (data.processingFee && data.processingFee > 0) {
                 details.push(`<span class="text-secondary"><i class="fas fa-file-invoice-dollar me-1"></i>Fee: ₹${data.processingFee.toFixed(2)}</span>`);
+            }
+            if (data.carryForwardAmount && data.carryForwardAmount > 0) {
+                details.push(`<span class="text-warning"><i class="fas fa-exchange-alt me-1"></i>Carry Forward: ₹${data.carryForwardAmount.toFixed(2)}</span>`);
             }
             
             if (details.length > 0) {
@@ -1974,29 +2196,54 @@ window.saveChanges = async function() {
         const repaymentDoc = await repaymentRef.get();
         if (!repaymentDoc.exists) {
             if(window.dashboard) window.dashboard.showNotification('Repayment not found.', 'danger');
+            window.setBtnLoading(btn, false);
             return;
         }
         const repaymentData = repaymentDoc.data();
+        const loanRef = db.collection('loans').doc(loanId);
+        const loanDoc = await loanRef.get();
+        if (!loanDoc.exists) {
+            if(window.dashboard) window.dashboard.showNotification('Loan not found.', 'danger');
+            window.setBtnLoading(btn, false);
+            return;
+        }
+        const loanData = loanDoc.data();
         const originalAmount = repaymentData.amount;
+        const penalty = repaymentData.penalty || 0;
+        const processingFee = repaymentData.processingFee || 0;
+        const carryForwardAmount = repaymentData.carryForwardAmount || 0;
         const transactionId = repaymentData.transactionId;
-
-        const amountDifference = newAmount - originalAmount;
+        if (carryForwardAmount > 0) {
+            if(window.dashboard) window.dashboard.showNotification('This entry includes carry-forward. Delete and add repayment again instead of editing.', 'warning');
+            window.setBtnLoading(btn, false);
+            return;
+        }
+        const oldPrincipal = repaymentData.appliedPrincipal !== undefined
+            ? repaymentData.appliedPrincipal
+            : (originalAmount - penalty - processingFee);
+        const newPrincipal = newAmount - penalty - processingFee;
+        if (newPrincipal <= 0) {
+            if(window.dashboard) window.dashboard.showNotification('Repayment amount is too low after penalty/fee.', 'warning');
+            window.setBtnLoading(btn, false);
+            return;
+        }
+        const amountDifference = newPrincipal - oldPrincipal;
 
         const batch = db.batch();
 
         // If a transaction was linked, update it.
         if (transactionId) {
             const txRef = db.collection('transactions').doc(transactionId);
-            batch.update(txRef, { amount: newAmount, date: newDate });
+            batch.update(txRef, { amount: newPrincipal, date: newDate });
         } 
 
         // Update the repayment
         batch.update(repaymentRef, { amount: newAmount, date: newDate });
 
-        // Update the loan's paid amount
-        const loanRef = db.collection('loans').doc(loanId);
-        const newPaidAmount = firebase.firestore.FieldValue.increment(amountDifference);
-        batch.update(loanRef, { paidAmount: newPaidAmount });
+        // Update the loan's paid amount + status consistency
+        const recalculatedPaid = (loanData.paidAmount || 0) + amountDifference;
+        const loanUpdatePayload = buildLoanStatusPayload(loanData, recalculatedPaid, newDate);
+        batch.update(loanRef, loanUpdatePayload);
 
         await batch.commit();
 
@@ -2032,11 +2279,22 @@ window.deleteRepayment = async function(loanId, repaymentId) {
             if(window.dashboard) window.dashboard.showNotification('Repayment not found.', 'danger');
             return;
         }
+        const loanRef = db.collection('loans').doc(loanId);
+        const loanDoc = await loanRef.get();
+        if (!loanDoc.exists) {
+            if(window.dashboard) window.dashboard.showNotification('Loan not found.', 'danger');
+            return;
+        }
+        const loanData = loanDoc.data();
         const repaymentData = repaymentDoc.data();
         const totalAmount = repaymentData.amount;
         const penalty = repaymentData.penalty || 0;
         const processingFee = repaymentData.processingFee || 0;
-        const principal = totalAmount - penalty - processingFee;
+        const principal = repaymentData.appliedPrincipal !== undefined
+            ? repaymentData.appliedPrincipal
+            : (totalAmount - penalty - processingFee);
+        const carryForwardAmount = repaymentData.carryForwardAmount || 0;
+        const carryForwardLoanId = repaymentData.carryForwardLoanId || null;
         const transactionId = repaymentData.transactionId;
         const penaltyTransactionId = repaymentData.penaltyTransactionId;
         const procFeeTransactionId = repaymentData.procFeeTransactionId;
@@ -2065,14 +2323,37 @@ window.deleteRepayment = async function(loanId, repaymentId) {
         batch.delete(repaymentRef);
 
         // Update the loan's paid amount and total penalty
-        const loanRef = db.collection('loans').doc(loanId);
-        const updates = {
-            paidAmount: firebase.firestore.FieldValue.increment(-principal)
-        };
+        const newPaidAmount = (loanData.paidAmount || 0) - principal;
+        const updates = buildLoanStatusPayload(loanData, newPaidAmount);
         if (penalty > 0) {
             updates.totalPenalty = firebase.firestore.FieldValue.increment(-penalty);
         }
         batch.update(loanRef, updates);
+
+        // Reverse auto carry-forward on opposite account, if present.
+        if (carryForwardLoanId && carryForwardAmount > 0) {
+            const cfRef = db.collection('loans').doc(carryForwardLoanId);
+            const cfDoc = await cfRef.get();
+            if (cfDoc.exists) {
+                const cfData = cfDoc.data();
+                const newTotal = (cfData.totalAmount || 0) - carryForwardAmount;
+                const safeTotal = Math.max(0, newTotal);
+
+                if (safeTotal <= 0 && (cfData.paidAmount || 0) <= 0) {
+                    batch.delete(cfRef);
+                } else {
+                    const cfStatusPayload = buildLoanStatusPayload(
+                        { ...cfData, totalAmount: safeTotal },
+                        cfData.paidAmount || 0
+                    );
+                    batch.update(cfRef, {
+                        totalAmount: safeTotal,
+                        ...cfStatusPayload,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+            }
+        }
 
         await batch.commit();
         
