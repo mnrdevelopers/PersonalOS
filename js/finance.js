@@ -254,6 +254,10 @@ window.loadFinanceSection = async function() {
     // Load data
     await window.refreshCategoryIcons();
     await window.populateCategoryFilter();
+
+    const activeFilterInput = document.getElementById(`filter-${currentFinanceFilter}`) || document.getElementById('filter-all');
+    if (activeFilterInput) activeFilterInput.checked = true;
+
     await loadFinanceData();
 
     // Setup filters
@@ -413,11 +417,10 @@ async function loadFinanceData(filter = null) {
     const user = auth.currentUser;
     if (!user) return;
 
-    if (filter) {
+    if (filter !== null) {
         currentFinanceFilter = filter;
         financeCurrentPage = 1;
         financeLastDocs = [];
-        financeSearchQuery = '';
     }
 
     let query = db.collection('transactions')
@@ -468,8 +471,12 @@ async function loadFinanceData(filter = null) {
             });
         }
 
-        if (snapshot.empty) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No transactions found</td></tr>';
+        if (snapshot.empty || docs.length === 0) {
+            const message = financeSearchQuery
+                ? 'No transactions found for this search'
+                : 'No transactions found';
+
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">${message}</td></tr>`;
             if (financeCurrentPage > 1) {
                 // If we are on a page > 1 and it's empty, it means we went too far or data was deleted.
                 // But usually Next button logic prevents this.
@@ -553,11 +560,12 @@ async function updateFinanceStats() {
         const snapshot = await query.get();
         let income = 0;
         let expense = 0;
-
         snapshot.forEach(doc => {
             const data = doc.data();
-            if (data.type === 'income') income += data.amount;
-            else if (data.type === 'expense') expense += data.amount;
+            const amount = Number(data.amount) || 0;
+
+            if (data.type === 'income') income += amount;
+            else if (data.type === 'expense') expense += amount;
         });
 
         document.getElementById('stats-income').textContent = `₹${income.toFixed(2)}`;
@@ -568,8 +576,8 @@ async function updateFinanceStats() {
 
 window.searchFinance = function(query) {
     financeSearchQuery = query.trim();
-    // Reset pagination when searching because we are filtering the current page's results or need to fetch all to filter properly (simplified here to filter current fetch)
-    // For true full-text search across all data, a third-party service like Algolia is recommended with Firestore.
+    financeCurrentPage = 1;
+    financeLastDocs = [];
     loadFinanceData();
 };
 
@@ -650,9 +658,10 @@ window.deleteTransaction = async function(id) {
 };
 
 function filterFinance(type, resetPage = false) {
-    document.querySelectorAll('#finance-section .btn-group .btn').forEach(btn => btn.classList.remove('active'));
-    document.getElementById(`filter-${type}`).classList.add('active');
-    if (resetPage) {
+    const input = document.getElementById(`filter-${type}`);
+    if (input) input.checked = true;
+
+    if (resetPage || type !== currentFinanceFilter) {
         financeCurrentPage = 1;
         financeLastDocs = [];
     }
