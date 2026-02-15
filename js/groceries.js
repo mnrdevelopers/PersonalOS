@@ -1,7 +1,7 @@
 let currentGroceryTab = 'list'; // list, inventory, history
 let groceryItems = [];
 let groceryLogs = [];
-let groceryCart = new Set(); // IDs of items selected for checkout
+let groceryCart = new Map(); // itemId -> planned quantity for checkout
 let grocerySearchQuery = '';
 let groceryFilterCategory = 'all';
 let groceryFilterStatus = 'all';
@@ -10,21 +10,23 @@ let grocerySpendProduct = '';
 let grocerySpendProductSearchQuery = '';
 let groceryHistoryMonthFilter = 'all';
 let groceryHistoryStoreFilter = 'all';
+let basketPlannerItemId = '';
+let basketPlannerEnsureToBuy = false;
 
 const GROCERY_CATEGORIES = {
-    'Fruits & Vegetables': 'FV',
-    'Dairy, Bread & Eggs': 'DBE',
-    'Masalas & Spices': 'MS',
-    'Flours & Grains': 'FG',
-    'Oils & Ghee': 'OG',
-    'Meat & Fish': 'MF',
-    'Snacks & Biscuits': 'SB',
-    'Beverages': 'BV',
-    'Cleaning & Household': 'CH',
-    'Personal Care': 'PC',
-    'Baby Care': 'BC',
-    'Pet Care': 'PT',
-    'Other': 'OT'
+    'Fruits & Vegetables': 'fas fa-carrot',
+    'Dairy, Bread & Eggs': 'fas fa-cheese',
+    'Masalas & Spices': 'fas fa-pepper-hot',
+    'Flours & Grains': 'fas fa-seedling',
+    'Oils & Ghee': 'fas fa-wine-bottle',
+    'Meat & Fish': 'fas fa-drumstick-bite',
+    'Snacks & Biscuits': 'fas fa-cookie-bite',
+    'Beverages': 'fas fa-mug-hot',
+    'Cleaning & Household': 'fas fa-pump-soap',
+    'Personal Care': 'fas fa-pump-medical',
+    'Baby Care': 'fas fa-baby',
+    'Pet Care': 'fas fa-paw',
+    'Other': 'fas fa-tag'
 };
 
 const GROCERY_UNITS = ['pcs', 'kg', 'g', 'l', 'ml', 'dozen', 'pack', 'bottle', 'box', 'can'];
@@ -87,6 +89,26 @@ function getItemSpendValue(item) {
     return qty * price;
 }
 
+function normalizeProductName(name) {
+    return (name || '').trim().toLowerCase();
+}
+
+function getCartPlan(id, fallbackItem) {
+    const raw = groceryCart.get(id);
+    if (raw && typeof raw === 'object') {
+        return {
+            qty: Number(raw.qty) || 1,
+            unit: raw.unit || fallbackItem?.unit || 'pcs',
+            estPrice: Number(raw.estPrice) || 0
+        };
+    }
+    return {
+        qty: Number(raw) || 1,
+        unit: fallbackItem?.unit || 'pcs',
+        estPrice: 0
+    };
+}
+
 async function loadGroceryLogsData() {
     const user = auth.currentUser;
     if (!user) return;
@@ -147,33 +169,63 @@ function refreshGrocerySpendProductOptions() {
     if (!productSelect) return;
 
     const monthLogs = groceryLogs.filter(log => (log.date || '').startsWith(grocerySpendMonth));
-    const purchasedProducts = [...new Set(
-        monthLogs.flatMap(log => (log.items || []).map(item => (item.name || '').trim()))
-            .filter(Boolean)
-    )].sort((a, b) => a.localeCompare(b));
+    const itemCategoryLookup = {};
+    groceryItems.forEach(item => {
+        const key = (item.name || '').trim().toLowerCase();
+        if (key && item.category) itemCategoryLookup[key] = item.category;
+    });
 
-    let visibleProducts = purchasedProducts;
-    if (grocerySpendProductSearchQuery) {
-        const q = grocerySpendProductSearchQuery.toLowerCase();
-        visibleProducts = purchasedProducts.filter(name => name.toLowerCase().includes(q));
+    const groupedProducts = {};
+    monthLogs.forEach(log => {
+        (log.items || []).forEach(item => {
+            const name = (item.name || '').trim();
+            if (!name) return;
+            const category = item.category || itemCategoryLookup[name.toLowerCase()] || 'Other';
+            if (!groupedProducts[category]) groupedProducts[category] = new Map();
+            const key = normalizeProductName(name);
+            if (!groupedProducts[category].has(key)) {
+                groupedProducts[category].set(key, name);
+            }
+        });
+    });
+
+    const q = grocerySpendProductSearchQuery.toLowerCase();
+    const sortedCategories = Object.keys(groupedProducts).sort((a, b) => a.localeCompare(b));
+    const visibleGroups = sortedCategories.map(category => {
+        let names = [...groupedProducts[category].values()].sort((a, b) => a.localeCompare(b));
+        if (q) names = names.filter(name => name.toLowerCase().includes(q));
+        return { category, names };
+    }).filter(group => group.names.length > 0);
+
+    const allPurchasedNames = sortedCategories.flatMap(category => [...groupedProducts[category].values()]);
+    const visibleNames = visibleGroups.flatMap(group => group.names);
+
+    if (!allPurchasedNames.includes(grocerySpendProduct)) {
+        grocerySpendProduct = visibleNames[0] || '';
+    }
+    if (visibleNames.length > 0 && !visibleNames.includes(grocerySpendProduct)) {
+        grocerySpendProduct = visibleNames[0];
     }
 
-    if (!purchasedProducts.includes(grocerySpendProduct)) {
-        grocerySpendProduct = purchasedProducts[0] || '';
-    }
-    if (visibleProducts.length > 0 && !visibleProducts.includes(grocerySpendProduct)) {
-        grocerySpendProduct = visibleProducts[0];
-    }
-
-    productSelect.innerHTML = visibleProducts.length
-        ? visibleProducts.map(name => `<option value="${name}" ${name === grocerySpendProduct ? 'selected' : ''}>${name}</option>`).join('')
+    productSelect.innerHTML = visibleGroups.length
+        ? visibleGroups.map(group => `
+            <optgroup label="${group.category}">
+                ${group.names.map(name => `<option value="${name}" ${name === grocerySpendProduct ? 'selected' : ''}>${name}</option>`).join('')}
+            </optgroup>
+        `).join('')
         : '<option value="">No purchased products</option>';
 }
 
 window.updateGrocerySpendAnalytics = function() {
     const monthSelect = document.getElementById('grocery-spend-month');
     const productSelect = document.getElementById('grocery-spend-product');
+    const selectedProductBeforeRefresh = productSelect ? productSelect.value : '';
+
     if (monthSelect) grocerySpendMonth = monthSelect.value;
+    if (selectedProductBeforeRefresh) {
+        grocerySpendProduct = selectedProductBeforeRefresh;
+    }
+
     refreshGrocerySpendProductOptions();
     if (productSelect) grocerySpendProduct = productSelect.value;
 
@@ -187,7 +239,7 @@ window.updateGrocerySpendAnalytics = function() {
         let hasMatchInLog = false;
         (log.items || []).forEach(item => {
             const itemName = item.name || '';
-            if (itemName === grocerySpendProduct) {
+            if (normalizeProductName(itemName) === normalizeProductName(grocerySpendProduct)) {
                 productSpend += getItemSpendValue(item);
                 productQty += Number(item.quantity) || 0;
                 hasMatchInLog = true;
@@ -213,7 +265,6 @@ window.updateGrocerySpendAnalytics = function() {
 
 window.searchGrocerySpendProduct = function(query) {
     grocerySpendProductSearchQuery = (query || '').trim();
-    refreshGrocerySpendProductOptions();
     updateGrocerySpendAnalytics();
 };
 
@@ -336,6 +387,18 @@ window.loadGroceriesSection = async function() {
             <h6 class="fw-bold text-muted text-uppercase small mb-3">Most Frequently Bought</h6>
             <div class="row g-3" id="top-items-list"></div>
         </div>
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div>
+                    <h6 class="mb-1 fw-bold text-uppercase small text-muted">Planned Basket Summary</h6>
+                    <div class="small text-muted">Based on selected basket plans</div>
+                </div>
+                <div class="text-end">
+                    <div class="fw-bold" id="planned-basket-count">0 items planned</div>
+                    <div class="text-primary fw-bold fs-5" id="planned-basket-spend">Rs 0.00</div>
+                </div>
+            </div>
+        </div>
 
         <div class="card border-0 shadow-sm mb-4">
             <div class="card-body">
@@ -387,7 +450,7 @@ window.loadGroceriesSection = async function() {
             <div class="col-md-3">
                 <select class="form-select" id="grocery-category-filter" onchange="filterGroceriesByCategory(this.value)">
                     <option value="all">All Categories</option>
-                    ${Object.keys(GROCERY_CATEGORIES).map(cat => `<option value="${cat}">${GROCERY_CATEGORIES[cat]} ${cat}</option>`).join('')}
+                    ${Object.keys(GROCERY_CATEGORIES).map(cat => `<option value="${cat}">${cat}</option>`).join('')}
                 </select>
             </div>
             <div class="col-md-3">
@@ -458,7 +521,7 @@ window.loadGroceriesSection = async function() {
                                 <div class="col-7 mb-3">
                                     <label class="form-label">Category</label>
                                     <select class="form-select" id="grocery-category">
-                                        ${Object.keys(GROCERY_CATEGORIES).map(cat => `<option value="${cat}">${GROCERY_CATEGORIES[cat]} ${cat}</option>`).join('')}
+                                        ${Object.keys(GROCERY_CATEGORIES).map(cat => `<option value="${cat}">${cat}</option>`).join('')}
                                     </select>
                                 </div>
                                 <div class="col-5 mb-3">
@@ -480,6 +543,52 @@ window.loadGroceriesSection = async function() {
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="button" class="btn btn-primary" id="btn-save-grocery" onclick="saveGroceryItem()">Save Item</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add To Basket Modal -->
+        <div class="modal fade" id="basketPlannerModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="fas fa-shopping-basket me-2"></i>Add To Shopping Basket</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="basket-plan-item-id">
+                        <div class="mb-2">
+                            <label class="form-label small text-muted mb-1">Item</label>
+                            <div class="fw-bold" id="basket-plan-item-name">-</div>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label">Quantity *</label>
+                                <input type="number" class="form-control" id="basket-plan-qty" min="0.1" step="0.1" required oninput="updateBasketPlannerEstimate()">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Unit *</label>
+                                <select class="form-select" id="basket-plan-unit" required>
+                                    ${GROCERY_UNITS.map(u => `<option value="${u}">${u}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Est. Price / Unit *</label>
+                                <input type="number" class="form-control" id="basket-plan-price" min="0" step="0.01" required oninput="updateBasketPlannerEstimate()">
+                                <div class="form-text" id="basket-plan-prev-price">Prev: -</div>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Estimated Amount</label>
+                                <input type="text" class="form-control bg-light" id="basket-plan-total" readonly>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" onclick="confirmBasketPlanner()">
+                            <i class="fas fa-plus-circle me-2"></i>Add To Basket
+                        </button>
                     </div>
                 </div>
             </div>
@@ -513,6 +622,7 @@ window.loadGroceriesSection = async function() {
                                         <th style="width: 150px;">Qty & Unit</th>
                                         <th style="width: 120px;">Price/Unit (Rs)</th>
                                         <th style="width: 120px;" class="text-end">Total (Rs)</th>
+                                        <th style="width: 70px;" class="text-end">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody id="checkout-items-body">
@@ -520,7 +630,7 @@ window.loadGroceriesSection = async function() {
                                 </tbody>
                                 <tfoot>
                                     <tr>
-                                        <td colspan="3" class="text-end fw-bold">Grand Total:</td>
+                                        <td colspan="4" class="text-end fw-bold">Grand Total:</td>
                                         <td class="fw-bold text-primary text-end" id="checkout-total">Rs 0.00</td>
                                     </tr>
                                 </tfoot>
@@ -664,8 +774,11 @@ window.renderGroceryView = function() {
     const container = document.getElementById('grocery-content');
     const checkoutBtn = document.getElementById('btn-checkout-fab');
     
-    // Reset Cart UI
-    groceryCart.clear();
+    // Keep only valid "to_buy" items in cart across re-renders.
+    const validToBuyIds = new Set(groceryItems.filter(i => i.status === 'to_buy').map(i => i.id));
+    for (const id of groceryCart.keys()) {
+        if (!validToBuyIds.has(id)) groceryCart.delete(id);
+    }
     updateCartUI();
 
     // Apply Filters
@@ -699,16 +812,36 @@ window.renderGroceryView = function() {
 
         let html = '';
         for (const [cat, items] of Object.entries(grouped)) {
-            const icon = GROCERY_CATEGORIES[cat] || 'OT';
+            const icon = GROCERY_CATEGORIES[cat] || 'fas fa-tag';
             html += `
                 <div class="col-12 mb-2">
-                    <h6 class="fw-bold text-muted border-bottom pb-2 mt-2">${icon} ${cat}</h6>
+                    <h6 class="fw-bold text-muted border-bottom pb-2 mt-2"><i class="${icon} me-2"></i>${cat}</h6>
                 </div>
             `;
             items.forEach(item => {
                 const lastPrice = item.lastCost ? `Rs ${item.lastCost}` : '-';
                 const duration = item.typicalDuration ? `${item.typicalDuration} days` : 'New';
                 const unitText = item.unit ? ` / ${item.unit}` : '';
+                const isSelected = groceryCart.has(item.id);
+                const cardStateClass = isSelected ? 'border-success bg-success bg-opacity-10' : 'border-primary';
+                const plan = getCartPlan(item.id, item);
+                const planQty = Number(plan.qty) || 0;
+                const planUnit = plan.unit || item.unit || 'pcs';
+                const planPrice = Number(plan.estPrice) || 0;
+                const planText = isSelected
+                    ? `<div class="small text-primary mt-1 d-flex align-items-center gap-2">
+                           <span>Plan: ${planQty.toFixed(1)} ${planUnit}${planPrice > 0 ? ` @ Rs ${planPrice.toFixed(2)}` : ''}</span>
+                           <span class="btn-group btn-group-sm" role="group">
+                               <button class="btn btn-outline-secondary py-0 px-2" onclick="event.stopPropagation(); adjustBasketQty('${item.id}', -1)">-</button>
+                               <button class="btn btn-outline-secondary py-0 px-2" onclick="event.stopPropagation(); adjustBasketQty('${item.id}', 1)">+</button>
+                           </span>
+                       </div>`
+                    : '';
+                const editPlanBtn = isSelected
+                    ? `<button class="btn btn-link text-primary p-0 me-2" onclick="event.stopPropagation(); openBasketPlannerModal('${item.id}')" title="Edit basket plan">
+                           <i class="fas fa-pen-to-square"></i>
+                       </button>`
+                    : '';
 
                 const actionMenu = `
                     <div class="dropdown ms-2" onclick="event.stopPropagation()">
@@ -723,10 +856,10 @@ window.renderGroceryView = function() {
 
                 html += `
                     <div class="col-md-6 col-lg-4">
-                        <div class="card h-100 shadow-sm border-start border-4 border-primary grocery-card" onclick="toggleCartItem('${item.id}', this)">
+                        <div class="card h-100 shadow-sm border-start border-4 ${cardStateClass} grocery-card" onclick="toggleCartItem('${item.id}', this)">
                             <div class="card-body d-flex align-items-center">
                                 <div class="form-check pointer-events-none">
-                                    <input class="form-check-input" type="checkbox" id="check-${item.id}">
+                                    <input class="form-check-input" type="checkbox" id="check-${item.id}" ${isSelected ? 'checked' : ''}>
                                 </div>
                                 <div class="ms-3 flex-grow-1">
                                     <h6 class="mb-0 fw-bold">${item.name}</h6>
@@ -734,7 +867,9 @@ window.renderGroceryView = function() {
                                         <span>Last: ${lastPrice}${unitText}</span>
                                         <span>Avg Life: ${duration}</span>
                                     </div>
+                                    ${planText}
                                 </div>
+                                ${editPlanBtn}
                                 <button class="btn btn-link text-muted p-0 me-2" onclick="event.stopPropagation(); removeFromList('${item.id}')" title="Return to Inventory">
                                     <i class="fas fa-undo"></i>
                                 </button>
@@ -765,7 +900,7 @@ window.renderGroceryView = function() {
 
         let html = '';
         inStock.forEach(item => {
-            const icon = GROCERY_CATEGORIES[item.category] || 'OT';
+            const icon = GROCERY_CATEGORIES[item.category] || 'fas fa-tag';
             
             // Calculate days since purchase
             let daysHeld = 0;
@@ -812,7 +947,7 @@ window.renderGroceryView = function() {
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start">
                                 <div>
-                                    <div class="mb-1">${icon} <span class="fw-bold">${item.name}</span></div>
+                                    <div class="mb-1"><i class="${icon} me-1"></i><span class="fw-bold">${item.name}</span></div>
                                     <span class="badge bg-light text-dark border">${item.category}</span>
                                 </div>
                                 <button class="btn btn-sm btn-outline-danger" onclick="consumeItem('${item.id}')" title="Mark as Finished / Add to List">
@@ -843,22 +978,168 @@ window.toggleCartItem = function(id, cardElement) {
         cardElement.classList.add('border-primary');
         checkbox.checked = false;
     } else {
-        groceryCart.add(id);
-        cardElement.classList.remove('border-primary');
-        cardElement.classList.add('border-success', 'bg-success', 'bg-opacity-10');
-        checkbox.checked = true;
+        openBasketPlannerModal(id, false);
+        return;
     }
     updateCartUI();
+};
+
+window.openBasketPlannerModal = function(id, ensureToBuy = false) {
+    const item = groceryItems.find(i => i.id === id);
+    if (!item) return;
+
+    basketPlannerItemId = id;
+    basketPlannerEnsureToBuy = !!ensureToBuy;
+    document.getElementById('basket-plan-item-id').value = id;
+    document.getElementById('basket-plan-item-name').textContent = item.name;
+
+    const existing = groceryCart.get(id);
+    const prevPrice = Number(item.lastCost) || 0;
+    const qty = (existing && typeof existing === 'object') ? (Number(existing.qty) || 1) : 1;
+    const unit = (existing && typeof existing === 'object') ? (existing.unit || item.unit || 'pcs') : (item.unit || 'pcs');
+    const estPrice = (existing && typeof existing === 'object')
+        ? (Number(existing.estPrice) || prevPrice)
+        : prevPrice;
+
+    document.getElementById('basket-plan-qty').value = qty;
+    document.getElementById('basket-plan-unit').value = unit;
+    document.getElementById('basket-plan-price').value = estPrice > 0 ? estPrice.toFixed(2) : '';
+    document.getElementById('basket-plan-prev-price').textContent = prevPrice > 0 ? `Prev: Rs ${prevPrice.toFixed(2)}` : 'Prev: -';
+    updateBasketPlannerEstimate();
+
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('basketPlannerModal'));
+    modal.show();
+};
+
+window.updateBasketPlannerEstimate = function() {
+    const qty = parseFloat(document.getElementById('basket-plan-qty')?.value) || 0;
+    const price = parseFloat(document.getElementById('basket-plan-price')?.value) || 0;
+    const total = qty * price;
+    const totalEl = document.getElementById('basket-plan-total');
+    if (totalEl) totalEl.value = `Rs ${total.toFixed(2)}`;
+};
+
+window.confirmBasketPlanner = async function() {
+    const id = basketPlannerItemId || document.getElementById('basket-plan-item-id')?.value;
+    if (!id) return;
+
+    const qty = parseFloat(document.getElementById('basket-plan-qty').value);
+    const unit = document.getElementById('basket-plan-unit').value;
+    const estPrice = parseFloat(document.getElementById('basket-plan-price').value);
+
+    if (!Number.isFinite(qty) || qty <= 0) {
+        if (window.dashboard) window.dashboard.showNotification('Please enter valid quantity', 'warning');
+        return;
+    }
+    if (!Number.isFinite(estPrice) || estPrice < 0) {
+        if (window.dashboard) window.dashboard.showNotification('Please enter valid estimated price', 'warning');
+        return;
+    }
+
+    groceryCart.set(id, { qty, unit, estPrice });
+
+    try {
+        if (basketPlannerEnsureToBuy) {
+            const item = groceryItems.find(i => i.id === id);
+            if (item && item.status !== 'to_buy') {
+                const updateData = {
+                    status: 'to_buy',
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                if (item.lastPurchased) {
+                    const purchased = new Date(item.lastPurchased);
+                    const today = new Date();
+                    const daysLasted = Math.floor((today - purchased) / (1000 * 60 * 60 * 24));
+                    if (daysLasted > 0) {
+                        const currentAvg = item.typicalDuration || daysLasted;
+                        updateData.typicalDuration = Math.round((currentAvg + daysLasted) / 2);
+                    }
+                }
+                await db.collection('grocery_items').doc(id).update({
+                    ...updateData
+                });
+            }
+            await loadGroceryData();
+            if (window.dashboard) window.dashboard.showNotification('Item added to shopping list', 'success');
+        } else if (currentGroceryTab === 'list') {
+            renderGroceryView();
+        } else {
+            updateCartUI();
+        }
+    } catch (e) {
+        console.error(e);
+        if (window.dashboard) window.dashboard.showNotification('Failed to update shopping list', 'danger');
+    } finally {
+        basketPlannerEnsureToBuy = false;
+        const modal = bootstrap.Modal.getInstance(document.getElementById('basketPlannerModal'));
+        if (modal) modal.hide();
+    }
+};
+
+window.syncCheckoutRowToCart = function(rowElement) {
+    if (!rowElement) return;
+    const ids = (rowElement.dataset.ids || rowElement.dataset.id || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (ids.length !== 1) return;
+    const id = ids[0];
+    if (!groceryCart.has(id)) return;
+
+    const qty = parseFloat(rowElement.querySelector('[data-field="qty"]')?.value) || 0;
+    const unit = rowElement.querySelector('[data-field="unit"]')?.value || 'pcs';
+    const estPrice = parseFloat(rowElement.querySelector('[data-field="price"]')?.value) || 0;
+    if (qty > 0) {
+        groceryCart.set(id, { qty, unit, estPrice });
+    }
+};
+
+window.updateCheckoutModalState = function() {
+    const tbody = document.getElementById('checkout-items-body');
+    const confirmBtn = document.getElementById('btn-confirm-checkout');
+    if (!tbody || !confirmBtn) return;
+
+    const realRows = [...tbody.querySelectorAll('tr')].filter(tr => !!tr.dataset.id);
+    if (realRows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No items in checkout.</td></tr>';
+    }
+    confirmBtn.disabled = realRows.length === 0;
 };
 
 window.updateCartUI = function() {
     const count = groceryCart.size;
     document.getElementById('cart-count').textContent = count;
+    let estimatedSpend = 0;
+    groceryCart.forEach((planned, id) => {
+        const item = groceryItems.find(i => i.id === id);
+        const plan = getCartPlan(id, item);
+        estimatedSpend += (Number(plan.qty) || 0) * (Number(plan.estPrice) || 0);
+    });
+
+    const plannedCountEl = document.getElementById('planned-basket-count');
+    const plannedSpendEl = document.getElementById('planned-basket-spend');
+    if (plannedCountEl) plannedCountEl.textContent = `${count} items planned`;
+    if (plannedSpendEl) plannedSpendEl.textContent = `Rs ${estimatedSpend.toFixed(2)}`;
+
     const btn = document.getElementById('btn-checkout-fab');
     if (currentGroceryTab === 'list') {
         btn.disabled = count === 0;
         btn.classList.toggle('btn-success', count > 0);
         btn.classList.toggle('btn-secondary', count === 0);
+    }
+};
+
+window.adjustBasketQty = function(id, delta) {
+    if (!groceryCart.has(id)) return;
+    const item = groceryItems.find(i => i.id === id);
+    const plan = getCartPlan(id, item);
+    const nextQty = Math.max(0, (Number(plan.qty) || 0) + (delta > 0 ? 1 : -1));
+    if (nextQty <= 0) {
+        groceryCart.delete(id);
+    } else {
+        groceryCart.set(id, { ...plan, qty: nextQty });
+    }
+    if (currentGroceryTab === 'list') {
+        renderGroceryView();
+    } else {
+        updateCartUI();
     }
 };
 
@@ -986,7 +1267,10 @@ window.deleteGroceryItem = async function(id) {
 };
 
 window.initiateCheckout = function() {
-    if (groceryCart.size === 0) return;
+    if (groceryCart.size === 0) {
+        if (window.dashboard) window.dashboard.showNotification('Add items to basket first', 'warning');
+        return;
+    }
     
     const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('checkoutModal'));
     const tbody = document.getElementById('checkout-items-body');
@@ -995,48 +1279,106 @@ window.initiateCheckout = function() {
     document.getElementById('checkout-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('checkout-store').value = '';
     
-    groceryCart.forEach(id => {
+    const mergedRows = new Map();
+    groceryCart.forEach((planned, id) => {
         const item = groceryItems.find(i => i.id === id);
-        if (item) {
-            const unitOptions = GROCERY_UNITS.map(u => `<option value="${u}" ${u === (item.unit || 'pcs') ? 'selected' : ''}>${u}</option>`).join('');
-            const tr = document.createElement('tr');
-            tr.dataset.id = id;
-            tr.innerHTML = `
-                <td>
-                    <div class="fw-bold">${item.name}</div>
-                </td>
-                <td>
-                    <div class="input-group input-group-sm">
-                        <input type="number" class="form-control checkout-input" data-field="qty" value="1" min="0.1" step="0.1" oninput="calculateCheckoutTotal()">
-                        <select class="form-select checkout-input bg-light" data-field="unit" style="max-width: 75px; padding-left: 5px; padding-right: 0;">
-                            ${unitOptions}
-                        </select>
-                    </div>
-                </td>
-                <td><input type="number" class="form-control form-control-sm checkout-input" data-field="price" placeholder="0.00" step="0.01" oninput="calculateCheckoutTotal()"></td>
-                <td class="text-end fw-medium" data-field="total">Rs 0.00</td>
-            `;
-            tbody.appendChild(tr);
+        if (!item) return;
+
+        const plan = getCartPlan(id, item);
+        const key = `${normalizeProductName(item.name)}||${plan.unit}`;
+        if (!mergedRows.has(key)) {
+            mergedRows.set(key, {
+                name: item.name,
+                category: item.category,
+                unit: plan.unit,
+                qty: 0,
+                amount: 0,
+                previousPrice: Number(item.lastCost) || 0,
+                sourceIds: []
+            });
         }
+
+        const row = mergedRows.get(key);
+        row.qty += Number(plan.qty) || 0;
+        row.amount += (Number(plan.qty) || 0) * (Number(plan.estPrice) || 0);
+        row.previousPrice = Math.max(row.previousPrice, Number(item.lastCost) || 0);
+        row.sourceIds.push(id);
+    });
+
+    mergedRows.forEach(row => {
+        const unitOptions = GROCERY_UNITS.map(u => `<option value="${u}" ${u === row.unit ? 'selected' : ''}>${u}</option>`).join('');
+        const estimatedPrice = row.qty > 0 ? (row.amount / row.qty) : 0;
+        const initialPrice = estimatedPrice > 0 ? estimatedPrice : row.previousPrice;
+        const priceValue = initialPrice > 0 ? initialPrice.toFixed(2) : '';
+        const priceHint = row.previousPrice > 0
+            ? `<div class="small text-muted mt-1">Prev: Rs ${row.previousPrice.toFixed(2)}</div>`
+            : '<div class="small text-muted mt-1">Prev: -</div>';
+
+        const tr = document.createElement('tr');
+        tr.dataset.id = row.sourceIds[0];
+        tr.dataset.ids = row.sourceIds.join(',');
+        tr.innerHTML = `
+            <td>
+                <div class="fw-bold">${row.name}</div>
+            </td>
+            <td>
+                <div class="input-group input-group-sm">
+                    <input type="number" class="form-control checkout-input" data-field="qty" value="${row.qty}" min="0.1" step="0.1" oninput="calculateCheckoutTotal(); syncCheckoutRowToCart(this.closest('tr'))">
+                    <select class="form-select checkout-input bg-light" data-field="unit" style="max-width: 75px; padding-left: 5px; padding-right: 0;" onchange="syncCheckoutRowToCart(this.closest('tr'))">
+                        ${unitOptions}
+                    </select>
+                </div>
+            </td>
+            <td>
+                <input type="number" class="form-control form-control-sm checkout-input" data-field="price" placeholder="0.00" step="0.01" value="${priceValue}" oninput="calculateCheckoutTotal(); syncCheckoutRowToCart(this.closest('tr'))">
+                ${priceHint}
+            </td>
+            <td class="text-end fw-medium" data-field="total">Rs 0.00</td>
+            <td class="text-end">
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeCheckoutItem('${row.sourceIds.join(',')}', this)">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
     });
     
     calculateCheckoutTotal(); // Initial calculation
+    updateCheckoutModalState();
     modal.show();
 };
 
 window.calculateCheckoutTotal = function() {
     let grandTotal = 0;
     document.querySelectorAll('#checkout-items-body tr').forEach(tr => {
-        const qty = parseFloat(tr.querySelector('[data-field="qty"]').value) || 0;
-        const price = parseFloat(tr.querySelector('[data-field="price"]').value) || 0;
+        const qtyInput = tr.querySelector('[data-field="qty"]');
+        const priceInput = tr.querySelector('[data-field="price"]');
+        const totalCell = tr.querySelector('[data-field="total"]');
+        if (!qtyInput || !priceInput || !totalCell) return;
+
+        const qty = parseFloat(qtyInput.value) || 0;
+        const price = parseFloat(priceInput.value) || 0;
         const lineTotal = qty * price;
         
-        tr.querySelector('[data-field="total"]').textContent = `Rs ${lineTotal.toFixed(2)}`;
+        totalCell.textContent = `Rs ${lineTotal.toFixed(2)}`;
         grandTotal += lineTotal;
+        syncCheckoutRowToCart(tr);
     });
     
     document.getElementById('checkout-total').textContent = `Rs ${grandTotal.toFixed(2)}`;
     return grandTotal;
+};
+
+window.removeCheckoutItem = function(id, btnElement) {
+    const ids = (id || '').split(',').map(s => s.trim()).filter(Boolean);
+    ids.forEach(itemId => groceryCart.delete(itemId));
+
+    const row = btnElement?.closest('tr');
+    if (row) row.remove();
+
+    calculateCheckoutTotal();
+    updateCartUI();
+    updateCheckoutModalState();
 };
 
 window.confirmCheckout = async function() {
@@ -1051,16 +1393,24 @@ window.confirmCheckout = async function() {
     let totalAmount = 0;
     
     document.querySelectorAll('#checkout-items-body tr').forEach(tr => {
-        const id = tr.dataset.id;
-        const qty = parseFloat(tr.querySelector('[data-field="qty"]').value) || 0;
-        const unit = tr.querySelector('[data-field="unit"]').value;
-        const pricePerUnit = parseFloat(tr.querySelector('[data-field="price"]').value) || 0;
+        const ids = (tr.dataset.ids || tr.dataset.id || '').split(',').map(s => s.trim()).filter(Boolean);
+        const id = ids[0];
+        const qtyInput = tr.querySelector('[data-field="qty"]');
+        const unitInput = tr.querySelector('[data-field="unit"]');
+        const priceInput = tr.querySelector('[data-field="price"]');
+        if (!id || !qtyInput || !unitInput || !priceInput) return;
+
+        const qty = parseFloat(qtyInput.value) || 0;
+        const unit = unitInput.value;
+        const pricePerUnit = parseFloat(priceInput.value) || 0;
         const lineTotal = qty * pricePerUnit;
         
-        if (id && lineTotal > 0) {
+        if (lineTotal > 0) {
             const itemDef = groceryItems.find(i => i.id === id);
+            if (!itemDef) return;
             items.push({
                 id,
+                sourceIds: ids.length ? ids : [id],
                 name: itemDef.name,
                 category: itemDef.category,
                 unit: unit, // Use the unit selected at checkout
@@ -1086,12 +1436,14 @@ window.confirmCheckout = async function() {
         });
 
         // 2. Update Items (Status -> in_stock, lastPurchased, lastCost)
-        items.forEach(item => {
-            const itemRef = db.collection('grocery_items').doc(item.id);
+        const allSourceIds = [...new Set(items.flatMap(item => item.sourceIds || [item.id]))];
+        allSourceIds.forEach(sourceId => {
+            const itemRef = db.collection('grocery_items').doc(sourceId);
+            const matchingItem = items.find(i => (i.sourceIds || [i.id]).includes(sourceId)) || items[0];
             batch.update(itemRef, {
                 status: 'in_stock',
                 lastPurchased: date,
-                lastCost: item.pricePerUnit, // Save price per unit as lastCost
+                lastCost: matchingItem?.pricePerUnit || 0, // Save price per unit as lastCost
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
         });
@@ -1131,33 +1483,7 @@ window.confirmCheckout = async function() {
 window.consumeItem = async function(id) {
     const item = groceryItems.find(i => i.id === id);
     if (!item) return;
-
-    try {
-        const updateData = {
-            status: 'to_buy',
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
-
-        // Calculate duration logic
-        if (item.lastPurchased) {
-            const purchased = new Date(item.lastPurchased);
-            const today = new Date();
-            const daysLasted = Math.floor((today - purchased) / (1000 * 60 * 60 * 24));
-            
-            if (daysLasted > 0) {
-                // Simple moving average for duration
-                const currentAvg = item.typicalDuration || daysLasted;
-                updateData.typicalDuration = Math.round((currentAvg + daysLasted) / 2);
-            }
-        }
-
-        await db.collection('grocery_items').doc(id).update(updateData);
-        loadGroceryData();
-        if(window.dashboard) window.dashboard.showNotification(`${item.name} moved to shopping list`, 'info');
-
-    } catch (e) {
-        console.error(e);
-    }
+    openBasketPlannerModal(id, true);
 };
 
 window.loadGroceryHistory = async function() {
@@ -1436,5 +1762,3 @@ window.loadTopItems = async function() {
         </div>
     `).join('');
 };
-
-
