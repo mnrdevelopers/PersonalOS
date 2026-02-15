@@ -905,7 +905,11 @@ window.loadLoansSection = async function() {
             </div>
         </div>
     `;
-    await loadLoansGrid('active');
+
+    // Initialize default tab state immediately so toolbar actions are available
+    // without waiting for data reads.
+    const defaultLoanTab = document.querySelector('#loans-section > .nav-pills .nav-link');
+    switchLoanView('loans', defaultLoanTab);
 };
 
 window.switchLoanView = function(view, element) {
@@ -1490,16 +1494,18 @@ window.openLoanTopUpModal = async function(loanId) {
 
 window.loadLoansGrid = async function(status = 'active') {
     const user = auth.currentUser;
-    const snapshot = await db.collection('loans')
-        .where('userId', '==', user.uid)
-        .where('status', '==', status)
-        .orderBy('createdAt', 'desc')
-        .get();
-    
-    // Fetch Investments for Stats
-    const invSnapshot = await db.collection('investments')
-        .where('userId', '==', user.uid)
-        .get();
+    if (!user) return;
+
+    const [snapshot, invSnapshot] = await Promise.all([
+        db.collection('loans')
+            .where('userId', '==', user.uid)
+            .where('status', '==', status)
+            .orderBy('createdAt', 'desc')
+            .get(),
+        db.collection('investments')
+            .where('userId', '==', user.uid)
+            .get()
+    ]);
 
     // Client-side filtering for type (since Firestore compound queries with != or multiple filters can be tricky without composite indexes)
     let docs = snapshot.docs;
