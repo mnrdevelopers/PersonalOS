@@ -1,35 +1,39 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#4f46e5">
     <title>Dashboard - PersonalOS</title>
-    
+
     <!-- Bootstrap 5 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    
+
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    
+    <link
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap"
+        rel="stylesheet">
+
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- PDF Export Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
-    
+
     <!-- App Styles -->
     <link rel="stylesheet" href="css/style.css">
     <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/3094/3094845.png">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3094/3094845.png">
     <link rel="manifest" href="manifest.json">
-    
+
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
@@ -46,31 +50,33 @@
                 display: flex;
                 align-items: flex-end;
             }
-            
+
             .modal.fade .modal-dialog {
                 transform: translate(0, 100%);
             }
-            
+
             .modal.show .modal-dialog {
                 transform: none;
                 transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
             }
-            
+
             .modal-content {
                 border-radius: 1.5rem 1.5rem 0 0;
                 border: none;
-                box-shadow: 0 -10px 20px rgba(0,0,0,0.1);
+                box-shadow: 0 -10px 20px rgba(0, 0, 0, 0.1);
                 width: 100%;
-                max-height: 85vh; /* Reduced height to show backdrop */
+                max-height: 85vh;
+                /* Reduced height to show backdrop */
             }
-            
+
             /* Drag Handle Visual */
             .modal-header {
-                border-bottom: 1px solid rgba(0,0,0,0.05);
+                border-bottom: 1px solid rgba(0, 0, 0, 0.05);
                 position: relative;
-                padding-top: 1.5rem; /* Space for handle */
+                padding-top: 1.5rem;
+                /* Space for handle */
             }
-            
+
             .modal-header::before {
                 content: '';
                 position: absolute;
@@ -82,13 +88,13 @@
                 background-color: #e0e0e0;
                 border-radius: 2px;
             }
-            
+
             /* Ensure scrollable content works well */
             .modal-dialog-scrollable {
                 height: auto;
                 max-height: 100%;
             }
-            
+
             .modal-dialog-scrollable .modal-content {
                 max-height: 85vh;
                 overflow: hidden;
@@ -96,8 +102,9 @@
         }
     </style>
 </head>
+
 <body>
-     <!-- Main Navigation -->
+    <!-- Main Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
         <div class="container-fluid">
             <button class="btn btn-link text-white d-none me-2 p-0" id="nav-back-btn" aria-label="Back">
@@ -107,17 +114,21 @@
                 <i class="fas fa-chart-line me-2"></i>PersonalOS
             </a>
             <div class="d-flex align-items-center">
-                <button class="btn btn-link text-white text-decoration-none me-2 p-2 position-relative" id="notifications-btn" aria-label="Notifications">
+                <button class="btn btn-link text-white text-decoration-none me-2 p-2 position-relative"
+                    id="notifications-btn" aria-label="Notifications">
                     <i class="fas fa-bell fa-lg"></i>
-                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" id="notification-badge">
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none"
+                        id="notification-badge">
                         0
                     </span>
                 </button>
-                <button class="btn btn-link text-white text-decoration-none me-2 p-2" id="calculator-btn" aria-label="Calculator">
+                <button class="btn btn-link text-white text-decoration-none me-2 p-2" id="calculator-btn"
+                    aria-label="Calculator">
                     <i class="fas fa-calculator fa-lg"></i>
                 </button>
                 <div id="current-time" class="text-white me-3 d-none d-md-block"></div>
-                <button class="btn btn-link text-white text-decoration-none d-lg-none me-2 p-2" id="mobile-logout-btn" aria-label="Logout">
+                <button class="btn btn-link text-white text-decoration-none d-lg-none me-2 p-2" id="mobile-logout-btn"
+                    aria-label="Logout">
                     <i class="fas fa-sign-out-alt fa-lg"></i>
                 </button>
                 <button class="navbar-toggler border-0 p-0" type="button" id="hamburger-menu" aria-expanded="false">
@@ -133,11 +144,17 @@
                             <i class="fas fa-user-circle"></i>
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="#" data-section="profile"><i class="fas fa-user me-2"></i>Profile</a></li>
-                            <li><a class="dropdown-item" href="#" data-section="settings"><i class="fas fa-cog me-2"></i>Settings</a></li>
-                            <li><a class="dropdown-item d-none" href="#" id="install-app-btn"><i class="fas fa-download me-2"></i>Install App</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-danger" href="#" id="logout-btn"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+                            <li><a class="dropdown-item" href="#" data-section="profile"><i
+                                        class="fas fa-user me-2"></i>Profile</a></li>
+                            <li><a class="dropdown-item" href="#" data-section="settings"><i
+                                        class="fas fa-cog me-2"></i>Settings</a></li>
+                            <li><a class="dropdown-item d-none" href="#" id="install-app-btn"><i
+                                        class="fas fa-download me-2"></i>Install App</a></li>
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
+                            <li><a class="dropdown-item text-danger" href="#" id="logout-btn"><i
+                                        class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
                         </ul>
                     </li>
                 </ul>
@@ -163,17 +180,20 @@
                         <div id="member-since-badge" class="mt-1"></div>
                         <div class="mt-3 pe-2">
                             <div class="d-flex justify-content-between align-items-center mb-1">
-                                <span class="text-muted" style="font-size: 0.65rem; text-transform: uppercase;">Profile</span>
-                                <span class="fw-bold text-primary" style="font-size: 0.65rem;" id="profile-completion-text">0%</span>
+                                <span class="text-muted"
+                                    style="font-size: 0.65rem; text-transform: uppercase;">Profile</span>
+                                <span class="fw-bold text-primary" style="font-size: 0.65rem;"
+                                    id="profile-completion-text">0%</span>
                             </div>
                             <div class="progress" style="height: 3px;">
-                                <div class="progress-bar bg-primary" role="progressbar" style="width: 0%" id="profile-completion-bar"></div>
+                                <div class="progress-bar bg-primary" role="progressbar" style="width: 0%"
+                                    id="profile-completion-bar"></div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-            
+
             <div class="sidebar-menu">
                 <ul class="nav flex-column">
                     <li class="nav-item">
@@ -258,7 +278,7 @@
                     </li>
                 </ul>
             </div>
-            
+
             <div class="sidebar-footer">
                 <div class="quick-actions">
                     <button class="btn btn-primary btn-sm w-100 mb-2" data-action="add-income">
@@ -296,11 +316,13 @@
                 <!-- Mobile Quick Nav (Visible only on mobile) -->
                 <div class="mobile-quick-nav d-lg-none mb-4">
                     <div class="nav-card" onclick="window.switchSection('finance')">
-                        <div class="icon-circle bg-primary bg-opacity-10 text-primary"><i class="fas fa-wallet"></i></div>
+                        <div class="icon-circle bg-primary bg-opacity-10 text-primary"><i class="fas fa-wallet"></i>
+                        </div>
                         <span>Finance</span>
                     </div>
                     <div class="nav-card" onclick="window.switchSection('habits')">
-                        <div class="icon-circle bg-success bg-opacity-10 text-success"><i class="fas fa-check-circle"></i></div>
+                        <div class="icon-circle bg-success bg-opacity-10 text-success"><i
+                                class="fas fa-check-circle"></i></div>
                         <span>Habits</span>
                     </div>
                     <div class="nav-card" onclick="window.switchSection('reminders')">
@@ -320,7 +342,8 @@
                             <h1 class="display-6 fw-bold gradient-text mb-0" id="welcome-message">Welcome back!</h1>
                             <p class="text-muted mb-0" id="current-date-full"></p>
                         </div>
-                        <button class="btn btn-light btn-icon shadow-sm rounded-circle" id="refresh-dashboard" style="width: 40px; height: 40px;">
+                        <button class="btn btn-light btn-icon shadow-sm rounded-circle" id="refresh-dashboard"
+                            style="width: 40px; height: 40px;">
                             <i class="fas fa-sync-alt text-primary"></i>
                         </button>
                     </div>
@@ -371,13 +394,15 @@
                                 </div>
                                 <div class="mt-4 z-1 position-relative">
                                     <div class="progress bg-black bg-opacity-25 rounded-pill" style="height: 6px;">
-                                        <div class="progress-bar bg-white rounded-pill" role="progressbar" style="width: 0%" id="habits-progress"></div>
+                                        <div class="progress-bar bg-white rounded-pill" role="progressbar"
+                                            style="width: 0%" id="habits-progress"></div>
                                     </div>
                                     <div class="d-flex justify-content-between small mt-2">
                                         <span>Completed Today</span>
                                         <span class="fw-bold"><span id="completed-today">0</span></span>
                                     </div>
-                                    <div id="money-saved-container" class="small fw-bold mt-1 d-none text-white-50">Saved: <span id="total-money-saved">₹0</span></div>
+                                    <div id="money-saved-container" class="small fw-bold mt-1 d-none text-white-50">
+                                        Saved: <span id="total-money-saved">₹0</span></div>
                                 </div>
                                 <div class="decorative-circle"></div>
                             </div>
@@ -399,10 +424,14 @@
                                 </div>
                                 <div class="mt-4 z-1 position-relative">
                                     <div class="d-flex align-items-center justify-content-between">
-                                        <span class="badge bg-white text-dark bg-opacity-90 px-3 py-2 rounded-pill shadow-sm">
+                                        <span
+                                            class="badge bg-white text-dark bg-opacity-90 px-3 py-2 rounded-pill shadow-sm">
                                             <span id="due-today">0</span> Due Today
                                         </span>
-                                        <button class="btn btn-sm btn-link text-white text-decoration-none p-0 fw-medium" onclick="window.switchSection('reminders')">View All <i class="fas fa-arrow-right ms-1"></i></button>
+                                        <button
+                                            class="btn btn-sm btn-link text-white text-decoration-none p-0 fw-medium"
+                                            onclick="window.switchSection('reminders')">View All <i
+                                                class="fas fa-arrow-right ms-1"></i></button>
                                     </div>
                                 </div>
                                 <div class="decorative-circle"></div>
@@ -414,7 +443,8 @@
                 <!-- Secondary Stats Grid -->
                 <div class="row g-4 mb-5 animate-fade-in" style="animation-delay: 0.4s;">
                     <div class="col-6 col-md-3">
-                        <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-info">
+                        <div
+                            class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-info">
                             <div class="text-muted small mb-1 fw-medium">Memories</div>
                             <div class="d-flex align-items-center justify-content-between">
                                 <h4 class="mb-0 fw-bold" id="total-memories">0</h4>
@@ -423,7 +453,8 @@
                         </div>
                     </div>
                     <div class="col-6 col-md-3">
-                        <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-danger">
+                        <div
+                            class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-danger">
                             <div class="text-muted small mb-1 fw-medium">Liabilities</div>
                             <div class="d-flex align-items-center justify-content-between">
                                 <h4 class="mb-0 fw-bold" id="total-liability">₹0</h4>
@@ -432,7 +463,8 @@
                         </div>
                     </div>
                     <div class="col-6 col-md-3">
-                        <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-warning">
+                        <div
+                            class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-warning">
                             <div class="text-muted small mb-1 fw-medium">Monthly EMI</div>
                             <div class="d-flex align-items-center justify-content-between">
                                 <h4 class="mb-0 fw-bold" id="total-monthly-emi">₹0</h4>
@@ -441,7 +473,8 @@
                         </div>
                     </div>
                     <div class="col-6 col-md-3">
-                        <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-secondary">
+                        <div
+                            class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-secondary">
                             <div class="text-muted small mb-1 fw-medium">Travel (Mo)</div>
                             <div class="d-flex align-items-center justify-content-between">
                                 <h4 class="mb-0 fw-bold" id="total-distance-month">0 km</h4>
@@ -455,9 +488,11 @@
                 <div class="row g-3 mb-4">
                     <div class="col-lg-8 animate-slide-up" style="animation-delay: 0.5s;">
                         <div class="card border-0 shadow-sm rounded-4 h-100">
-                            <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+                            <div
+                                class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
                                 <h5 class="fw-bold mb-0">Financial Flow</h5>
-                                <select class="form-select form-select-sm border-0 bg-light rounded-pill px-3" id="chart-period" style="width: auto;">
+                                <select class="form-select form-select-sm border-0 bg-light rounded-pill px-3"
+                                    id="chart-period" style="width: auto;">
                                     <option value="week">This Week</option>
                                     <option value="month">This Month</option>
                                     <option value="year">This Year</option>
@@ -486,9 +521,11 @@
                 <div class="row g-4">
                     <div class="col-lg-6 animate-slide-up" style="animation-delay: 0.7s;">
                         <div class="card border-0 shadow-sm rounded-4 h-100">
-                            <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+                            <div
+                                class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
                                 <h5 class="fw-bold mb-0">Recent Transactions</h5>
-                                <button class="btn btn-sm btn-light rounded-pill px-3 fw-medium" onclick="window.switchSection('finance')">View All</button>
+                                <button class="btn btn-sm btn-light rounded-pill px-3 fw-medium"
+                                    onclick="window.switchSection('finance')">View All</button>
                             </div>
                             <div class="card-body px-4 pb-4">
                                 <div id="recent-transactions" class="d-flex flex-column gap-3">
@@ -499,9 +536,11 @@
                     </div>
                     <div class="col-lg-6 animate-slide-up" style="animation-delay: 0.8s;">
                         <div class="card border-0 shadow-sm rounded-4 h-100">
-                            <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+                            <div
+                                class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
                                 <h5 class="fw-bold mb-0">Today's Focus</h5>
-                                <button class="btn btn-sm btn-light rounded-pill px-3 fw-medium" onclick="window.switchSection('habits')">View All</button>
+                                <button class="btn btn-sm btn-light rounded-pill px-3 fw-medium"
+                                    onclick="window.switchSection('habits')">View All</button>
                             </div>
                             <div class="card-body px-4 pb-4">
                                 <div id="todays-habits" class="d-flex flex-column gap-3">
@@ -625,11 +664,13 @@
                         <div class="mb-3">
                             <label class="form-label">Type</label>
                             <div class="btn-group w-100" role="group">
-                                <input type="radio" class="btn-check" name="transaction-type" id="type-income" value="income" checked>
+                                <input type="radio" class="btn-check" name="transaction-type" id="type-income"
+                                    value="income" checked>
                                 <label class="btn btn-outline-success" for="type-income">
                                     <i class="fas fa-plus-circle me-1"></i> Income
                                 </label>
-                                <input type="radio" class="btn-check" name="transaction-type" id="type-expense" value="expense">
+                                <input type="radio" class="btn-check" name="transaction-type" id="type-expense"
+                                    value="expense">
                                 <label class="btn btn-outline-danger" for="type-expense">
                                     <i class="fas fa-minus-circle me-1"></i> Expense
                                 </label>
@@ -639,7 +680,8 @@
                             <label class="form-label">Amount</label>
                             <div class="input-group">
                                 <span class="input-group-text">₹</span>
-                                <input type="number" class="form-control" id="transaction-amount" step="0.01" min="0" required>
+                                <input type="number" class="form-control" id="transaction-amount" step="0.01" min="0"
+                                    required>
                             </div>
                         </div>
                         <div class="mb-3">
@@ -648,6 +690,11 @@
                                 <option value="cash">Cash</option>
                                 <option value="bank">Bank Transfer</option>
                                 <option value="upi">UPI</option>
+                                <option value="upi-bhim">UPI - BHIM</option>
+                                <option value="upi-phonepe">UPI - PhonePe</option>
+                                <option value="upi-gpay">UPI - Google Pay</option>
+                                <option value="upi-navi">UPI - Navi Pay</option>
+                                <option value="upi-cred">UPI - CRED Pay</option>
                                 <option value="credit-card">Credit Card</option>
                                 <option value="wallet">Wallet</option>
                                 <option value="debit-card">Debit Card</option>
@@ -660,7 +707,8 @@
                                 <option value="" selected disabled>Choose a card...</option>
                                 <!-- Credit cards will be loaded dynamically via JS -->
                             </select>
-                            <div class="form-text text-muted">Expense will be added to this card's outstanding balance.</div>
+                            <div class="form-text text-muted">Expense will be added to this card's outstanding balance.
+                            </div>
                         </div>
                         <div class="mb-3 d-none" id="wallet-select-container">
                             <label class="form-label">Select Wallet</label>
@@ -677,14 +725,16 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Description</label>
-                            <textarea class="form-control" id="transaction-description" rows="2" placeholder="Optional description"></textarea>
+                            <textarea class="form-control" id="transaction-description" rows="2"
+                                placeholder="Optional description"></textarea>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Date</label>
                             <input type="date" class="form-control" id="transaction-date" required>
                         </div>
                         <div class="form-check mb-3">
-                            <input class="form-check-input" type="checkbox" id="recurring-transaction" onchange="document.getElementById('recurring-options').classList.toggle('d-none', !this.checked)">
+                            <input class="form-check-input" type="checkbox" id="recurring-transaction"
+                                onchange="document.getElementById('recurring-options').classList.toggle('d-none', !this.checked)">
                             <label class="form-check-label" for="recurring-transaction">
                                 This is a recurring transaction
                             </label>
@@ -707,6 +757,37 @@
         </div>
     </div>
 
+    <!-- UPI App Selection Modal -->
+    <div class="modal fade" id="upiPaymentModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Complete UPI Payment</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="upi-payment-summary" class="small text-muted mb-3"></div>
+                    <p class="mb-2">Select UPI app:</p>
+                    <div class="d-grid gap-2 mb-3" id="upi-app-list">
+                        <button type="button" class="btn btn-outline-primary text-start" data-upi-app="upi-bhim">BHIM</button>
+                        <button type="button" class="btn btn-outline-primary text-start" data-upi-app="upi-phonepe">PhonePe</button>
+                        <button type="button" class="btn btn-outline-primary text-start" data-upi-app="upi-gpay">Google Pay</button>
+                        <button type="button" class="btn btn-outline-primary text-start" data-upi-app="upi-navi">Navi Pay</button>
+                        <button type="button" class="btn btn-outline-primary text-start" data-upi-app="upi-cred">CRED Pay</button>
+                    </div>
+                    <div class="alert alert-info small mb-0">
+                        Tap <strong>Open App</strong>, complete QR payment, return to this app, then tap <strong>Payment Done & Save</strong>.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" id="upi-cancel-transaction">Cancel</button>
+                    <button type="button" class="btn btn-outline-primary" id="upi-open-app">Open App</button>
+                    <button type="button" class="btn btn-success" id="upi-save-transaction">Payment Done & Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Add Loan/Debt/Investment Modal -->
     <div class="modal fade" id="addLoanModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
@@ -721,11 +802,13 @@
                         <div class="mb-3">
                             <label class="form-label">Type</label>
                             <div class="btn-group w-100" role="group">
-                                <input type="radio" class="btn-check" name="loan-type" id="type-lent" value="lent" checked>
+                                <input type="radio" class="btn-check" name="loan-type" id="type-lent" value="lent"
+                                    checked>
                                 <label class="btn btn-outline-success" for="type-lent">
                                     <i class="fas fa-hand-holding-usd me-1"></i> Lent / Invested
                                 </label>
-                                <input type="radio" class="btn-check" name="loan-type" id="type-borrowed" value="borrowed">
+                                <input type="radio" class="btn-check" name="loan-type" id="type-borrowed"
+                                    value="borrowed">
                                 <label class="btn btn-outline-danger" for="type-borrowed">
                                     <i class="fas fa-hand-holding me-1"></i> Borrowed (Debt)
                                 </label>
@@ -733,7 +816,8 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Person / Entity Name</label>
-                            <input type="text" class="form-control" id="loan-person" required placeholder="Who is this with?">
+                            <input type="text" class="form-control" id="loan-person" required
+                                placeholder="Who is this with?">
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Amount</label>
@@ -745,7 +829,8 @@
                         <div class="row">
                             <div class="col-6 mb-3">
                                 <label class="form-label">Interest Rate (%)</label>
-                                <input type="number" class="form-control" id="loan-interest" step="0.1" min="0" value="0">
+                                <input type="number" class="form-control" id="loan-interest" step="0.1" min="0"
+                                    value="0">
                             </div>
                             <div class="col-6 mb-3">
                                 <label class="form-label">Due Date</label>
@@ -796,7 +881,8 @@
                         <div class="mb-3">
                             <label class="form-label">Habit Type</label>
                             <div class="btn-group w-100" role="group">
-                                <input type="radio" class="btn-check" name="habit-type" id="type-good" value="good" checked>
+                                <input type="radio" class="btn-check" name="habit-type" id="type-good" value="good"
+                                    checked>
                                 <label class="btn btn-outline-success" for="type-good">Build (Good)</label>
                                 <input type="radio" class="btn-check" name="habit-type" id="type-bad" value="bad">
                                 <label class="btn btn-outline-danger" for="type-bad">Quit (Bad)</label>
@@ -804,7 +890,8 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Habit Name</label>
-                            <input type="text" class="form-control" id="habit-name" placeholder="e.g., Morning Exercise" required>
+                            <input type="text" class="form-control" id="habit-name" placeholder="e.g., Morning Exercise"
+                                required>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Category</label>
@@ -831,7 +918,8 @@
                         <div class="mb-3">
                             <div id="habit-cost-container" class="d-none">
                                 <label class="form-label">Cost per occurrence (₹)</label>
-                                <input type="number" class="form-control" id="habit-cost" min="0" step="0.01" placeholder="Amount saved per avoidance">
+                                <input type="number" class="form-control" id="habit-cost" min="0" step="0.01"
+                                    placeholder="Amount saved per avoidance">
                             </div>
                         </div>
                         <div class="mb-3">
@@ -899,7 +987,8 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Alert Before (Days)</label>
-                            <input type="number" class="form-control" id="reminder-alert-days" min="0" value="0" placeholder="0 = On due date">
+                            <input type="number" class="form-control" id="reminder-alert-days" min="0" value="0"
+                                placeholder="0 = On due date">
                         </div>
                     </form>
                 </div>
@@ -976,7 +1065,8 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Tags (comma separated)</label>
-                            <input type="text" class="form-control" id="memory-tags" placeholder="e.g., vacation, family, travel">
+                            <input type="text" class="form-control" id="memory-tags"
+                                placeholder="e.g., vacation, family, travel">
                         </div>
                     </form>
                 </div>
@@ -1000,29 +1090,48 @@
                     <div class="calculator">
                         <input type="text" class="form-control mb-2 text-end fs-4" id="calc-display" readonly value="0">
                         <div class="row g-1">
-                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="clear">C</button></div>
-                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="backspace"><i class="fas fa-backspace"></i></button></div>
-                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="operator" data-value="%">%</button></div>
-                            <div class="col-3"><button class="btn btn-warning w-100 calc-btn" data-action="operator" data-value="/">÷</button></div>
-                            
-                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number" data-value="7">7</button></div>
-                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number" data-value="8">8</button></div>
-                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number" data-value="9">9</button></div>
-                            <div class="col-3"><button class="btn btn-warning w-100 calc-btn" data-action="operator" data-value="*">×</button></div>
-                            
-                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number" data-value="4">4</button></div>
-                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number" data-value="5">5</button></div>
-                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number" data-value="6">6</button></div>
-                            <div class="col-3"><button class="btn btn-warning w-100 calc-btn" data-action="operator" data-value="-">-</button></div>
-                            
-                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number" data-value="1">1</button></div>
-                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number" data-value="2">2</button></div>
-                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number" data-value="3">3</button></div>
-                            <div class="col-3"><button class="btn btn-warning w-100 calc-btn" data-action="operator" data-value="+">+</button></div>
-                            
-                            <div class="col-6"><button class="btn btn-light w-100 calc-btn" data-action="number" data-value="0">0</button></div>
-                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="decimal" data-value=".">.</button></div>
-                            <div class="col-3"><button class="btn btn-primary w-100 calc-btn" data-action="calculate">=</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn"
+                                    data-action="clear">C</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="backspace"><i
+                                        class="fas fa-backspace"></i></button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="operator"
+                                    data-value="%">%</button></div>
+                            <div class="col-3"><button class="btn btn-warning w-100 calc-btn" data-action="operator"
+                                    data-value="/">÷</button></div>
+
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number"
+                                    data-value="7">7</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number"
+                                    data-value="8">8</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number"
+                                    data-value="9">9</button></div>
+                            <div class="col-3"><button class="btn btn-warning w-100 calc-btn" data-action="operator"
+                                    data-value="*">×</button></div>
+
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number"
+                                    data-value="4">4</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number"
+                                    data-value="5">5</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number"
+                                    data-value="6">6</button></div>
+                            <div class="col-3"><button class="btn btn-warning w-100 calc-btn" data-action="operator"
+                                    data-value="-">-</button></div>
+
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number"
+                                    data-value="1">1</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number"
+                                    data-value="2">2</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number"
+                                    data-value="3">3</button></div>
+                            <div class="col-3"><button class="btn btn-warning w-100 calc-btn" data-action="operator"
+                                    data-value="+">+</button></div>
+
+                            <div class="col-6"><button class="btn btn-light w-100 calc-btn" data-action="number"
+                                    data-value="0">0</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="decimal"
+                                    data-value=".">.</button></div>
+                            <div class="col-3"><button class="btn btn-primary w-100 calc-btn"
+                                    data-action="calculate">=</button></div>
                         </div>
                     </div>
                 </div>
@@ -1037,7 +1146,8 @@
                 <div class="modal-header">
                     <h5 class="modal-title"><i class="fas fa-bell me-2"></i>Notifications</h5>
                     <div class="ms-auto">
-                        <button class="btn btn-sm btn-link text-decoration-none" id="mark-all-read">Mark all read</button>
+                        <button class="btn btn-sm btn-link text-decoration-none" id="mark-all-read">Mark all
+                            read</button>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
@@ -1062,7 +1172,7 @@
                 <!-- Notification message will appear here -->
             </div>
         </div>
-        
+
         <!-- Update Toast -->
         <div id="update-toast" class="toast" role="alert" data-bs-autohide="false">
             <div class="toast-header bg-primary text-white">
@@ -1072,7 +1182,8 @@
             </div>
             <div class="toast-body">
                 A new version is available.
-                <button type="button" class="btn btn-sm btn-outline-primary w-100 mt-2" id="reload-app-btn">Reload to Update</button>
+                <button type="button" class="btn btn-sm btn-outline-primary w-100 mt-2" id="reload-app-btn">Reload to
+                    Update</button>
             </div>
         </div>
     </div>
@@ -1096,12 +1207,12 @@
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
+
     <!-- App Scripts -->
     <script src="js/firebase-config.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            firebase.auth().onAuthStateChanged(function(user) {
+        document.addEventListener('DOMContentLoaded', function () {
+            firebase.auth().onAuthStateChanged(function (user) {
                 if (!user) {
                     window.location.href = 'index.html';
                 }
@@ -1127,13 +1238,13 @@
     <script src="js/pwa.js"></script>
     <script>
         // UI Logic for Transaction Modal - Credit Card Selection
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const transactionMode = document.getElementById('transaction-mode');
             const creditCardContainer = document.getElementById('credit-card-select-container');
             const walletContainer = document.getElementById('wallet-select-container');
-            
+
             if (transactionMode) {
-                transactionMode.addEventListener('change', function() {
+                transactionMode.addEventListener('change', function () {
                     if (creditCardContainer) creditCardContainer.classList.add('d-none');
                     if (walletContainer) walletContainer.classList.add('d-none');
                     document.getElementById('transaction-credit-card').required = false;
@@ -1152,9 +1263,9 @@
             // UI Logic for Loan Modal - Transaction Toggle
             const loanAddTransaction = document.getElementById('loan-add-transaction');
             const loanTransactionDetails = document.getElementById('loan-transaction-details');
-            
+
             if (loanAddTransaction && loanTransactionDetails) {
-                loanAddTransaction.addEventListener('change', function() {
+                loanAddTransaction.addEventListener('change', function () {
                     if (this.checked) {
                         loanTransactionDetails.classList.remove('d-none');
                     } else {
@@ -1165,4 +1276,5 @@
         });
     </script>
 </body>
+
 </html>
