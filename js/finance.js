@@ -40,6 +40,29 @@ window.getCategoryIcon = function(name, explicitIcon = null) {
     return '🏷️';
 };
 
+window.getPaymentModeLabel = function(mode) {
+    if (!mode) return 'CASH';
+    const labels = {
+        cash: 'CASH',
+        bank: 'BANK TRANSFER',
+        upi: 'UPI',
+        'upi-bhim': 'UPI (BHIM)',
+        'upi-phonepe': 'UPI (PHONEPE)',
+        'upi-gpay': 'UPI (GOOGLE PAY)',
+        'upi-navi': 'UPI (NAVI PAY)',
+        'upi-cred': 'UPI (CRED PAY)',
+        'credit-card': 'CREDIT CARD',
+        'debit-card': 'DEBIT CARD',
+        wallet: 'WALLET',
+        other: 'OTHER'
+    };
+    return labels[mode] || mode.toUpperCase();
+};
+
+window.isUpiPaymentMode = function(mode) {
+    return mode === 'upi' || (typeof mode === 'string' && mode.startsWith('upi-'));
+};
+
 window.loadFinanceSection = async function() {
     const container = document.getElementById('finance-section');
     container.innerHTML = `
@@ -503,8 +526,8 @@ async function loadFinanceData(filter = null) {
             const isIncome = data.type === 'income';
             const colorClass = isIncome ? 'text-success' : 'text-danger';
             const sign = isIncome ? '+' : '-';
-            const modeBadge = data.paymentMode === 'upi' ? 'bg-info' : 'bg-warning text-dark';
-            const modeText = data.paymentMode ? data.paymentMode.toUpperCase() : 'CASH';
+            const modeBadge = window.isUpiPaymentMode(data.paymentMode) ? 'bg-info' : 'bg-warning text-dark';
+            const modeText = window.getPaymentModeLabel(data.paymentMode);
             const icon = window.getCategoryIcon(data.category);
             
             const tr = document.createElement('tr');
@@ -560,9 +583,20 @@ async function updateFinanceStats() {
         const snapshot = await query.get();
         let income = 0;
         let expense = 0;
+        const lowerQuery = financeSearchQuery ? financeSearchQuery.toLowerCase() : '';
+
         snapshot.forEach(doc => {
             const data = doc.data();
             const amount = Number(data.amount) || 0;
+
+            // Keep summary cards aligned with the same client-side search used by the ledger table.
+            if (lowerQuery) {
+                const description = (data.description || '').toLowerCase();
+                const category = (data.category || '').toLowerCase();
+                if (!description.includes(lowerQuery) && !category.includes(lowerQuery)) {
+                    return;
+                }
+            }
 
             if (data.type === 'income') income += amount;
             else if (data.type === 'expense') expense += amount;
@@ -1052,3 +1086,5 @@ window.deleteCategory = async function(id) {
         if(window.dashboard) window.dashboard.hideLoading();
     }
 };
+
+
