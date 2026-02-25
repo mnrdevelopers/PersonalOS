@@ -4,6 +4,8 @@ class Dashboard {
         this.currentSection = 'dashboard';
         this.financeChart = null;
         this.notificationTimeouts = {};
+        this.pendingUpiTransaction = null;
+        this.selectedUpiApp = '';
         this.init();
     }
 
@@ -14,7 +16,7 @@ class Dashboard {
         this.updateTime();
         this.updateGreeting();
         this.loadUserProfile();
-        
+
         const hashSection = window.location.hash.substring(1);
         if (hashSection && document.getElementById(`${hashSection}-section`)) {
             this.switchSection(hashSection);
@@ -115,10 +117,10 @@ class Dashboard {
         // Hamburger Menu Logic
         const hamburger = document.getElementById('hamburger-menu');
         const overlay = document.querySelector('.sidebar-overlay');
-        
+
         const closeSidebar = () => {
             document.body.classList.remove('sidebar-open');
-            if(hamburger) hamburger.setAttribute('aria-expanded', 'false');
+            if (hamburger) hamburger.setAttribute('aria-expanded', 'false');
         };
 
         if (hamburger && overlay) {
@@ -138,7 +140,7 @@ class Dashboard {
         // FAB Logic
         const fabBtn = document.getElementById('fab-main-btn');
         const fabContainer = document.querySelector('.fab-container');
-        
+
         if (fabBtn && fabContainer) {
             fabBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -151,7 +153,7 @@ class Dashboard {
                     fabContainer.classList.remove('active');
                 }
             });
-            
+
             // Handle FAB options
             fabContainer.querySelectorAll('.fab-option').forEach(btn => {
                 btn.addEventListener('click', (e) => {
@@ -182,6 +184,26 @@ class Dashboard {
         // Transaction modal
         document.getElementById('save-transaction')?.addEventListener('click', () => {
             this.saveTransaction();
+        });
+
+        document.querySelectorAll('#upi-app-list [data-upi-app]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                this.selectedUpiApp = btn.dataset.upiApp;
+                document.querySelectorAll('#upi-app-list [data-upi-app]').forEach((b) => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
+
+        document.getElementById('upi-open-app')?.addEventListener('click', () => {
+            this.openSelectedUpiApp();
+        });
+
+        document.getElementById('upi-save-transaction')?.addEventListener('click', () => {
+            this.completePendingUpiTransaction();
+        });
+
+        document.getElementById('upi-cancel-transaction')?.addEventListener('click', () => {
+            this.cancelPendingUpiTransaction();
         });
 
         // Habit modal
@@ -222,20 +244,20 @@ class Dashboard {
             categorySelect.addEventListener('change', (e) => {
                 if (e.target.value === '__add_new__') {
                     e.target.value = ''; // Reset selection
-                    
+
                     const categoriesModalEl = document.getElementById('categoriesModal');
-                    
+
                     if (window.openCategoriesModal && categoriesModalEl) {
                         // Get Transaction Modal Instance
                         const transactionModalEl = document.getElementById('addTransactionModal');
                         const transactionModal = bootstrap.Modal.getInstance(transactionModalEl);
-                        
+
                         // Hide Transaction Modal temporarily
                         if (transactionModal) transactionModal.hide();
 
                         const type = document.querySelector('input[name="transaction-type"]:checked')?.value || 'expense';
                         window.openCategoriesModal();
-                        
+
                         // Switch to correct tab in categories modal
                         setTimeout(() => {
                             const tabLink = document.querySelector(`#categoriesModal .nav-link[onclick*="'${type}'"]`);
@@ -259,7 +281,7 @@ class Dashboard {
     initCalculator() {
         const display = document.getElementById('calc-display');
         if (!display) return;
-        
+
         let currentInput = '0';
         let previousInput = '';
         let operator = null;
@@ -268,7 +290,7 @@ class Dashboard {
         // History Setup
         let history = [];
         let historyContainer = document.getElementById('calc-history');
-        
+
         if (!historyContainer) {
             historyContainer = document.createElement('div');
             historyContainer.id = 'calc-history';
@@ -295,8 +317,8 @@ class Dashboard {
             historyToggle.addEventListener('click', () => {
                 historyContainer.classList.toggle('d-none');
                 const isHidden = historyContainer.classList.contains('d-none');
-                historyToggle.innerHTML = isHidden ? 
-                    '<i class="fas fa-history me-1"></i> Show History' : 
+                historyToggle.innerHTML = isHidden ?
+                    '<i class="fas fa-history me-1"></i> Show History' :
                     '<i class="fas fa-history me-1"></i> Hide History';
                 historyToggle.classList.toggle('text-primary', !isHidden);
                 historyToggle.classList.toggle('text-secondary', isHidden);
@@ -306,7 +328,7 @@ class Dashboard {
         const updateHistory = (expr, res) => {
             history.unshift({ expr, res });
             if (history.length > 20) history.pop();
-            
+
             historyContainer.innerHTML = '';
             history.forEach(item => {
                 const row = document.createElement('div');
@@ -314,7 +336,7 @@ class Dashboard {
                 row.style.cursor = 'pointer';
                 row.title = 'Click to use result';
                 row.innerHTML = `<span class="text-muted">${item.expr}</span><span class="fw-bold">${item.res}</span>`;
-                
+
                 row.addEventListener('click', () => {
                     currentInput = item.res;
                     updateDisplay();
@@ -353,12 +375,12 @@ class Dashboard {
             let result;
             const prev = parseFloat(previousInput);
             const current = parseFloat(currentInput);
-            
+
             if (isNaN(prev) || isNaN(current)) return;
-            
+
             const expression = `${prev} ${operator} ${current}`;
 
-            switch(operator) {
+            switch (operator) {
                 case '+': result = prev + current; break;
                 case '-': result = prev - current; break;
                 case '*': result = prev * current; break;
@@ -366,7 +388,7 @@ class Dashboard {
                 case '%': result = prev % current; break;
                 default: return;
             }
-            
+
             currentInput = parseFloat(result.toFixed(8)).toString();
             updateHistory(expression, currentInput);
             shouldResetDisplay = true;
@@ -477,7 +499,7 @@ class Dashboard {
         const targetLabel = document.getElementById('habit-target-label');
         const targetInput = document.getElementById('habit-target');
         const costContainer = document.getElementById('habit-cost-container');
-        
+
         if (type === 'bad') {
             targetLabel.textContent = 'Daily Limit (Max allowed)';
             if (targetInput.value === '1') targetInput.value = '0';
@@ -496,7 +518,7 @@ class Dashboard {
                 hour: '2-digit',
                 minute: '2-digit'
             });
-            
+
             const timeElement = document.getElementById('current-time');
             if (timeElement) {
                 timeElement.textContent = timeString;
@@ -513,18 +535,18 @@ class Dashboard {
         const dateElement = document.getElementById('current-date-full');
         const mobileGreeting = document.getElementById('mobile-welcome-message');
         const mobileDate = document.getElementById('mobile-date-display');
-        
+
         if (greetingElement) {
             let greeting = 'Welcome back!';
             if (hour < 12) greeting = 'Good Morning,';
             else if (hour < 18) greeting = 'Good Afternoon,';
             else greeting = 'Good Evening,';
-            
+
             if (this.currentUser && this.currentUser.displayName) {
                 greeting += ` ${this.currentUser.displayName.split(' ')[0]}`;
             }
             greetingElement.textContent = greeting;
-            
+
             if (mobileGreeting) {
                 mobileGreeting.textContent = greeting;
             }
@@ -543,15 +565,15 @@ class Dashboard {
             const userDoc = await db.collection('users').doc(this.currentUser.uid).get();
             if (userDoc.exists) {
                 const userData = userDoc.data();
-                
+
                 // Update UI with user info
                 const userNameElements = document.querySelectorAll('#user-name');
                 const userEmailElements = document.querySelectorAll('#user-email');
-                
+
                 userNameElements.forEach(el => {
                     el.textContent = userData.name || 'User';
                 });
-                
+
                 userEmailElements.forEach(el => {
                     el.textContent = this.currentUser.email;
                 });
@@ -572,16 +594,16 @@ class Dashboard {
                 // Profile Completion Logic
                 let completedFields = 0;
                 const totalFields = 4; // Name, Avatar, Currency, Theme
-                
+
                 if (userData.name) completedFields++;
                 if (userData.avatar && userData.avatar !== '👤') completedFields++;
                 if (userData.settings?.currency) completedFields++;
                 if (userData.settings?.theme) completedFields++;
-                
+
                 const completionPercent = Math.round((completedFields / totalFields) * 100);
                 const completionText = document.getElementById('profile-completion-text');
                 const completionBar = document.getElementById('profile-completion-bar');
-                
+
                 if (completionText) completionText.textContent = `${completionPercent}%`;
                 if (completionBar) completionBar.style.width = `${completionPercent}%`;
 
@@ -602,7 +624,7 @@ class Dashboard {
                         el.style.cssText = 'display: flex; align-items: center; justify-content: center; font-size: 1.5rem; width: 40px; height: 40px; background-color: rgba(255,255,255,0.2); border-radius: 50%;';
                     }
                 });
-                
+
                 // Apply theme
                 const theme = userData.settings?.theme || 'auto';
                 this.applyTheme(theme);
@@ -614,13 +636,13 @@ class Dashboard {
 
     applyTheme(theme) {
         const html = document.documentElement;
-        
+
         if (theme === 'dark' || (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             html.setAttribute('data-theme', 'dark');
         } else {
             html.setAttribute('data-theme', 'light');
         }
-        
+
         // Save to localStorage for consistency
         localStorage.setItem('theme', theme);
     }
@@ -635,14 +657,14 @@ class Dashboard {
             this.loadHabitStreaks()
         ]);
         this.setupNotificationListener();
-        
+
         this.updateGreeting();
     }
 
     startGlobalAlertSystem() {
         // Run immediately
         this.checkGlobalAlerts();
-        
+
         // Run every 15 minutes
         setInterval(() => this.checkGlobalAlerts(), 15 * 60 * 1000);
     }
@@ -650,7 +672,7 @@ class Dashboard {
     setupNotificationListener() {
         if (!this.currentUser) return;
         if (this.notificationListener) return; // Prevent duplicate listeners
-        
+
         let isFirstLoad = true;
 
         // Listen for unread notifications count
@@ -661,7 +683,7 @@ class Dashboard {
                 const count = snapshot.size;
                 const badge = document.getElementById('notification-badge');
                 const btn = document.getElementById('notifications-btn');
-                
+
                 if (badge) {
                     const newText = count > 9 ? '9+' : count;
                     if (badge.textContent != newText) {
@@ -800,7 +822,7 @@ class Dashboard {
                 .where('userId', '==', this.currentUser.uid)
                 .where('read', '==', false)
                 .get();
-            
+
             if (snapshot.empty) return;
 
             snapshot.forEach(doc => {
@@ -826,24 +848,24 @@ class Dashboard {
     async processRecurringTransactions() {
         if (!this.currentUser) return;
         const today = new Date().toISOString().split('T')[0];
-        
+
         try {
             const snapshot = await db.collection('transactions')
                 .where('userId', '==', this.currentUser.uid)
                 .where('recurring', '==', true)
                 .where('nextDueDate', '<=', today)
                 .get();
-                
+
             if (snapshot.empty) return;
-            
+
             const batch = db.batch();
             let count = 0;
-            
+
             snapshot.forEach(doc => {
                 const data = doc.data();
                 let nextDate = data.nextDueDate;
                 let iterations = 0;
-                
+
                 // Process missed occurrences (limit to 12 to prevent infinite loops)
                 while (nextDate <= today && iterations < 12) {
                     const newRef = db.collection('transactions').doc();
@@ -856,7 +878,7 @@ class Dashboard {
                 }
                 batch.update(doc.ref, { nextDueDate: nextDate });
             });
-            
+
             if (count > 0) {
                 await batch.commit();
                 this.showNotification(`Processed ${count} recurring transactions`, 'info');
@@ -871,17 +893,17 @@ class Dashboard {
         try {
             const now = new Date();
             const today = now.toISOString().split('T')[0];
-            
+
             // Get today's transactions
             const transactionsSnapshot = await db.collection('transactions')
                 .where('userId', '==', this.currentUser.uid)
                 .where('date', '==', today)
                 .get();
-            
+
             let totalIncome = 0;
             let totalExpense = 0;
             let totalMoneySaved = 0;
-            
+
             transactionsSnapshot.forEach(doc => {
                 const data = doc.data();
                 if (data.type === 'income') {
@@ -890,14 +912,14 @@ class Dashboard {
                     totalExpense += data.amount;
                 }
             });
-            
+
             const balance = totalIncome - totalExpense;
-            
+
             // Update balance stats
             document.getElementById('today-balance').textContent = `₹${balance.toFixed(2)}`;
             document.getElementById('income-today').textContent = `₹${totalIncome.toFixed(2)}`;
             document.getElementById('expense-today').textContent = `₹${totalExpense.toFixed(2)}`;
-            
+
             // Get active habits count
             const habitsSnapshot = await db.collection('habits')
                 .where('userId', '==', this.currentUser.uid)
@@ -916,14 +938,14 @@ class Dashboard {
                     totalMoneySaved += cleanDays * habit.cost;
                 }
             });
-            
+
             // Get today's completed habits
             const todayHabitsSnapshot = await db.collection('habit_logs')
                 .where('userId', '==', this.currentUser.uid)
                 .where('date', '==', today)
                 .where('completed', '==', true)
                 .get();
-            
+
             document.getElementById('active-habits').textContent = habitsSnapshot.size;
             document.getElementById('completed-today').textContent = todayHabitsSnapshot.size;
 
@@ -941,52 +963,52 @@ class Dashboard {
             } else {
                 moneySavedContainer.classList.add('d-none');
             }
-            
+
             // Get pending tasks
             const tasksSnapshot = await db.collection('reminders')
                 .where('userId', '==', this.currentUser.uid)
                 .where('completed', '==', false)
                 .get();
-            
+
             // Get tasks due today
             const todayTasksSnapshot = await db.collection('reminders')
                 .where('userId', '==', this.currentUser.uid)
                 .where('dueDate', '==', today)
                 .where('completed', '==', false)
                 .get();
-            
+
             document.getElementById('pending-tasks').textContent = tasksSnapshot.size;
             document.getElementById('due-today').textContent = todayTasksSnapshot.size;
-            
+
             // Get total memories
             const memoriesSnapshot = await db.collection('memories')
                 .where('userId', '==', this.currentUser.uid)
                 .get();
-            
+
             // Get this month's memories
             const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
             const monthMemoriesSnapshot = await db.collection('memories')
                 .where('userId', '==', this.currentUser.uid)
                 .where('date', '>=', startOfMonth)
                 .get();
-            
+
             if (document.getElementById('total-memories')) {
                 document.getElementById('total-memories').textContent = memoriesSnapshot.size;
             }
             if (document.getElementById('memories-this-month')) {
                 document.getElementById('memories-this-month').textContent = monthMemoriesSnapshot.size;
             }
-            
+
             // Update Loan Stats
             const loansSnapshot = await db.collection('loans')
                 .where('userId', '==', this.currentUser.uid)
                 .where('status', '==', 'active')
                 .get();
-                
+
             let totalLiability = 0;
             let totalAsset = 0;
             let totalMonthlyEmi = 0;
-            
+
             loansSnapshot.forEach(doc => {
                 const data = doc.data();
                 const remaining = data.totalAmount - (data.paidAmount || 0);
@@ -996,10 +1018,10 @@ class Dashboard {
                 }
                 else if (data.type === 'lent') totalAsset += remaining;
             });
-            
-            if(document.getElementById('total-liability')) document.getElementById('total-liability').textContent = `₹${totalLiability.toFixed(0)}`;
-            if(document.getElementById('total-asset')) document.getElementById('total-asset').textContent = `₹${totalAsset.toFixed(0)}`;
-            if(document.getElementById('total-monthly-emi')) document.getElementById('total-monthly-emi').textContent = `₹${totalMonthlyEmi.toFixed(0)}`;
+
+            if (document.getElementById('total-liability')) document.getElementById('total-liability').textContent = `₹${totalLiability.toFixed(0)}`;
+            if (document.getElementById('total-asset')) document.getElementById('total-asset').textContent = `₹${totalAsset.toFixed(0)}`;
+            if (document.getElementById('total-monthly-emi')) document.getElementById('total-monthly-emi').textContent = `₹${totalMonthlyEmi.toFixed(0)}`;
 
             // Vehicle Distance Stats (This Month)
             const [vehicleLogsSnapshot, vehiclesSnapshot] = await Promise.all([
@@ -1059,9 +1081,9 @@ class Dashboard {
                 .orderBy('createdAt', 'desc')
                 .limit(5)
                 .get();
-            
+
             container.innerHTML = '';
-            
+
             if (snapshot.empty) {
                 container.innerHTML = `
                     <div class="text-center py-4">
@@ -1074,13 +1096,13 @@ class Dashboard {
                 `;
                 return;
             }
-            
+
             snapshot.forEach(doc => {
                 const data = doc.data();
                 const element = this.createTransactionElement(data);
                 container.appendChild(element);
             });
-            
+
         } catch (error) {
             console.error('Error loading transactions:', error);
             container.innerHTML = '<p class="text-danger">Error loading transactions</p>';
@@ -1090,12 +1112,12 @@ class Dashboard {
     createTransactionElement(data) {
         const div = document.createElement('div');
         div.className = 'transaction-item';
-        
+
         const isIncome = data.type === 'income';
         const amountClass = isIncome ? 'transaction-income' : 'transaction-expense';
         const amountPrefix = isIncome ? '+' : '-';
         const icon = isIncome ? 'fa-arrow-down' : 'fa-arrow-up';
-        
+
         div.innerHTML = `
             <div class="transaction-info">
                 <div class="d-flex align-items-center gap-2">
@@ -1112,7 +1134,7 @@ class Dashboard {
                 ${amountPrefix}₹${data.amount.toFixed(2)}
             </div>
         `;
-        
+
         return div;
     }
 
@@ -1122,16 +1144,16 @@ class Dashboard {
 
         try {
             const today = new Date().toISOString().split('T')[0];
-            
+
             // Get habits for today
             const habitsSnapshot = await db.collection('habits')
                 .where('userId', '==', this.currentUser.uid)
                 .where('active', '==', true)
                 .limit(5)
                 .get();
-            
+
             container.innerHTML = '';
-            
+
             if (habitsSnapshot.empty) {
                 container.innerHTML = `
                     <div class="text-center py-4">
@@ -1144,20 +1166,20 @@ class Dashboard {
                 `;
                 return;
             }
-            
+
             // Get today's habit logs
             const logsSnapshot = await db.collection('habit_logs')
                 .where('userId', '==', this.currentUser.uid)
                 .where('date', '==', today)
                 .get();
-            
+
             const completedHabits = new Set();
             logsSnapshot.forEach(doc => {
                 if (doc.data().completed) {
                     completedHabits.add(doc.data().habitId);
                 }
             });
-            
+
             habitsSnapshot.forEach(doc => {
                 const habit = doc.data();
                 habit.id = doc.id;
@@ -1165,7 +1187,7 @@ class Dashboard {
                 const element = this.createHabitElement(habit);
                 container.appendChild(element);
             });
-            
+
         } catch (error) {
             console.error('Error loading habits:', error);
             container.innerHTML = '<p class="text-danger">Error loading habits</p>';
@@ -1176,15 +1198,15 @@ class Dashboard {
         const div = document.createElement('div');
         div.className = 'habit-item';
         div.dataset.habitId = habit.id;
-        
+
         const isBad = habit.type === 'bad';
-        const btnClass = isBad 
-            ? (habit.completed ? 'btn-danger' : 'btn-outline-danger') 
+        const btnClass = isBad
+            ? (habit.completed ? 'btn-danger' : 'btn-outline-danger')
             : (habit.completed ? 'btn-success' : 'btn-outline-success');
-        const iconClass = isBad 
-            ? (habit.completed ? 'fa-skull' : 'fa-ban') 
+        const iconClass = isBad
+            ? (habit.completed ? 'fa-skull' : 'fa-ban')
             : 'fa-check';
-            
+
         // Add tooltip title for clarity
         const btnTitle = isBad
             ? (habit.completed ? 'Undo Relapse' : 'Log Relapse (I did it)')
@@ -1207,7 +1229,7 @@ class Dashboard {
                 </button>
             </div>
         `;
-        
+
         return div;
     }
 
@@ -1230,11 +1252,11 @@ class Dashboard {
             const offset = now.getTimezoneOffset();
             const todayDate = new Date(now.getTime() - (offset * 60 * 1000));
             const today = todayDate.toISOString().split('T')[0];
-            
+
             const nextWeekDate = new Date(now.getTime() - (offset * 60 * 1000));
             nextWeekDate.setDate(nextWeekDate.getDate() + 7);
             const nextWeekString = nextWeekDate.toISOString().split('T')[0];
-            
+
             const snapshot = await db.collection('reminders')
                 .where('userId', '==', this.currentUser.uid)
                 .where('completed', '==', false)
@@ -1243,9 +1265,9 @@ class Dashboard {
                 .orderBy('dueDate')
                 .limit(5)
                 .get();
-            
+
             container.innerHTML = '';
-            
+
             if (snapshot.empty) {
                 container.innerHTML = `
                     <div class="text-center py-4">
@@ -1258,14 +1280,14 @@ class Dashboard {
                 `;
                 return;
             }
-            
+
             snapshot.forEach(doc => {
                 const task = doc.data();
                 task.id = doc.id;
                 const element = this.createTaskElement(task);
                 container.appendChild(element);
             });
-            
+
         } catch (error) {
             console.error('Error loading tasks:', error);
             container.innerHTML = '<p class="text-danger">Error loading tasks</p>';
@@ -1276,12 +1298,12 @@ class Dashboard {
         const div = document.createElement('div');
         div.className = 'task-item';
         div.dataset.taskId = task.id;
-        
+
         const priorityClass = `priority-${task.priority || 'medium'}`;
         const dueDate = new Date(task.dueDate);
         const today = new Date();
         const isToday = dueDate.toDateString() === today.toDateString();
-        
+
         div.innerHTML = `
             <div class="task-checkbox">
                 <input type="checkbox" class="form-check-input" 
@@ -1301,7 +1323,7 @@ class Dashboard {
                 ${task.priority || 'medium'}
             </div>
         `;
-        
+
         return div;
     }
 
@@ -1315,27 +1337,27 @@ class Dashboard {
                 .where('active', '==', true)
                 .limit(5)
                 .get();
-            
+
             container.innerHTML = '';
-            
+
             if (snapshot.empty) {
                 container.innerHTML = '<p class="text-muted text-center">No active habits</p>';
                 return;
             }
-            
+
             // Get streak data for each habit
             const habitPromises = snapshot.docs.map(async doc => {
                 const habit = doc.data();
                 habit.id = doc.id;
-                
+
                 let streak = 0;
-                
+
                 if (habit.type === 'bad') {
                     // Bad Habit: Days since last log (Relapse)
                     const today = new Date();
                     const startDate = habit.createdAt ? habit.createdAt.toDate() : today;
                     const lastRelapse = habit.lastLogDate ? new Date(habit.lastLogDate) : startDate;
-                    
+
                     // If logged today, streak is 0
                     // We need to check if logged today, but for the widget we can approximate
                     // or fetch today's log. For simplicity, we use the diff.
@@ -1350,14 +1372,14 @@ class Dashboard {
                         .orderBy('date', 'desc')
                         .limit(30)
                         .get();
-                    
+
                     const today = new Date();
                     let currentDate = new Date(today);
-                    
+
                     for (let i = 0; i < 30; i++) {
                         const dateString = currentDate.toISOString().split('T')[0];
                         const hasLog = logsSnapshot.docs.some(log => log.data().date === dateString);
-                        
+
                         if (hasLog) {
                             streak++;
                             currentDate.setDate(currentDate.getDate() - 1);
@@ -1366,18 +1388,18 @@ class Dashboard {
                         }
                     }
                 }
-                
+
                 habit.streak = streak;
                 return habit;
             });
-            
+
             const habits = await Promise.all(habitPromises);
-            
+
             habits.forEach(habit => {
                 const element = this.createStreakElement(habit);
                 container.appendChild(element);
             });
-            
+
         } catch (error) {
             console.error('Error loading habit streaks:', error);
             container.innerHTML = '<p class="text-danger">Error loading streaks</p>';
@@ -1388,7 +1410,7 @@ class Dashboard {
         const div = document.createElement('div');
         div.className = 'streak-item mb-3';
         const label = habit.type === 'bad' ? 'Days Clean' : 'Current streak';
-        
+
         div.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
                 <div>
@@ -1406,7 +1428,7 @@ class Dashboard {
                 </div>
             </div>
         `;
-        
+
         return div;
     }
 
@@ -1415,7 +1437,7 @@ class Dashboard {
             const period = document.getElementById('chart-period')?.value || 'week';
             let startDate, endDate;
             const today = new Date();
-            
+
             switch (period) {
                 case 'week':
                     startDate = new Date(today);
@@ -1430,45 +1452,45 @@ class Dashboard {
                     endDate = new Date(today.getFullYear(), 11, 31);
                     break;
             }
-            
+
             // Format dates for query
             const startDateString = startDate.toISOString().split('T')[0];
             const endDateString = (endDate || today).toISOString().split('T')[0];
-            
+
             // Get transactions for the period
             const snapshot = await db.collection('transactions')
                 .where('userId', '==', this.currentUser.uid)
                 .where('date', '>=', startDateString)
                 .where('date', '<=', endDateString)
                 .get();
-            
+
             // Process data for chart
             const incomeData = {};
             const expenseData = {};
-            
+
             snapshot.forEach(doc => {
                 const data = doc.data();
                 const date = data.date;
-                
+
                 if (data.type === 'income') {
                     incomeData[date] = (incomeData[date] || 0) + data.amount;
                 } else {
                     expenseData[date] = (expenseData[date] || 0) + data.amount;
                 }
             });
-            
+
             // Generate labels based on period
             const labels = [];
             const incomeValues = [];
             const expenseValues = [];
-            
+
             let currentDate = new Date(startDate);
             while (currentDate <= (endDate || today)) {
                 const dateString = currentDate.toISOString().split('T')[0];
                 labels.push(this.formatChartLabel(dateString, period));
                 incomeValues.push(incomeData[dateString] || 0);
                 expenseValues.push(expenseData[dateString] || 0);
-                
+
                 if (period === 'week') {
                     currentDate.setDate(currentDate.getDate() + 1);
                 } else if (period === 'month') {
@@ -1477,15 +1499,15 @@ class Dashboard {
                     currentDate.setMonth(currentDate.getMonth() + 1);
                 }
             }
-            
+
             // Create or update chart
             const ctx = document.getElementById('financeChart')?.getContext('2d');
             if (!ctx) return;
-            
+
             if (this.financeChart) {
                 this.financeChart.destroy();
             }
-            
+
             const isMobile = window.innerWidth < 768;
 
             this.financeChart = new Chart(ctx, {
@@ -1523,8 +1545,8 @@ class Dashboard {
                                 color: 'rgba(0, 0, 0, 0.05)'
                             },
                             ticks: {
-                                callback: function(value) {
-                                    if (isMobile && value >= 1000) return '₹' + (value/1000).toFixed(1) + 'k';
+                                callback: function (value) {
+                                    if (isMobile && value >= 1000) return '₹' + (value / 1000).toFixed(1) + 'k';
                                     return '₹' + value;
                                 },
                                 font: {
@@ -1558,7 +1580,7 @@ class Dashboard {
                         },
                         tooltip: {
                             callbacks: {
-                                label: function(context) {
+                                label: function (context) {
                                     return context.dataset.label + ': ₹' + context.parsed.y.toFixed(2);
                                 }
                             }
@@ -1566,7 +1588,7 @@ class Dashboard {
                     }
                 }
             });
-            
+
         } catch (error) {
             console.error('Error updating finance chart:', error);
         }
@@ -1574,7 +1596,7 @@ class Dashboard {
 
     formatChartLabel(dateString, period) {
         const date = new Date(dateString);
-        
+
         switch (period) {
             case 'week':
                 return date.toLocaleDateString('en-US', { weekday: 'short' });
@@ -1598,29 +1620,29 @@ class Dashboard {
         document.querySelectorAll('[data-section]').forEach(element => {
             element.classList.toggle('active', element.dataset.section === section);
         });
-        
+
         // Hide all sections
         document.querySelectorAll('.content-section').forEach(section => {
             section.classList.add('d-none');
         });
-        
+
         // Show selected section
         const sectionElement = document.getElementById(`${section}-section`);
         if (sectionElement) {
             sectionElement.classList.remove('d-none');
-            
+
             // Load section-specific content
             this.loadSectionContent(section).catch(error => {
                 console.error(`Error loading section ${section}:`, error);
             });
         }
-        
+
         this.currentSection = section;
-        
+
         // Handle Mobile Navigation State & Back Button
         const body = document.body;
         const backBtn = document.getElementById('nav-back-btn');
-        
+
         if (section === 'dashboard') {
             body.classList.add('is-dashboard');
             if (backBtn) backBtn.classList.add('d-none');
@@ -1722,9 +1744,9 @@ class Dashboard {
     async populateTransactionCCSelect() {
         const select = document.getElementById('transaction-credit-card');
         if (!select) return;
-        
+
         const snapshot = await db.collection('credit_cards').where('userId', '==', this.currentUser.uid).get();
-        
+
         select.innerHTML = '<option value="" selected disabled>Choose a card...</option>';
         snapshot.forEach(doc => {
             select.innerHTML += `<option value="${doc.id}">${doc.data().name} (..${doc.data().last4 || ''})</option>`;
@@ -1734,9 +1756,9 @@ class Dashboard {
     async populateTransactionWalletSelect() {
         const select = document.getElementById('transaction-wallet');
         if (!select) return;
-        
+
         const snapshot = await db.collection('wallets').where('userId', '==', this.currentUser.uid).get();
-        
+
         select.innerHTML = '<option value="" selected disabled>Choose a wallet...</option>';
         snapshot.forEach(doc => {
             select.innerHTML += `<option value="${doc.id}">${doc.data().name} (₹${doc.data().balance})</option>`;
@@ -1747,7 +1769,7 @@ class Dashboard {
         // Load categories first
         this.loadTransactionCategories().then(() => {
             const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addTransactionModal'));
-            
+
             // Set default values
             document.getElementById('type-income').checked = type === 'income';
             document.getElementById('type-expense').checked = type === 'expense';
@@ -1759,15 +1781,15 @@ class Dashboard {
             document.getElementById('recurring-transaction').checked = false;
             document.getElementById('recurring-options').classList.add('d-none');
             document.getElementById('transaction-frequency').value = 'monthly';
-            
+
             // Populate CCs
             this.populateTransactionCCSelect();
             this.populateTransactionWalletSelect();
 
             // Reset button state
             const btn = document.getElementById('save-transaction');
-            if(btn) window.setBtnLoading(btn, false);
-            
+            if (btn) window.setBtnLoading(btn, false);
+
             modal.show();
         });
     }
@@ -1778,15 +1800,15 @@ class Dashboard {
                 .where('userId', '==', this.currentUser.uid)
                 .where('type', '==', 'income')
                 .get();
-            
+
             const expenseSnapshot = await db.collection('categories')
                 .where('userId', '==', this.currentUser.uid)
                 .where('type', '==', 'expense')
                 .get();
-            
+
             const select = document.getElementById('transaction-category');
             if (!select) return;
-            
+
             select.innerHTML = '';
 
             // Add "Add New" option
@@ -1801,7 +1823,7 @@ class Dashboard {
             defaultOption.textContent = 'Select Category';
             defaultOption.selected = true;
             select.appendChild(defaultOption);
-            
+
             // Add income categories
             if (!incomeSnapshot.empty) {
                 const optgroup = document.createElement('optgroup');
@@ -1817,7 +1839,7 @@ class Dashboard {
                 });
                 select.appendChild(optgroup);
             }
-            
+
             // Add expense categories
             if (!expenseSnapshot.empty) {
                 const optgroup = document.createElement('optgroup');
@@ -1833,7 +1855,7 @@ class Dashboard {
                 });
                 select.appendChild(optgroup);
             }
-            
+
         } catch (error) {
             console.error('Error loading categories:', error);
         }
@@ -1853,17 +1875,17 @@ class Dashboard {
             const frequency = document.getElementById('transaction-frequency').value;
             const creditCardId = document.getElementById('transaction-credit-card').value;
             const walletId = document.getElementById('transaction-wallet').value;
-            
+
             if (!type || !amount || !category || !date) {
                 this.showNotification('Please fill all required fields', 'danger');
                 return;
             }
-            
+
             if (amount <= 0) {
                 this.showNotification('Amount must be greater than 0', 'danger');
                 return;
             }
-            
+
             window.setBtnLoading(btn, true);
 
             const transaction = {
@@ -1879,7 +1901,16 @@ class Dashboard {
                 nextDueDate: isRecurring ? this.calculateNextDate(date, frequency) : null,
                 relatedId: (paymentMode === 'credit-card' && creditCardId) ? creditCardId : ((paymentMode === 'wallet' && walletId) ? walletId : null)
             };
-            
+
+            if (!id && type === 'expense' && this.isUpiPaymentMode(paymentMode)) {
+                this.pendingUpiTransaction = transaction;
+                this.selectedUpiApp = paymentMode === 'upi' ? '' : paymentMode;
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('addTransactionModal')).hide();
+                this.openUpiPaymentModal(transaction);
+                window.setBtnLoading(btn, false);
+                return;
+            }
+
             if (id) {
                 transaction.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
                 await db.collection('transactions').doc(id).update(transaction);
@@ -1901,26 +1932,26 @@ class Dashboard {
                     });
                 }
             }
-            
+
             // Close modal
             bootstrap.Modal.getOrCreateInstance(document.getElementById('addTransactionModal')).hide();
-            
+
             // Reset form
             document.getElementById('transaction-form').reset();
-            
+
             // Update dashboard
             this.updateStats();
             this.loadRecentTransactions();
             this.updateFinanceChart();
-            
+
             // Reload finance table if active
             if (this.currentSection === 'finance' && typeof window.loadFinanceData === 'function') {
                 window.loadFinanceData();
             }
-            
+
             this.showNotification(id ? 'Transaction updated successfully!' : 'Transaction added successfully!', 'success');
             window.setBtnLoading(btn, false);
-            
+
         } catch (error) {
             window.setBtnLoading(btn, false);
             console.error('Error saving transaction:', error);
@@ -1928,12 +1959,90 @@ class Dashboard {
         }
     }
 
+    isUpiPaymentMode(mode) {
+        return mode === 'upi' || (typeof mode === 'string' && mode.startsWith('upi-'));
+    }
+
+    openUpiPaymentModal(transaction) {
+        const summary = document.getElementById('upi-payment-summary');
+        if (summary) {
+            summary.textContent = `Amount: ₹${Number(transaction.amount || 0).toFixed(2)} | Category: ${transaction.category || '-'} | Date: ${transaction.date || '-'}`;
+        }
+
+        document.querySelectorAll('#upi-app-list [data-upi-app]').forEach((btn) => btn.classList.remove('active'));
+        if (this.selectedUpiApp) {
+            const selectedBtn = document.querySelector(`#upi-app-list [data-upi-app="${this.selectedUpiApp}"]`);
+            if (selectedBtn) selectedBtn.classList.add('active');
+        }
+
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('upiPaymentModal'));
+        modal.show();
+    }
+
+    openSelectedUpiApp() {
+        if (!this.pendingUpiTransaction) return;
+        if (!this.selectedUpiApp) {
+            this.showNotification('Select a UPI app first', 'warning');
+            return;
+        }
+
+        const appLinks = {
+            'upi-bhim': 'bhim://',
+            'upi-phonepe': 'phonepe://',
+            'upi-gpay': 'tez://',
+            'upi-navi': 'navi://',
+            'upi-cred': 'credpay://'
+        };
+
+        const link = appLinks[this.selectedUpiApp] || 'upi://pay';
+        window.location.href = link;
+        this.showNotification('Complete payment in UPI app, then return and tap Payment Done & Save', 'info');
+    }
+
+    async completePendingUpiTransaction() {
+        if (!this.pendingUpiTransaction) return;
+
+        const tx = {
+            ...this.pendingUpiTransaction,
+            paymentMode: this.selectedUpiApp || this.pendingUpiTransaction.paymentMode,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        try {
+            await db.collection('transactions').add(tx);
+
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('upiPaymentModal')).hide();
+            this.pendingUpiTransaction = null;
+            this.selectedUpiApp = '';
+            document.getElementById('transaction-form')?.reset();
+
+            this.updateStats();
+            this.loadRecentTransactions();
+            this.updateFinanceChart();
+            if (this.currentSection === 'finance' && typeof window.loadFinanceData === 'function') {
+                window.loadFinanceData();
+            }
+
+            this.showNotification('Expense saved after UPI payment', 'success');
+        } catch (error) {
+            console.error('Error saving UPI transaction:', error);
+            this.showNotification('Error saving UPI transaction: ' + error.message, 'danger');
+        }
+    }
+
+    cancelPendingUpiTransaction() {
+        this.pendingUpiTransaction = null;
+        this.selectedUpiApp = '';
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('upiPaymentModal')).hide();
+        this.showNotification('UPI payment flow cancelled. Transaction not saved.', 'warning');
+    }
+
     showHabitModal() {
         const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addHabitModal'));
-        
+
         // Setup color picker
         this.setupColorPicker();
-        
+
         // Set default values
         document.getElementById('type-good').checked = true;
         document.getElementById('habit-id').value = '';
@@ -1944,7 +2053,7 @@ class Dashboard {
         document.getElementById('habit-reminder-time').value = '';
         document.getElementById('habit-cost').value = '';
         this.updateHabitModalUI('good');
-        
+
         modal.show();
     }
 
@@ -1953,12 +2062,12 @@ class Dashboard {
             '#4361ee', '#3a0ca3', '#4cc9f0', '#f72585',
             '#7209b7', '#ff9e00', '#06d6a0', '#ef476f'
         ];
-        
+
         const container = document.getElementById('color-picker');
         if (!container) return;
-        
+
         container.innerHTML = '';
-        
+
         colors.forEach(color => {
             const colorBtn = document.createElement('button');
             colorBtn.type = 'button';
@@ -1972,17 +2081,17 @@ class Dashboard {
                 cursor: pointer;
             `;
             colorBtn.dataset.color = color;
-            
+
             colorBtn.addEventListener('click', () => {
                 document.querySelectorAll('.color-option').forEach(btn => {
                     btn.style.borderColor = 'transparent';
                 });
                 colorBtn.style.borderColor = '#000';
             });
-            
+
             container.appendChild(colorBtn);
         });
-        
+
         // Select first color by default
         if (container.firstChild) {
             container.firstChild.style.borderColor = '#000';
@@ -2001,12 +2110,12 @@ class Dashboard {
             const reminderTime = document.getElementById('habit-reminder-time').value;
             const cost = parseFloat(document.getElementById('habit-cost').value) || 0;
             const selectedColor = document.querySelector('.color-option[style*="border-color: rgb(0, 0, 0)"]')?.dataset.color || '#4361ee';
-            
+
             if (!name) {
                 this.showNotification('Please enter habit name', 'danger');
                 return;
             }
-            
+
             if (type === 'good' && target < 1) {
                 this.showNotification('Target must be at least 1', 'danger');
                 return;
@@ -2016,7 +2125,7 @@ class Dashboard {
                 this.showNotification('Limit cannot be negative', 'danger');
                 return;
             }
-            
+
             window.setBtnLoading(btn, true);
 
             const habit = {
@@ -2034,7 +2143,7 @@ class Dashboard {
                 totalCompletions: 0,
                 longestStreak: 0
             };
-            
+
             if (id) {
                 habit.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
                 await db.collection('habits').doc(id).update(habit);
@@ -2042,21 +2151,21 @@ class Dashboard {
                 habit.createdAt = firebase.firestore.FieldValue.serverTimestamp();
                 await db.collection('habits').add(habit);
             }
-            
+
             // Close modal
             window.setBtnLoading(btn, false);
             bootstrap.Modal.getOrCreateInstance(document.getElementById('addHabitModal')).hide();
-            
+
             // Reset form
             document.getElementById('habit-form').reset();
-            
+
             // Update dashboard
             this.updateStats();
             this.loadTodaysHabits();
             this.loadHabitStreaks();
-            
+
             this.showNotification(id ? 'Habit updated successfully!' : 'Habit created successfully!', 'success');
-            
+
         } catch (error) {
             window.setBtnLoading(btn, false);
             console.error('Error saving habit:', error);
@@ -2066,7 +2175,7 @@ class Dashboard {
 
     showReminderModal() {
         const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addReminderModal'));
-        
+
         // Set default values
         document.getElementById('reminder-id').value = '';
         const today = new Date().toISOString().split('T')[0];
@@ -2076,7 +2185,7 @@ class Dashboard {
         document.getElementById('reminder-time').value = '';
         document.getElementById('reminder-priority').value = 'medium';
         document.getElementById('reminder-notification').checked = true;
-        
+
         modal.show();
     }
 
@@ -2091,12 +2200,12 @@ class Dashboard {
             const priority = document.getElementById('reminder-priority').value;
             const sendNotification = document.getElementById('reminder-notification').checked;
             const alertDaysBefore = parseInt(document.getElementById('reminder-alert-days').value) || 0;
-            
+
             if (!title || !dueDate) {
                 this.showNotification('Please fill all required fields', 'danger');
                 return;
             }
-            
+
             window.setBtnLoading(btn, true);
 
             const reminder = {
@@ -2110,7 +2219,7 @@ class Dashboard {
                 completed: false,
                 userId: this.currentUser.uid,
             };
-            
+
             if (id) {
                 reminder.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
                 await db.collection('reminders').doc(id).update(reminder);
@@ -2120,17 +2229,17 @@ class Dashboard {
                 const docRef = await db.collection('reminders').add(reminder);
                 reminder.id = docRef.id;
             }
-            
+
             // Close modal
             bootstrap.Modal.getOrCreateInstance(document.getElementById('addReminderModal')).hide();
-            
+
             // Reset form
             document.getElementById('reminder-form').reset();
-            
+
             // Update dashboard
             this.updateStats();
             this.loadUpcomingTasks();
-            
+
             // Refresh Reminders Section if active
             if (this.currentSection === 'reminders' && window.loadTasks) {
                 const activeTab = document.querySelector('#reminders-section .nav-link.active');
@@ -2139,7 +2248,7 @@ class Dashboard {
             }
 
             this.showNotification(id ? 'Task updated successfully!' : 'Task added successfully!', 'success');
-            
+
             // Schedule or Cancel notification
             if (sendNotification) {
                 this.scheduleNotification(reminder);
@@ -2149,7 +2258,7 @@ class Dashboard {
             }
 
             window.setBtnLoading(btn, false);
-            
+
         } catch (error) {
             window.setBtnLoading(btn, false);
             console.error('Error saving reminder:', error);
@@ -2171,7 +2280,7 @@ class Dashboard {
 
         // Parse date as Local Time (append T00:00:00)
         const dueDateTime = new Date(reminder.dueDate + 'T00:00:00');
-        
+
         if (reminder.time) {
             const [hours, minutes] = reminder.time.split(':');
             dueDateTime.setHours(parseInt(hours), parseInt(minutes));
@@ -2179,15 +2288,15 @@ class Dashboard {
             // Default to 9:00 AM if no time specified
             dueDateTime.setHours(9, 0, 0);
         }
-        
+
         // Adjust for "Days Before"
         if (reminder.alertDaysBefore && reminder.alertDaysBefore > 0) {
             dueDateTime.setDate(dueDateTime.getDate() - parseInt(reminder.alertDaysBefore));
         }
-        
+
         const now = new Date();
         const timeUntilDue = dueDateTime.getTime() - now.getTime();
-        
+
         if (timeUntilDue > 0) {
             this.notificationTimeouts[reminder.id] = setTimeout(() => {
                 if ('Notification' in window && Notification.permission === 'granted') {
@@ -2196,7 +2305,7 @@ class Dashboard {
                         icon: '/icons/icon-192.png'
                     });
                 }
-                
+
                 // Create in-app notification
                 db.collection('notifications').add({
                     userId: this.currentUser.uid,
@@ -2207,7 +2316,7 @@ class Dashboard {
                     relatedId: reminder.id || null,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                
+
                 // Cleanup timeout reference
                 delete this.notificationTimeouts[reminder.id];
             }, timeUntilDue);
@@ -2216,7 +2325,7 @@ class Dashboard {
 
     showMemoryModal() {
         const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addMemoryModal'));
-        
+
         // Set default values
         document.getElementById('memory-id').value = '';
         const today = new Date().toISOString().split('T')[0];
@@ -2225,13 +2334,13 @@ class Dashboard {
         document.getElementById('memory-date').value = today;
         document.getElementById('memory-image').value = '';
         document.getElementById('memory-tags').value = '';
-        
+
         // Clear preview
         const previewContainer = document.querySelector('.preview-container');
         if (previewContainer) {
             previewContainer.classList.add('d-none');
         }
-        
+
         modal.show();
     }
 
@@ -2239,10 +2348,10 @@ class Dashboard {
         const file = event.target.files[0];
         const preview = document.getElementById('image-preview');
         const previewContainer = document.querySelector('.preview-container');
-        
+
         if (file && preview && previewContainer) {
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = function (e) {
                 preview.src = e.target.result;
                 previewContainer.classList.remove('d-none');
             };
@@ -2259,16 +2368,16 @@ class Dashboard {
             const date = document.getElementById('memory-date').value;
             const tags = document.getElementById('memory-tags').value.split(',').map(tag => tag.trim()).filter(tag => tag);
             const imageFile = document.getElementById('memory-image').files[0];
-            
+
             if (!title) {
                 this.showNotification('Please enter a title', 'danger');
                 return;
             }
-            
+
             window.setBtnLoading(btn, true);
 
             let imageUrl = null;
-            
+
             // Upload image if exists
             if (imageFile) {
                 const storageRef = storage.ref();
@@ -2276,7 +2385,7 @@ class Dashboard {
                 await imageRef.put(imageFile);
                 imageUrl = await imageRef.getDownloadURL();
             }
-            
+
             const memory = {
                 title: title,
                 description: description,
@@ -2285,7 +2394,7 @@ class Dashboard {
                 imageUrl: imageUrl,
                 userId: this.currentUser.uid,
             };
-            
+
             if (id) {
                 memory.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
                 if (!imageUrl) delete memory.imageUrl; // Don't overwrite image if not changed
@@ -2294,23 +2403,23 @@ class Dashboard {
                 memory.createdAt = firebase.firestore.FieldValue.serverTimestamp();
                 await db.collection('memories').add(memory);
             }
-            
+
             // Close modal
             window.setBtnLoading(btn, false);
             bootstrap.Modal.getOrCreateInstance(document.getElementById('addMemoryModal')).hide();
-            
+
             // Reset form
             document.getElementById('memory-form').reset();
             const previewContainer = document.querySelector('.preview-container');
             if (previewContainer) {
                 previewContainer.classList.add('d-none');
             }
-            
+
             // Update dashboard
             this.updateStats();
-            
+
             this.showNotification(id ? 'Memory updated successfully!' : 'Memory saved successfully!', 'success');
-            
+
         } catch (error) {
             window.setBtnLoading(btn, false);
             console.error('Error saving memory:', error);
@@ -2323,14 +2432,14 @@ class Dashboard {
             const today = new Date().toISOString().split('T')[0];
             const habitDoc = await db.collection('habits').doc(habitId).get();
             const habitData = habitDoc.data();
-            
+
             // Check if already logged today
             const existingLog = await db.collection('habit_logs')
                 .where('userId', '==', this.currentUser.uid)
                 .where('habitId', '==', habitId)
                 .where('date', '==', today)
                 .get();
-            
+
             // Confirmation for Bad Habits (Relapse)
             if (habitData.type === 'bad' && existingLog.empty) {
                 if (!confirm("Are you sure you want to log a relapse? This will reset your streak.")) {
@@ -2342,7 +2451,7 @@ class Dashboard {
                 // Update existing log
                 const logDoc = existingLog.docs[0];
                 const currentStatus = logDoc.data().completed;
-                
+
                 // If undoing a bad habit relapse (setting to false), restore lastLogDate
                 if (habitData.type === 'bad' && currentStatus === true) {
                     const prevLogSnap = await db.collection('habit_logs')
@@ -2353,7 +2462,7 @@ class Dashboard {
                         .orderBy('date', 'desc')
                         .limit(1)
                         .get();
-                    
+
                     const newLastLogDate = !prevLogSnap.empty ? prevLogSnap.docs[0].data().date : (habitData.createdAt ? new Date(habitData.createdAt.toDate()).toISOString().split('T')[0] : null);
                     await db.collection('habits').doc(habitId).update({ lastLogDate: newLastLogDate });
                 }
@@ -2362,9 +2471,9 @@ class Dashboard {
                     completed: !currentStatus,
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                
-                const msg = habitData.type === 'bad' 
-                    ? (!currentStatus ? 'Relapse logged.' : 'Relapse undone.') 
+
+                const msg = habitData.type === 'bad'
+                    ? (!currentStatus ? 'Relapse logged.' : 'Relapse undone.')
                     : (!currentStatus ? 'Habit completed!' : 'Habit unchecked.');
                 this.showNotification(msg, 'success');
             } else {
@@ -2374,7 +2483,7 @@ class Dashboard {
                     const todayDate = new Date();
                     const diffTime = Math.abs(todayDate - lastDate);
                     const daysClean = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                    
+
                     const currentLongest = habitData.longestStreak || 0;
                     if (daysClean > currentLongest) {
                         await db.collection('habits').doc(habitId).update({ longestStreak: daysClean });
@@ -2395,11 +2504,11 @@ class Dashboard {
                     completed: true,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                
+
                 const msg = habitData.type === 'bad' ? 'Relapse recorded.' : 'Habit completed!';
                 this.showNotification(msg, 'success');
             }
-            
+
             // Handle updating totalCompletions for existing log toggle
             if (!existingLog.empty) {
                 const logDoc = existingLog.docs[0];
@@ -2413,7 +2522,7 @@ class Dashboard {
             this.loadTodaysHabits();
             this.updateStats();
             this.loadHabitStreaks();
-            
+
         } catch (error) {
             console.error('Error toggling habit:', error);
             this.showNotification('Error updating habit', 'danger');
@@ -2426,13 +2535,13 @@ class Dashboard {
                 completed: completed,
                 completedAt: completed ? firebase.firestore.FieldValue.serverTimestamp() : null
             });
-            
+
             this.showNotification(`Task ${completed ? 'completed' : 'reopened'}!`, 'success');
-            
+
             // Update UI
             this.updateStats();
             this.loadUpcomingTasks();
-            
+
         } catch (error) {
             console.error('Error toggling task:', error);
             this.showNotification('Error updating task', 'danger');
@@ -2442,16 +2551,16 @@ class Dashboard {
     showNotification(message, type = 'info') {
         const toastElement = document.getElementById('notification-toast');
         const toastBody = toastElement.querySelector('.toast-body');
-        
+
         if (!toastElement || !toastBody) return;
-        
+
         // Set message
         toastBody.textContent = message;
-        
+
         // Set icon based on type
         const toastHeader = toastElement.querySelector('.toast-header');
         const icon = toastHeader.querySelector('i');
-        
+
         switch (type) {
             case 'success':
                 icon.className = 'fas fa-check-circle text-success me-2';
@@ -2465,7 +2574,7 @@ class Dashboard {
             default:
                 icon.className = 'fas fa-info-circle text-primary me-2';
         }
-        
+
         // Show toast
         const toast = new bootstrap.Toast(toastElement);
         toast.show();
@@ -2501,12 +2610,12 @@ class Dashboard {
             // 1. Get User Settings
             const userDoc = await db.collection('users').doc(this.currentUser.uid).get();
             const settings = userDoc.data()?.settings || {};
-            
+
             // Master switch
             if (settings.notifications === false) return;
 
             const today = new Date();
-            today.setHours(0,0,0,0);
+            today.setHours(0, 0, 0, 0);
             const todayStr = today.toISOString().split('T')[0];
 
             // Helper to check if we notified today
@@ -2514,9 +2623,9 @@ class Dashboard {
                 if (!data.lastAlertDate) return false;
                 const last = data.lastAlertDate.toDate ? data.lastAlertDate.toDate() : new Date(data.lastAlertDate);
                 const now = new Date();
-                return last.getDate() === now.getDate() && 
-                       last.getMonth() === now.getMonth() && 
-                       last.getFullYear() === now.getFullYear();
+                return last.getDate() === now.getDate() &&
+                    last.getMonth() === now.getMonth() &&
+                    last.getFullYear() === now.getFullYear();
             };
 
             // Helper to check if we already notified for this item
@@ -2549,7 +2658,7 @@ class Dashboard {
 
                     // Toast
                     this.showNotification(`${title}: ${message}`, priority === 'high' ? 'danger' : 'info');
-                    
+
                     // Update source doc to prevent spam today
                     if (collection) {
                         db.collection(collection).doc(relatedId).update({
@@ -2566,7 +2675,7 @@ class Dashboard {
                     .where('completed', '==', false)
                     .where('dueDate', '<=', todayStr)
                     .get();
-                
+
                 tasksSnap.forEach(doc => {
                     const task = doc.data();
                     if (notifiedToday(task)) return;
@@ -2589,7 +2698,7 @@ class Dashboard {
                 const expirySnap = await db.collection('expiry_docs')
                     .where('userId', '==', this.currentUser.uid)
                     .get();
-                
+
                 expirySnap.forEach(doc => {
                     const data = doc.data();
                     if (notifiedToday(data)) return;
@@ -2614,7 +2723,7 @@ class Dashboard {
                     .where('userId', '==', this.currentUser.uid)
                     .where('status', '==', 'active')
                     .get();
-                
+
                 loansSnap.forEach(doc => {
                     const loan = doc.data();
                     if (notifiedToday(loan)) return;
@@ -2680,7 +2789,7 @@ class Dashboard {
 }
 
 // Global Utility for Button Loading State
-window.setBtnLoading = function(btn, isLoading) {
+window.setBtnLoading = function (btn, isLoading) {
     if (!btn) return;
     if (isLoading) {
         btn.dataset.originalText = btn.innerHTML;
@@ -2698,25 +2807,25 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Global functions for inline event handlers
-window.switchSection = function(section) {
+window.switchSection = function (section) {
     if (window.dashboard) {
         window.dashboard.switchSection(section);
     }
 };
 
-window.handleQuickAction = function(action) {
+window.handleQuickAction = function (action) {
     if (window.dashboard) {
         window.dashboard.handleQuickAction(action);
     }
 };
 
-window.toggleHabitCompletion = function(habitId) {
+window.toggleHabitCompletion = function (habitId) {
     if (window.dashboard) {
         return window.dashboard.toggleHabitCompletion(habitId);
     }
 };
 
-window.toggleTaskCompletion = function(taskId, completed) {
+window.toggleTaskCompletion = function (taskId, completed) {
     if (window.dashboard) {
         window.dashboard.toggleTaskCompletion(taskId, completed);
     }
