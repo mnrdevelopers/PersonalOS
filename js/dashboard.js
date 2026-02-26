@@ -1991,7 +1991,8 @@ class Dashboard {
             'upi-phonepe': 'phonepe://',
             'upi-gpay': 'tez://',
             'upi-navi': 'navi://',
-            'upi-cred': 'credpay://'
+            'upi-cred': 'credpay://',
+            'upi-paytm': 'paytmmp://'
         };
 
         const link = appLinks[this.selectedUpiApp] || 'upi://pay';
