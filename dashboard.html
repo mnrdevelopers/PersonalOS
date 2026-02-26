@@ -100,6 +100,79 @@
                 overflow: hidden;
             }
         }
+
+        .upi-logo-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.65rem;
+        }
+
+        .upi-logo-btn {
+            border: 1px solid #dbe3f0;
+            border-radius: 0.85rem;
+            padding: 0.65rem 0.7rem;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            text-align: left;
+            transition: all 0.18s ease;
+        }
+
+        .upi-logo-btn:hover {
+            border-color: #9db2ff;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.12);
+        }
+
+        .upi-logo-btn.active {
+            border-color: #4f46e5;
+            background: #eef0ff;
+            box-shadow: 0 6px 14px rgba(79, 70, 229, 0.18);
+        }
+
+        .upi-logo-mark {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 1.1rem;
+            font-weight: 700;
+            flex-shrink: 0;
+            letter-spacing: 0.2px;
+            overflow: hidden;
+        }
+
+        .logo-bhim, .logo-phonepe, .logo-gpay, .logo-navi, .logo-cred, .logo-paytm, .logo-upi {
+            background: #fff;
+            border: 1px solid #e9ecef;
+        }
+
+        .upi-logo-mark img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            padding: 4px;
+        }
+
+        .upi-logo-text {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.1;
+        }
+
+        .upi-logo-text .name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #212529;
+        }
+
+        .upi-logo-text .hint {
+            font-size: 0.72rem;
+            color: #6c757d;
+        }
     </style>
 </head>
 
@@ -768,12 +841,35 @@
                 <div class="modal-body">
                     <div id="upi-payment-summary" class="small text-muted mb-3"></div>
                     <p class="mb-2">Select UPI app:</p>
-                    <div class="d-grid gap-2 mb-3" id="upi-app-list">
-                        <button type="button" class="btn btn-outline-primary text-start" data-upi-app="upi-bhim">BHIM</button>
-                        <button type="button" class="btn btn-outline-primary text-start" data-upi-app="upi-phonepe">PhonePe</button>
-                        <button type="button" class="btn btn-outline-primary text-start" data-upi-app="upi-gpay">Google Pay</button>
-                        <button type="button" class="btn btn-outline-primary text-start" data-upi-app="upi-navi">Navi Pay</button>
-                        <button type="button" class="btn btn-outline-primary text-start" data-upi-app="upi-cred">CRED Pay</button>
+                    <div class="upi-logo-grid mb-3" id="upi-app-list">
+                        <button type="button" class="upi-logo-btn" data-upi-app="upi-bhim">
+                            <span class="upi-logo-mark logo-bhim"><img src="https://iconlogovector.com/uploads/images/2025/08/lg-688f0ebbc155a-BHIM.webp" alt="BHIM" onerror="this.src='https://cdn-icons-png.flaticon.com/512/10102/10102748.png'"></span>
+                            <span class="upi-logo-text"><span class="name">BHIM</span><span class="hint">UPI App</span></span>
+                        </button>
+                        <button type="button" class="upi-logo-btn" data-upi-app="upi-phonepe">
+                            <span class="upi-logo-mark logo-phonepe"><img src="https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/phonepe-icon.png" alt="PhonePe"></span>
+                            <span class="upi-logo-text"><span class="name">PhonePe</span><span class="hint">UPI App</span></span>
+                        </button>
+                        <button type="button" class="upi-logo-btn" data-upi-app="upi-gpay">
+                            <span class="upi-logo-mark logo-gpay"><img src="https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/google-pay-icon.png" alt="GPay"></span>
+                            <span class="upi-logo-text"><span class="name">Google Pay</span><span class="hint">UPI App</span></span>
+                        </button>
+                        <button type="button" class="upi-logo-btn" data-upi-app="upi-navi">
+                            <span class="upi-logo-mark logo-navi"><img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT_SWCBXC5dTJHAJ7vUdUVZbWzzwouewGRJmA&s" alt="Navi"></span>
+                            <span class="upi-logo-text"><span class="name">Navi Pay</span><span class="hint">UPI App</span></span>
+                        </button>
+                        <button type="button" class="upi-logo-btn" data-upi-app="upi-cred">
+                            <span class="upi-logo-mark logo-cred"><img src="https://static.vecteezy.com/system/resources/thumbnails/069/146/524/small_2x/cred-app-icon-on-transparent-background-free-png.png" alt="CRED"></span>
+                            <span class="upi-logo-text"><span class="name">CRED Pay</span><span class="hint">UPI App</span></span>
+                        </button>
+                        <button type="button" class="upi-logo-btn" data-upi-app="upi-paytm">
+                            <span class="upi-logo-mark logo-paytm"><img src="https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/paytm-icon.png" alt="Paytm"></span>
+                            <span class="upi-logo-text"><span class="name">Paytm</span><span class="hint">UPI App</span></span>
+                        </button>
+                        <button type="button" class="upi-logo-btn" data-upi-app="upi-default">
+                            <span class="upi-logo-mark logo-upi"><img src="https://upload.wikimedia.org/wikipedia/commons/e/e1/UPI-Logo-vector.svg" alt="UPI"></span>
+                            <span class="upi-logo-text"><span class="name">Any UPI App</span><span class="hint">System Default</span></span>
+                        </button>
                     </div>
                     <div class="alert alert-info small mb-0">
                         Tap <strong>Open App</strong>, complete QR payment, return to this app, then tap <strong>Payment Done & Save</strong>.
