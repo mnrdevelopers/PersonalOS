@@ -12,6 +12,7 @@ let groceryHistoryMonthFilter = 'all';
 let groceryHistoryStoreFilter = 'all';
 let basketPlannerItemId = '';
 let basketPlannerEnsureToBuy = false;
+let groceryStoreDirectory = [];
 
 const GROCERY_CATEGORIES = {
     'Fruits & Vegetables': 'fas fa-carrot',
@@ -93,6 +94,144 @@ function normalizeProductName(name) {
     return (name || '').trim().toLowerCase();
 }
 
+function cleanGroceryStoreName(name) {
+    return (name || '').trim().replace(/\s+/g, ' ');
+}
+
+function normalizeGroceryStoreKey(name) {
+    return cleanGroceryStoreName(name)
+        .toLowerCase()
+        .replace(/&/g, 'and')
+        .replace(/[^a-z0-9]+/g, '');
+}
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function refreshGroceryStoreDirectory() {
+    const storeMap = new Map();
+
+    groceryLogs.forEach(log => {
+        const rawStore = cleanGroceryStoreName(log.storeDisplay || log.store || '');
+        const key = log.storeKey || normalizeGroceryStoreKey(rawStore);
+        if (!key || !rawStore) return;
+
+        const existing = storeMap.get(key);
+        if (!existing) {
+            storeMap.set(key, {
+                key,
+                label: rawStore,
+                count: 1,
+                lastDate: log.date || ''
+            });
+            return;
+        }
+
+        existing.count += 1;
+        if ((log.date || '') >= existing.lastDate) {
+            existing.label = rawStore;
+            existing.lastDate = log.date || existing.lastDate;
+        }
+    });
+
+    groceryStoreDirectory = [...storeMap.values()].sort((a, b) =>
+        b.count - a.count || b.lastDate.localeCompare(a.lastDate) || a.label.localeCompare(b.label)
+    );
+
+    groceryLogs = groceryLogs.map(log => {
+        const rawStore = cleanGroceryStoreName(log.storeDisplay || log.store || '');
+        const key = log.storeKey || normalizeGroceryStoreKey(rawStore);
+        const match = key ? storeMap.get(key) : null;
+        return {
+            ...log,
+            storeKey: key,
+            storeDisplay: match?.label || rawStore
+        };
+    });
+}
+
+function resolveGroceryStoreName(name) {
+    const cleaned = cleanGroceryStoreName(name);
+    if (!cleaned) return { key: '', label: '' };
+
+    const key = normalizeGroceryStoreKey(cleaned);
+    const existing = groceryStoreDirectory.find(store => store.key === key);
+    return {
+        key,
+        label: existing?.label || cleaned
+    };
+}
+
+function populateGroceryStoreSuggestions() {
+    const markup = groceryStoreDirectory
+        .map(store => `<option value="${escapeHtml(store.label)}"></option>`)
+        .join('');
+
+    ['grocery-store-suggestions', 'grocery-edit-store-suggestions', 'grocery-merge-store-suggestions'].forEach(id => {
+        const list = document.getElementById(id);
+        if (list) list.innerHTML = markup;
+    });
+}
+
+function formatDaysSinceDate(dateString) {
+    if (!dateString) return 'Unknown';
+    const value = new Date(`${dateString}T00:00:00`);
+    if (Number.isNaN(value.getTime())) return 'Unknown';
+
+    const today = new Date();
+    const localToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const diffMs = localToday.getTime() - value.getTime();
+    const diffDays = Math.max(0, Math.floor(diffMs / 86400000));
+
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return '1 day ago';
+    return `${diffDays} days ago`;
+}
+
+function getGroceryStoreInsights() {
+    const grouped = new Map();
+
+    groceryLogs.forEach(log => {
+        const key = log.storeKey || normalizeGroceryStoreKey(log.store || '');
+        const label = cleanGroceryStoreName(log.storeDisplay || log.store || '');
+        if (!key || !label) return;
+
+        if (!grouped.has(key)) {
+            grouped.set(key, {
+                key,
+                label,
+                visits: 0,
+                totalSpend: 0,
+                firstDate: log.date || '',
+                lastDate: log.date || '',
+                itemCount: 0
+            });
+        }
+
+        const entry = grouped.get(key);
+        entry.visits += 1;
+        entry.totalSpend += Number(log.totalAmount) || 0;
+        entry.itemCount += (log.items || []).length;
+        if ((log.date || '') < entry.firstDate || !entry.firstDate) entry.firstDate = log.date || entry.firstDate;
+        if ((log.date || '') > entry.lastDate) entry.lastDate = log.date || entry.lastDate;
+        if ((log.date || '') >= entry.lastDate) entry.label = label || entry.label;
+    });
+
+    return [...grouped.values()]
+        .map(entry => ({
+            ...entry,
+            averageSpend: entry.visits > 0 ? entry.totalSpend / entry.visits : 0,
+            daysSince: formatDaysSinceDate(entry.lastDate)
+        }))
+        .sort((a, b) => b.visits - a.visits || b.totalSpend - a.totalSpend || a.label.localeCompare(b.label));
+}
+
 function getCartPlan(id, fallbackItem) {
     const raw = groceryCart.get(id);
     if (raw && typeof raw === 'object') {
@@ -120,6 +259,7 @@ async function loadGroceryLogsData() {
         .get();
 
     groceryLogs = logsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    refreshGroceryStoreDirectory();
 }
 
 function populateGroceryInsightControls() {
@@ -152,16 +292,14 @@ function populateGroceryInsightControls() {
     }
     refreshGrocerySpendProductOptions();
 
-    const stores = [...new Set(
-        groceryLogs
-            .map(log => (log.store || '').trim())
-            .filter(Boolean)
-    )].sort((a, b) => a.localeCompare(b));
-    if (groceryHistoryStoreFilter !== 'all' && !stores.includes(groceryHistoryStoreFilter)) {
+    populateGroceryStoreSuggestions();
+
+    const stores = groceryStoreDirectory;
+    if (groceryHistoryStoreFilter !== 'all' && !stores.some(store => store.key === groceryHistoryStoreFilter)) {
         groceryHistoryStoreFilter = 'all';
     }
     historyStoreSelect.innerHTML = `<option value="all">All Stores</option>` +
-        stores.map(store => `<option value="${store}" ${store === groceryHistoryStoreFilter ? 'selected' : ''}>${store}</option>`).join('');
+        stores.map(store => `<option value="${escapeHtml(store.key)}" ${store.key === groceryHistoryStoreFilter ? 'selected' : ''}>${escapeHtml(store.label)}</option>`).join('');
 }
 
 function refreshGrocerySpendProductOptions() {
@@ -291,6 +429,170 @@ window.resetGroceryHistoryFilters = function() {
     if (monthSelect) monthSelect.value = 'all';
     if (storeSelect) storeSelect.value = 'all';
     if (currentGroceryTab === 'history') loadGroceryHistory();
+};
+
+window.openGroceryStoreManager = function() {
+    populateGroceryStoreSuggestions();
+    renderGroceryStoreManager();
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('groceryStoreManagerModal'));
+    modal.show();
+};
+
+function renderGroceryStoreManager() {
+    const insightsContainer = document.getElementById('grocery-store-insights');
+    const sourceSelect = document.getElementById('grocery-merge-source');
+    if (!insightsContainer || !sourceSelect) return;
+
+    const stores = getGroceryStoreInsights();
+    sourceSelect.innerHTML = `<option value="">Select a source store</option>` +
+        stores.map(store => `<option value="${escapeHtml(store.key)}">${escapeHtml(store.label)} (${store.visits} bills)</option>`).join('');
+
+    if (stores.length === 0) {
+        insightsContainer.innerHTML = '<div class="col-12 text-center text-muted small">No store history yet.</div>';
+        return;
+    }
+
+    insightsContainer.innerHTML = stores.map(store => `
+        <div class="col-md-6">
+            <div class="border rounded-3 p-3 h-100 bg-white">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div>
+                        <div class="fw-bold">${escapeHtml(store.label)}</div>
+                        <div class="small text-muted">First purchase: ${store.firstDate ? new Date(store.firstDate).toLocaleDateString() : 'Unknown'}</div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary" type="button" onclick="prefillGroceryStoreMerge('${escapeHtml(store.key)}')">
+                        Use As Target
+                    </button>
+                </div>
+                <div class="row g-2 mt-2 small">
+                    <div class="col-6">
+                        <div class="p-2 rounded bg-light">
+                            <div class="text-muted">Bills</div>
+                            <div class="fw-semibold">${store.visits}</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-2 rounded bg-light">
+                            <div class="text-muted">Items</div>
+                            <div class="fw-semibold">${store.itemCount}</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-2 rounded bg-light">
+                            <div class="text-muted">Total Spend</div>
+                            <div class="fw-semibold">Rs ${store.totalSpend.toFixed(2)}</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-2 rounded bg-light">
+                            <div class="text-muted">Avg Basket</div>
+                            <div class="fw-semibold">Rs ${store.averageSpend.toFixed(2)}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-2 small text-muted">
+                    Last purchase: ${store.lastDate ? new Date(store.lastDate).toLocaleDateString() : 'Unknown'} • ${store.daysSince}
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+window.prefillGroceryStoreMerge = function(sourceKey) {
+    const targetInput = document.getElementById('grocery-merge-target');
+    const sourceStore = getGroceryStoreInsights().find(store => store.key === sourceKey);
+    if (targetInput) targetInput.value = sourceStore?.label || '';
+};
+
+async function commitFirestoreUpdates(updates) {
+    const chunkSize = 400;
+    for (let index = 0; index < updates.length; index += chunkSize) {
+        const batch = db.batch();
+        updates.slice(index, index + chunkSize).forEach(update => {
+            batch.update(update.ref, update.data);
+        });
+        await batch.commit();
+    }
+}
+
+window.mergeGroceryStoreRecords = async function() {
+    const btn = document.getElementById('btn-merge-grocery-store');
+    const sourceKey = document.getElementById('grocery-merge-source')?.value || '';
+    const targetInput = document.getElementById('grocery-merge-target')?.value || '';
+    const targetMeta = resolveGroceryStoreName(targetInput);
+    const user = auth.currentUser;
+    if (!user) return;
+
+    if (!sourceKey) {
+        if (window.dashboard) window.dashboard.showNotification('Choose a store variant to merge', 'warning');
+        return;
+    }
+    if (!targetMeta.label) {
+        if (window.dashboard) window.dashboard.showNotification('Enter the store name to merge into', 'warning');
+        return;
+    }
+    if (sourceKey === targetMeta.key) {
+        if (window.dashboard) window.dashboard.showNotification('Source and target store are already the same', 'info');
+        return;
+    }
+
+    try {
+        window.setBtnLoading(btn, true);
+        const logsSnap = await db.collection('grocery_logs')
+            .where('userId', '==', user.uid)
+            .get();
+
+        const matchingLogs = logsSnap.docs.filter(doc => {
+            const data = doc.data();
+            const key = data.storeKey || normalizeGroceryStoreKey(data.store || '');
+            return key === sourceKey;
+        });
+
+        if (matchingLogs.length === 0) {
+            if (window.dashboard) window.dashboard.showNotification('No matching grocery logs found for this store variant', 'warning');
+            return;
+        }
+
+        const updates = matchingLogs.map(doc => ({
+            ref: doc.ref,
+            data: {
+                store: targetMeta.label,
+                storeKey: targetMeta.key,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }
+        }));
+
+        for (const logDoc of matchingLogs) {
+            const txSnap = await db.collection('transactions')
+                .where('userId', '==', user.uid)
+                .where('relatedId', '==', logDoc.id)
+                .get();
+
+            txSnap.forEach(txDoc => {
+                const itemCount = Array.isArray(logDoc.data().items) ? logDoc.data().items.length : null;
+                updates.push({
+                    ref: txDoc.ref,
+                    data: {
+                        description: itemCount
+                            ? `Grocery Run: ${targetMeta.label} (${itemCount} items)`
+                            : `Grocery Run: ${targetMeta.label}`,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }
+                });
+            });
+        }
+
+        await commitFirestoreUpdates(updates);
+        await loadGroceryData();
+        renderGroceryStoreManager();
+        if (currentGroceryTab === 'history') await loadGroceryHistory();
+        if (window.dashboard) window.dashboard.showNotification(`Merged ${matchingLogs.length} grocery bills into ${targetMeta.label}`, 'success');
+    } catch (e) {
+        console.error('Error merging grocery stores:', e);
+        if (window.dashboard) window.dashboard.showNotification('Error merging grocery stores', 'danger');
+    } finally {
+        window.setBtnLoading(btn, false);
+    }
 };
 
 window.autoSelectCategory = function(itemName) {
@@ -477,19 +779,24 @@ window.loadGroceriesSection = async function() {
         <div id="grocery-history-filters" class="card border-0 shadow-sm mt-3 d-none">
             <div class="card-body p-3">
                 <div class="row g-2 align-items-end">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">History Month</label>
                         <select class="form-select form-select-sm" id="grocery-history-month" onchange="filterGroceryHistoryByMonth(this.value)">
                             <option value="all">All Months</option>
                         </select>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Store</label>
                         <select class="form-select form-select-sm" id="grocery-history-store" onchange="filterGroceryHistoryByStore(this.value)">
                             <option value="all">All Stores</option>
                         </select>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
+                        <button class="btn btn-outline-primary btn-sm w-100" onclick="openGroceryStoreManager()">
+                            <i class="fas fa-code-merge me-1"></i>Manage Stores
+                        </button>
+                    </div>
+                    <div class="col-md-3">
                         <button class="btn btn-outline-secondary btn-sm w-100" onclick="resetGroceryHistoryFilters()">
                             <i class="fas fa-undo me-1"></i>Reset History Filters
                         </button>
@@ -610,7 +917,8 @@ window.loadGroceriesSection = async function() {
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Store / Supermarket</label>
-                                <input type="text" class="form-control" id="checkout-store" placeholder="e.g. DMart, BigBasket">
+                                <input type="text" class="form-control" id="checkout-store" list="grocery-store-suggestions" placeholder="e.g. DMart, BigBasket">
+                                <datalist id="grocery-store-suggestions"></datalist>
                             </div>
                         </div>
                         
@@ -679,7 +987,8 @@ window.loadGroceriesSection = async function() {
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Store</label>
-                                <input type="text" class="form-control" id="edit-log-store">
+                                <input type="text" class="form-control" id="edit-log-store" list="grocery-edit-store-suggestions">
+                                <datalist id="grocery-edit-store-suggestions"></datalist>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Total Amount (Rs)</label>
@@ -691,6 +1000,60 @@ window.loadGroceriesSection = async function() {
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="button" class="btn btn-primary" id="btn-save-log-edit" onclick="saveGroceryLogEdit()">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="groceryStoreManagerModal" tabindex="-1">
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Manage Grocery Stores</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="card border-0 bg-light mb-3">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                                    <div>
+                                        <h6 class="mb-1 fw-bold text-uppercase small text-muted">Store Insights</h6>
+                                        <div class="small text-muted">See how often you buy, total spend, average basket, and how recently you purchased from each store.</div>
+                                    </div>
+                                </div>
+                                <div id="grocery-store-insights" class="row g-3">
+                                    <div class="col-12 text-center text-muted small">No store history yet.</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body">
+                                <h6 class="mb-3 fw-bold text-uppercase small text-muted">Merge Store Variants</h6>
+                                <div class="row g-3 align-items-end">
+                                    <div class="col-md-5">
+                                        <label class="form-label">From Store Variant</label>
+                                        <select class="form-select" id="grocery-merge-source">
+                                            <option value="">Select a source store</option>
+                                        </select>
+                                        <div class="form-text">Choose the older or inconsistent store name you want to merge.</div>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label">Merge Into</label>
+                                        <input type="text" class="form-control" id="grocery-merge-target" list="grocery-merge-store-suggestions" placeholder="e.g. DMart">
+                                        <datalist id="grocery-merge-store-suggestions"></datalist>
+                                        <div class="form-text">Pick an existing store name or type a clean new canonical label.</div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button class="btn btn-primary w-100" id="btn-merge-grocery-store" onclick="mergeGroceryStoreRecords()">
+                                            <i class="fas fa-code-merge me-1"></i>Merge
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="small text-muted mt-3" id="grocery-store-merge-note">
+                                    Merging updates old grocery logs and their linked finance transaction descriptions.
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1385,7 +1748,10 @@ window.confirmCheckout = async function() {
     const btn = document.getElementById('btn-confirm-checkout');
     const user = auth.currentUser;
     const date = document.getElementById('checkout-date').value;
-    const store = document.getElementById('checkout-store').value;
+    const storeInput = document.getElementById('checkout-store').value;
+    const storeMeta = resolveGroceryStoreName(storeInput);
+    const store = storeMeta.label;
+    const storeKey = storeMeta.key;
     const addToLedger = document.getElementById('checkout-ledger').checked;
     const paymentMode = document.getElementById('checkout-payment-mode').value;
     
@@ -1431,7 +1797,7 @@ window.confirmCheckout = async function() {
         const logRef = db.collection('grocery_logs').doc();
         batch.set(logRef, {
             userId: user.uid,
-            date, store, totalAmount, items,
+            date, store, storeKey, totalAmount, items,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
@@ -1486,6 +1852,42 @@ window.consumeItem = async function(id) {
     openBasketPlannerModal(id, true);
 };
 
+function groupGroceryHistoryByStore(logs) {
+    const storeMap = new Map();
+
+    logs.forEach(log => {
+        const key = log.storeKey || normalizeGroceryStoreKey(log.store || '');
+        const label = cleanGroceryStoreName(log.storeDisplay || log.store || 'Supermarket') || 'Supermarket';
+        const groupKey = key || `store-${normalizeGroceryStoreKey(label) || 'supermarket'}`;
+
+        if (!storeMap.has(groupKey)) {
+            storeMap.set(groupKey, {
+                key: groupKey,
+                label,
+                visits: 0,
+                itemCount: 0,
+                totalSpend: 0,
+                lastDate: log.date || '',
+                logs: []
+            });
+        }
+
+        const group = storeMap.get(groupKey);
+        group.visits += 1;
+        group.itemCount += Array.isArray(log.items) ? log.items.length : 0;
+        group.totalSpend += Number(log.totalAmount) || 0;
+        if ((log.date || '') > group.lastDate) group.lastDate = log.date || group.lastDate;
+        group.logs.push(log);
+    });
+
+    return [...storeMap.values()]
+        .map(group => ({
+            ...group,
+            logs: group.logs.sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+        }))
+        .sort((a, b) => (b.lastDate || '').localeCompare(a.lastDate || '') || b.visits - a.visits || a.label.localeCompare(b.label));
+}
+
 window.loadGroceryHistory = async function() {
     const container = document.getElementById('grocery-content');
     const user = auth.currentUser;
@@ -1496,12 +1898,12 @@ window.loadGroceryHistory = async function() {
         logs = logs.filter(log => (log.date || '').startsWith(groceryHistoryMonthFilter));
     }
     if (groceryHistoryStoreFilter !== 'all') {
-        logs = logs.filter(log => (log.store || '').trim() === groceryHistoryStoreFilter);
+        logs = logs.filter(log => (log.storeKey || normalizeGroceryStoreKey(log.store || '')) === groceryHistoryStoreFilter);
     }
     if (grocerySearchQuery) {
         const q = grocerySearchQuery;
         logs = logs.filter(log => {
-            const inStore = (log.store || '').toLowerCase().includes(q);
+            const inStore = (log.storeDisplay || log.store || '').toLowerCase().includes(q);
             const inItems = (log.items || []).some(item => (item.name || '').toLowerCase().includes(q));
             return inStore || inItems;
         });
@@ -1512,57 +1914,98 @@ window.loadGroceryHistory = async function() {
         return;
     }
 
+    const groupedStores = groupGroceryHistoryByStore(logs).slice(0, 30);
     let html = '<div class="col-12"><div class="list-group">';
-    logs.slice(0, 50).forEach(data => {
-        const docId = data.id;
-        const itemCount = data.items ? data.items.length : 0;
+    groupedStores.forEach(storeGroup => {
+        const storeCollapseId = `store-history-${storeGroup.key}`;
+        const lastVisitText = storeGroup.lastDate ? new Date(storeGroup.lastDate).toLocaleDateString() : 'Unknown';
 
         html += `
-            <div class="list-group-item p-3 mb-2 border rounded-3">
-                <div class="d-flex justify-content-between align-items-center">
+            <div class="list-group-item p-3 mb-3 border rounded-3">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
                     <div>
-                        <h6 class="mb-1 fw-bold">${data.store || 'Supermarket'}</h6>
-                        <div class="small text-muted">
-                            <i class="far fa-calendar me-1"></i> ${new Date(data.date).toLocaleDateString()} 
-                            <span class="mx-2">|</span> 
-                            <i class="fas fa-shopping-basket me-1"></i> ${itemCount} items
-                        </div>
+                        <h5 class="mb-1 fw-bold">${escapeHtml(storeGroup.label)}</h5>
+                        <div class="small text-muted">Last visit: ${lastVisitText}</div>
                     </div>
                     <div class="text-end">
-                        <h5 class="mb-0 text-success">Rs ${(data.totalAmount || 0).toFixed(2)}</h5>
-                        <div class="d-flex align-items-center justify-content-end gap-2">
-                            <button class="btn btn-sm btn-link text-decoration-none p-0" type="button" data-bs-toggle="collapse" data-bs-target="#log-${docId}" aria-expanded="false">
-                                Details <i class="fas fa-chevron-down small"></i>
-                            </button>
-                            <div class="dropdown">
-                                <button class="btn btn-link text-muted p-0" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></button>
-                                <ul class="dropdown-menu dropdown-menu-end">
-                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="editGroceryLog('${docId}')">Edit</a></li>
-                                    <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="deleteGroceryLog('${docId}')">Delete</a></li>
-                                </ul>
-                            </div>
+                        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#${storeCollapseId}" aria-expanded="false">
+                            View <i class="fas fa-chevron-down small ms-1"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="row g-2 mt-2">
+                    <div class="col-md-4 col-6">
+                        <div class="p-2 rounded bg-light h-100">
+                            <div class="small text-muted">Visited</div>
+                            <div class="fw-bold">${storeGroup.visits} times</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-6">
+                        <div class="p-2 rounded bg-light h-100">
+                            <div class="small text-muted">Items Purchased</div>
+                            <div class="fw-bold">${storeGroup.itemCount}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-12">
+                        <div class="p-2 rounded bg-light h-100">
+                            <div class="small text-muted">Amount Spent</div>
+                            <div class="fw-bold text-success">Rs ${storeGroup.totalSpend.toFixed(2)}</div>
                         </div>
                     </div>
                 </div>
-                <div class="collapse mt-2" id="log-${docId}">
-                    <div class="card card-body bg-light border-0 small">
-                        <ul class="list-unstyled mb-0">
-                            ${(data.items || []).map(i => {
-                                const qty = i.quantity || 1;
-                                const unit = i.unit || 'pcs';
-                                const total = getItemSpendValue(i);
-                                const pricePer = i.pricePerUnit ? `@ Rs ${i.pricePerUnit.toFixed(2)}/${unit}` : '';
-                                return `
-                                    <li class="d-flex justify-content-between border-bottom py-1">
+                <div class="collapse mt-3" id="${storeCollapseId}">
+                    <div class="d-flex flex-column gap-2">
+                        ${storeGroup.logs.map(data => {
+                            const docId = data.id;
+                            const logCollapseId = `store-log-${docId}`;
+                            const itemCount = Array.isArray(data.items) ? data.items.length : 0;
+                            return `
+                                <div class="border rounded-3 p-3 bg-white">
+                                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
                                         <div>
-                                            ${i.name}
-                                            <span class="text-muted" style="font-size: 0.8em;">(${qty} ${unit} ${pricePer})</span>
+                                            <div class="fw-semibold">${new Date(data.date).toLocaleDateString()}</div>
+                                            <div class="small text-muted">${itemCount} items in this visit</div>
                                         </div>
-                                        <span>Rs ${total.toFixed(2)}</span>
-                                    </li>
-                                `;
-                            }).join('')}
-                        </ul>
+                                        <div class="text-end">
+                                            <div class="fw-bold text-success">Rs ${(Number(data.totalAmount) || 0).toFixed(2)}</div>
+                                            <div class="d-flex align-items-center justify-content-end gap-2 mt-1">
+                                                <button class="btn btn-sm btn-link text-decoration-none p-0" type="button" data-bs-toggle="collapse" data-bs-target="#${logCollapseId}" aria-expanded="false">
+                                                    Items <i class="fas fa-chevron-down small"></i>
+                                                </button>
+                                                <div class="dropdown">
+                                                    <button class="btn btn-link text-muted p-0" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></button>
+                                                    <ul class="dropdown-menu dropdown-menu-end">
+                                                        <li><a class="dropdown-item" href="javascript:void(0)" onclick="editGroceryLog('${docId}')">Edit</a></li>
+                                                        <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="deleteGroceryLog('${docId}')">Delete</a></li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="collapse mt-2" id="${logCollapseId}">
+                                        <div class="card card-body bg-light border-0 small">
+                                            <ul class="list-unstyled mb-0">
+                                                ${(data.items || []).map(i => {
+                                                    const qty = i.quantity || 1;
+                                                    const unit = i.unit || 'pcs';
+                                                    const total = getItemSpendValue(i);
+                                                    const pricePer = i.pricePerUnit ? `@ Rs ${i.pricePerUnit.toFixed(2)}/${unit}` : '';
+                                                    return `
+                                                        <li class="d-flex justify-content-between border-bottom py-1">
+                                                            <div>
+                                                                ${escapeHtml(i.name || 'Item')}
+                                                                <span class="text-muted" style="font-size: 0.8em;">(${qty} ${unit} ${pricePer})</span>
+                                                            </div>
+                                                            <span>Rs ${total.toFixed(2)}</span>
+                                                        </li>
+                                                    `;
+                                                }).join('')}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
                     </div>
                 </div>
             </div>
@@ -1663,7 +2106,7 @@ window.editGroceryLog = async function(id) {
 
         document.getElementById('edit-log-id').value = id;
         document.getElementById('edit-log-date').value = data.date;
-        document.getElementById('edit-log-store').value = data.store || '';
+        document.getElementById('edit-log-store').value = resolveGroceryStoreName(data.storeDisplay || data.store || '').label;
         document.getElementById('edit-log-total').value = data.totalAmount;
 
         const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('editGroceryLogModal'));
@@ -1679,7 +2122,10 @@ window.saveGroceryLogEdit = async function() {
     const user = auth.currentUser;
     if (!user) return;
     const date = document.getElementById('edit-log-date').value;
-    const store = document.getElementById('edit-log-store').value;
+    const storeInput = document.getElementById('edit-log-store').value;
+    const storeMeta = resolveGroceryStoreName(storeInput);
+    const store = storeMeta.label;
+    const storeKey = storeMeta.key;
     const total = parseFloat(document.getElementById('edit-log-total').value) || 0;
 
     try {
@@ -1689,7 +2135,7 @@ window.saveGroceryLogEdit = async function() {
         const logRef = db.collection('grocery_logs').doc(id);
         
         batch.update(logRef, {
-            date, store, totalAmount: total,
+            date, store, storeKey, totalAmount: total,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
