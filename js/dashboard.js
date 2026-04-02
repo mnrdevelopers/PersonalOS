@@ -908,7 +908,7 @@ class Dashboard {
                 const data = doc.data();
                 if (data.type === 'income') {
                     totalIncome += data.amount;
-                } else {
+                } else if (data.type === 'expense') {
                     totalExpense += data.amount;
                 }
             });
@@ -1114,19 +1114,23 @@ class Dashboard {
         div.className = 'transaction-item';
 
         const isIncome = data.type === 'income';
-        const amountClass = isIncome ? 'transaction-income' : 'transaction-expense';
-        const amountPrefix = isIncome ? '+' : '-';
-        const icon = isIncome ? 'fa-arrow-down' : 'fa-arrow-up';
+        const isTransfer = data.type === 'transfer';
+        const amountClass = isTransfer ? 'text-primary fw-bold' : (isIncome ? 'transaction-income' : 'transaction-expense');
+        const amountPrefix = isTransfer ? '' : (isIncome ? '+' : '-');
+        const icon = isTransfer ? 'fa-right-left' : (isIncome ? 'fa-arrow-down' : 'fa-arrow-up');
+        const iconClass = isTransfer ? 'text-primary' : (isIncome ? 'text-success' : 'text-danger');
+        const title = isTransfer ? (data.accountLabel || 'Transfer') : data.category;
+        const subtitle = data.description || (isTransfer ? 'Internal transfer' : 'No description');
 
         div.innerHTML = `
             <div class="transaction-info">
                 <div class="d-flex align-items-center gap-2">
-                    <div class="transaction-icon ${isIncome ? 'text-success' : 'text-danger'}">
+                    <div class="transaction-icon ${iconClass}">
                         <i class="fas ${icon}"></i>
                     </div>
                     <div>
-                        <h6 class="mb-0">${data.category}</h6>
-                        <small class="text-muted">${data.description || 'No description'}</small>
+                        <h6 class="mb-0">${title}</h6>
+                        <small class="text-muted">${subtitle}</small>
                     </div>
                 </div>
             </div>
@@ -1474,7 +1478,7 @@ class Dashboard {
 
                 if (data.type === 'income') {
                     incomeData[date] = (incomeData[date] || 0) + data.amount;
-                } else {
+                } else if (data.type === 'expense') {
                     expenseData[date] = (expenseData[date] || 0) + data.amount;
                 }
             });
@@ -1778,6 +1782,8 @@ class Dashboard {
             document.getElementById('transaction-id').value = '';
             document.getElementById('transaction-amount').value = '';
             document.getElementById('transaction-description').value = '';
+            document.getElementById('transaction-credit-card').value = '';
+            document.getElementById('transaction-wallet').value = '';
             document.getElementById('recurring-transaction').checked = false;
             document.getElementById('recurring-options').classList.add('d-none');
             document.getElementById('transaction-frequency').value = 'monthly';
@@ -1785,6 +1791,7 @@ class Dashboard {
             // Populate CCs
             this.populateTransactionCCSelect();
             this.populateTransactionWalletSelect();
+            document.getElementById('transaction-mode').dispatchEvent(new Event('change'));
 
             // Reset button state
             const btn = document.getElementById('save-transaction');
@@ -1888,10 +1895,16 @@ class Dashboard {
 
             window.setBtnLoading(btn, true);
 
+            const accountMeta = window.getTransactionAccountMeta
+                ? window.getTransactionAccountMeta(paymentMode)
+                : { type: paymentMode === 'cash' ? 'cash' : 'bank', label: paymentMode === 'cash' ? 'Cash' : 'Bank' };
+
             const transaction = {
                 type: type,
                 amount: amount,
                 paymentMode: paymentMode,
+                accountType: accountMeta.type,
+                accountLabel: accountMeta.label,
                 category: category,
                 description: description,
                 date: date,
@@ -1948,6 +1961,9 @@ class Dashboard {
             if (this.currentSection === 'finance' && typeof window.loadFinanceData === 'function') {
                 window.loadFinanceData();
             }
+            if (typeof window.loadTransactionsSection === 'function' && document.getElementById('transactions-section')?.innerHTML.trim()) {
+                window.loadTransactionsSection();
+            }
 
             this.showNotification(id ? 'Transaction updated successfully!' : 'Transaction added successfully!', 'success');
             window.setBtnLoading(btn, false);
@@ -2003,9 +2019,16 @@ class Dashboard {
     async completePendingUpiTransaction() {
         if (!this.pendingUpiTransaction) return;
 
+        const paymentMode = this.selectedUpiApp || this.pendingUpiTransaction.paymentMode;
+        const accountMeta = window.getTransactionAccountMeta
+            ? window.getTransactionAccountMeta(paymentMode)
+            : { type: 'bank', label: 'Bank' };
+
         const tx = {
             ...this.pendingUpiTransaction,
-            paymentMode: this.selectedUpiApp || this.pendingUpiTransaction.paymentMode,
+            paymentMode,
+            accountType: accountMeta.type,
+            accountLabel: accountMeta.label,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
@@ -2022,6 +2045,9 @@ class Dashboard {
             this.updateFinanceChart();
             if (this.currentSection === 'finance' && typeof window.loadFinanceData === 'function') {
                 window.loadFinanceData();
+            }
+            if (typeof window.loadTransactionsSection === 'function' && document.getElementById('transactions-section')?.innerHTML.trim()) {
+                window.loadTransactionsSection();
             }
 
             this.showNotification('Expense saved after UPI payment', 'success');
