@@ -37,73 +37,80 @@ const METALPRICE_API_KEY = 'goldapi-1tsml7nm4zv-io'; // Enter your API Key here 
 window.loadLoansSection = async function() {
     const container = document.getElementById('loans-section');
     container.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="fw-bold gradient-text mb-0">Finance</h2>
-        </div>
+        <div class="loans-shell">
+            <div class="loans-hero card border-0 shadow-lg rounded-4 overflow-hidden animate-slide-up mb-4">
+                <div class="card-body p-3 p-lg-4">
+                    <div class="loans-hero-grid">
+                        <div class="loans-hero-copy">
+                            <div class="loans-kicker">Loans Workspace</div>
+                            <h2 class="fw-bold mb-2">Loans, Debts, Wallets and Cards</h2>
+                            <p class="loans-subtitle mb-3">Track what you owe, what others owe you, recurring EMIs, and connected money tools with a cleaner mobile-friendly layout.</p>
+                            <ul class="nav nav-pills loans-workspace-tabs" id="loan-workspace-tabs">
+                                <li class="nav-item">
+                                    <a class="nav-link active rounded-pill" href="javascript:void(0)" onclick="switchLoanView('loans', this)">Loans & Debts</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link rounded-pill" href="javascript:void(0)" onclick="switchLoanView('investments', this)">Investments</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link rounded-pill" href="javascript:void(0)" onclick="switchLoanView('wallets', this)">Wallets</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link rounded-pill" href="javascript:void(0)" onclick="switchLoanView('cards', this)">Credit Cards</a>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div id="finance-toolbar" class="loans-toolbar">
+                            <!-- Buttons will be injected here based on active tab -->
+                        </div>
+                    </div>
+                </div>
+            </div>
         
-        <!-- Tabs -->
-        <ul class="nav nav-pills mb-4 gap-2 p-1 bg-light rounded-pill d-inline-flex">
-            <li class="nav-item">
-                <a class="nav-link active rounded-pill" href="javascript:void(0)" onclick="switchLoanView('loans', this)">Loans & Debts</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link rounded-pill" href="javascript:void(0)" onclick="switchLoanView('investments', this)">Investments</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link rounded-pill" href="javascript:void(0)" onclick="switchLoanView('wallets', this)">Wallets</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link rounded-pill" href="javascript:void(0)" onclick="switchLoanView('cards', this)">Credit Cards</a>
-            </li>
-        </ul>
+            <!-- Stats Row -->
+            <div class="row g-3 mb-4 animate-fade-in" id="loan-stats-container">
+                <!-- Populated dynamically -->
+            </div>
 
-        <!-- Dynamic Toolbar -->
-        <div id="finance-toolbar" class="d-flex justify-content-end gap-2 mb-4">
-            <!-- Buttons will be injected here based on active tab -->
-        </div>
-
-        <!-- Stats Row -->
-        <div class="row g-4 mb-4 animate-fade-in" id="loan-stats-container">
-            <!-- Populated dynamically -->
-        </div>
-
-        <!-- Loans View -->
-        <div id="loans-view-container">
-            <div class="d-flex justify-content-between mb-3 align-items-center">
-                <ul class="nav nav-pills gap-2 small">
+            <!-- Loans View -->
+            <div id="loans-view-container">
+                <div class="loans-filter-bar">
+                    <ul class="nav nav-pills gap-2 small loans-status-tabs">
                     <li class="nav-item"><a class="nav-link active py-1 px-3" href="javascript:void(0)" onclick="filterLoans('active', this)">Active</a></li>
                     <li class="nav-item"><a class="nav-link py-1 px-3" href="javascript:void(0)" onclick="filterLoans('closed', this)">Closed</a></li>
-                </ul>
-                <select class="form-select form-select-sm w-auto" id="loan-type-filter" onchange="filterLoanType(this.value)">
-                    <option value="all">All Types</option>
-                    <option value="borrowed">Liabilities</option>
-                    <option value="lent">Assets</option>
-                    <option value="emi">EMIs</option>
-                </select>
+                    </ul>
+                    <select class="form-select form-select-sm loans-type-filter" id="loan-type-filter" onchange="filterLoanType(this.value)">
+                        <option value="all">All Types</option>
+                        <option value="borrowed">Liabilities</option>
+                        <option value="lent">Assets</option>
+                        <option value="emi">EMIs</option>
+                    </select>
+                </div>
+                <div class="row g-3" id="loans-grid">
+                    <div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>
+                </div>
             </div>
-            <div class="row g-4" id="loans-grid">
-                <div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>
-            </div>
-        </div>
 
-        <!-- Investments View -->
-        <div id="investments-view-container" class="d-none">
-            <div class="row g-4" id="investments-grid">
-                <div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>
+            <!-- Investments View -->
+            <div id="investments-view-container" class="d-none">
+                <div class="row g-3" id="investments-grid">
+                    <div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>
+                </div>
             </div>
-        </div>
 
-        <!-- Credit Cards View -->
-        <div id="cards-view-container" class="d-none">
-            <div class="row g-4" id="cards-grid">
-                <div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>
+            <!-- Credit Cards View -->
+            <div id="cards-view-container" class="d-none">
+                <div class="row g-3" id="cards-grid">
+                    <div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>
+                </div>
             </div>
-        </div>
 
-        <!-- Wallets View -->
-        <div id="wallets-view-container" class="d-none">
-            <div class="row g-4" id="wallets-grid">
-                <div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>
+            <!-- Wallets View -->
+            <div id="wallets-view-container" class="d-none">
+                <div class="row g-3" id="wallets-grid">
+                    <div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>
+                </div>
             </div>
         </div>
         
@@ -908,14 +915,14 @@ window.loadLoansSection = async function() {
 
     // Initialize default tab state immediately so toolbar actions are available
     // without waiting for data reads.
-    const defaultLoanTab = document.querySelector('#loans-section > .nav-pills .nav-link');
+    const defaultLoanTab = document.querySelector('#loan-workspace-tabs .nav-link');
     switchLoanView('loans', defaultLoanTab);
 };
 
 window.switchLoanView = function(view, element) {
     currentLoanView = view;
     if(element) {
-        document.querySelectorAll('#loans-section > .nav-pills .nav-link').forEach(l => l.classList.remove('active'));
+        document.querySelectorAll('#loan-workspace-tabs .nav-link').forEach(l => l.classList.remove('active'));
         element.classList.add('active');
     }
 
@@ -925,34 +932,34 @@ window.switchLoanView = function(view, element) {
         let buttons = '';
         if (view === 'loans') {
             buttons = `
-                <button class="btn btn-sm btn-outline-secondary" onclick="showAmortizationCalculator()">
+                <button class="btn btn-sm btn-outline-secondary loans-toolbar-btn" onclick="showAmortizationCalculator()">
                     <i class="fas fa-calculator me-2"></i>EMI Calc
                 </button>
-                <button class="btn btn-sm btn-primary" onclick="showAddLoanModal()">
+                <button class="btn btn-sm btn-primary loans-toolbar-btn" onclick="showAddLoanModal()">
                     <i class="fas fa-plus me-2"></i>Add Loan
                 </button>
             `;
         } else if (view === 'investments') {
             buttons = `
-                <button class="btn btn-sm btn-outline-warning" onclick="updateAllMetalPrices()" id="btn-update-metals">
+                <button class="btn btn-sm btn-outline-warning loans-toolbar-btn" onclick="updateAllMetalPrices()" id="btn-update-metals">
                     <i class="fas fa-sync-alt me-1"></i>Update Prices
                 </button>
-                <button class="btn btn-sm btn-success" onclick="showAddInvestmentModal()">
+                <button class="btn btn-sm btn-success loans-toolbar-btn" onclick="showAddInvestmentModal()">
                     <i class="fas fa-chart-line me-2"></i>Add Investment
                 </button>
             `;
         } else if (view === 'wallets') {
             buttons = `
-                <button class="btn btn-sm btn-outline-secondary" onclick="showTransferWalletModal()">
+                <button class="btn btn-sm btn-outline-secondary loans-toolbar-btn" onclick="showTransferWalletModal()">
                     <i class="fas fa-exchange-alt me-2"></i>Transfer
                 </button>
-                <button class="btn btn-sm btn-info text-white" onclick="showAddWalletModal()">
+                <button class="btn btn-sm btn-info text-white loans-toolbar-btn" onclick="showAddWalletModal()">
                     <i class="fas fa-wallet me-2"></i>Add Wallet
                 </button>
             `;
         } else if (view === 'cards') {
             buttons = `
-                <button class="btn btn-sm btn-primary" onclick="showAddCreditCardModal()">
+                <button class="btn btn-sm btn-primary loans-toolbar-btn" onclick="showAddCreditCardModal()">
                     <i class="fas fa-credit-card me-2"></i>Add Card
                 </button>
             `;
@@ -1593,14 +1600,14 @@ window.loadLoansGrid = async function(status = 'active') {
     docs.forEach(doc => {
         const data = doc.data();
         const progress = Math.min(100, Math.round((data.paidAmount / data.totalAmount) * 100));
-        let typeBadge = '<span class="badge bg-danger-subtle text-danger border border-danger-subtle">Liability</span>';
+        let typeBadge = '<span class="loan-card-pill pill-liability"><i class="fas fa-arrow-trend-down"></i>Liability</span>';
         let cardBorder = 'border-start border-4 border-danger';
         
         if (data.type === 'lent') {
-            typeBadge = '<span class="badge bg-success-subtle text-success border border-success-subtle">Asset</span>';
+            typeBadge = '<span class="loan-card-pill pill-asset"><i class="fas fa-arrow-trend-up"></i>Asset</span>';
             cardBorder = 'border-start border-4 border-success';
         } else if (data.type === 'emi') {
-            typeBadge = '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">EMI</span>';
+            typeBadge = '<span class="loan-card-pill pill-emi"><i class="fas fa-calendar-check"></i>EMI</span>';
             cardBorder = 'border-start border-4 border-warning';
         }
         
@@ -1715,14 +1722,14 @@ window.loadLoansGrid = async function(status = 'active') {
         }
 
         const col = document.createElement('div');
-        col.className = 'col-md-6';
+        col.className = 'col-lg-6';
         col.innerHTML = `
-            <div class="card h-100 border-0 shadow-sm rounded-4 animate-slide-up ${cardBorder}">
-                <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
+            <div class="loan-card loan-record-card card h-100 border-0 shadow-sm rounded-4 animate-slide-up ${cardBorder}">
+                <div class="card-body">
+                    <div class="loan-card-header">
                         <div>
-                            <h5 class="card-title fw-bold mb-1">${data.name}</h5>
-                            ${typeBadge}
+                            <h5 class="card-title loan-card-title">${data.name}</h5>
+                            <div class="loan-card-pills">${typeBadge}</div>
                         </div>
                         <div class="dropdown">
                             <button class="btn btn-link text-muted p-0" data-bs-toggle="dropdown">
@@ -1763,7 +1770,7 @@ window.loadLoansGrid = async function(status = 'active') {
                     </div>` : ''}
 
                     ${showActionButtons ? `
-                    <div class="mt-3 d-flex gap-2 justify-content-end flex-wrap">
+                    <div class="loan-card-footer mt-3 d-flex gap-2 justify-content-end flex-wrap">
                         ${whatsappBtn}
                         ${data.type === 'lent' ? `
                             <button class="btn btn-sm btn-success px-3" onclick="showRepaymentModal('${doc.id}')">
