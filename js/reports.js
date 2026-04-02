@@ -118,7 +118,7 @@ async function loadReportCharts() {
         
         if (data.type === 'income') {
             incomeByMonth[month] += data.amount;
-        } else {
+        } else if (data.type === 'expense') {
             expenseByMonth[month] += data.amount;
             
             if (!expenseByCategory[data.category]) expenseByCategory[data.category] = 0;
