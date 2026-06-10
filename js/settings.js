@@ -84,7 +84,7 @@ window.loadSettingsSection = async function() {
                 <button class="btn btn-outline-primary mb-2" onclick="exportData()">
                     <i class="fas fa-download me-2"></i>Export All Data (JSON)
                 </button>
-                <div class="text-muted small">Download a copy of your transactions, habits, and memories.</div>
+                <div class="text-muted small">Download a copy of your transactions, habits, and reminders.</div>
             </div>
         </div>
 
@@ -136,7 +136,7 @@ window.exportData = async function() {
     const data = {};
     
     // Fetch all collections
-    const collections = ['transactions', 'habits', 'reminders', 'memories', 'goals'];
+    const collections = ['transactions', 'habits', 'reminders'];
     
     try {
         if(window.dashboard) window.dashboard.showLoading();

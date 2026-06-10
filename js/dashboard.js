@@ -216,15 +216,7 @@ class Dashboard {
             this.saveReminder();
         });
 
-        // Memory modal
-        document.getElementById('save-memory')?.addEventListener('click', () => {
-            this.saveMemory();
-        });
 
-        // Memory image preview
-        document.getElementById('memory-image')?.addEventListener('change', (e) => {
-            this.previewImage(e);
-        });
 
         // Habit type toggle
         document.querySelectorAll('input[name="habit-type"]').forEach(radio => {
@@ -418,8 +410,7 @@ class Dashboard {
             { id: 'loans', icon: 'fa-hand-holding-usd', label: 'Loans', color: '#f72585' },
             { id: 'habits', icon: 'fa-check-circle', label: 'Habits', color: '#4cc9f0' },
             { id: 'reminders', icon: 'fa-tasks', label: 'Tasks', color: '#7209b7' },
-            { id: 'memories', icon: 'fa-images', label: 'Memory', color: '#f8961e' },
-            { id: 'goals', icon: 'fa-bullseye', label: 'Goals', color: '#f94144' },
+
             { id: 'entertainment', icon: 'fa-film', label: 'Fun', color: '#90be6d' },
             { id: 'vehicles', icon: 'fa-car', label: 'Auto', color: '#577590' },
             { id: 'groceries', icon: 'fa-shopping-basket', label: 'Grocery', color: '#2ec4b6' },
@@ -944,24 +935,7 @@ class Dashboard {
             document.getElementById('pending-tasks').textContent = tasksSnapshot.size;
             document.getElementById('due-today').textContent = todayTasksSnapshot.size;
 
-            // Get total memories
-            const memoriesSnapshot = await db.collection('memories')
-                .where('userId', '==', this.currentUser.uid)
-                .get();
 
-            // Get this month's memories
-            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-            const monthMemoriesSnapshot = await db.collection('memories')
-                .where('userId', '==', this.currentUser.uid)
-                .where('date', '>=', startOfMonth)
-                .get();
-
-            if (document.getElementById('total-memories')) {
-                document.getElementById('total-memories').textContent = memoriesSnapshot.size;
-            }
-            if (document.getElementById('memories-this-month')) {
-                document.getElementById('memories-this-month').textContent = monthMemoriesSnapshot.size;
-            }
 
             // Update Loan Stats
             const loansSnapshot = await db.collection('loans')
@@ -1646,17 +1620,11 @@ class Dashboard {
             case 'reminders':
                 await window.loadRemindersSection();
                 break;
-            case 'memories':
-                await window.loadMemoriesSection();
-                break;
             case 'reports':
                 await window.loadReportsSection();
                 break;
             case 'profile':
                 await window.loadProfileSection();
-                break;
-            case 'goals':
-                if (window.loadGoalsSection) await window.loadGoalsSection();
                 break;
             case 'entertainment':
                 if (window.loadEntertainmentSection) await window.loadEntertainmentSection();
@@ -2327,74 +2295,6 @@ class Dashboard {
                 previewContainer.classList.remove('d-none');
             };
             reader.readAsDataURL(file);
-        }
-    }
-
-    async saveMemory() {
-        const btn = document.getElementById('save-memory');
-        try {
-            const id = document.getElementById('memory-id').value;
-            const title = document.getElementById('memory-title').value;
-            const description = document.getElementById('memory-description').value;
-            const date = document.getElementById('memory-date').value;
-            const tags = document.getElementById('memory-tags').value.split(',').map(tag => tag.trim()).filter(tag => tag);
-            const imageFile = document.getElementById('memory-image').files[0];
-
-            if (!title) {
-                this.showNotification('Please enter a title', 'danger');
-                return;
-            }
-
-            window.setBtnLoading(btn, true);
-
-            let imageUrl = null;
-
-            // Upload image if exists
-            if (imageFile) {
-                const storageRef = storage.ref();
-                const imageRef = storageRef.child(`memories/${this.currentUser.uid}/${Date.now()}_${imageFile.name}`);
-                await imageRef.put(imageFile);
-                imageUrl = await imageRef.getDownloadURL();
-            }
-
-            const memory = {
-                title: title,
-                description: description,
-                date: date,
-                tags: tags,
-                imageUrl: imageUrl,
-                userId: this.currentUser.uid,
-            };
-
-            if (id) {
-                memory.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
-                if (!imageUrl) delete memory.imageUrl; // Don't overwrite image if not changed
-                await db.collection('memories').doc(id).update(memory);
-            } else {
-                memory.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-                await db.collection('memories').add(memory);
-            }
-
-            // Close modal
-            window.setBtnLoading(btn, false);
-            bootstrap.Modal.getOrCreateInstance(document.getElementById('addMemoryModal')).hide();
-
-            // Reset form
-            document.getElementById('memory-form').reset();
-            const previewContainer = document.querySelector('.preview-container');
-            if (previewContainer) {
-                previewContainer.classList.add('d-none');
-            }
-
-            // Update dashboard
-            this.updateStats();
-
-            this.showNotification(id ? 'Memory updated successfully!' : 'Memory saved successfully!', 'success');
-
-        } catch (error) {
-            window.setBtnLoading(btn, false);
-            console.error('Error saving memory:', error);
-            this.showNotification('Error saving memory: ' + error.message, 'danger');
         }
     }
 

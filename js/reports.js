@@ -51,41 +51,8 @@ window.loadReportsSection = async function() {
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card h-100 shadow-sm">
-                    <div class="card-header bg-transparent">
-                        <h5 class="mb-0">Goal Progress</h5>
-                    </div>
-                    <div class="card-body">
-                        <canvas id="goalProgressChart"></canvas>
-                    </div>
-                </div>
-            </div>
         </div>
 
-        <!-- Lifestyle Section -->
-        <h4 class="mb-3 text-info"><i class="fas fa-camera me-2"></i>Lifestyle</h4>
-        <div class="row g-4">
-            <div class="col-md-6">
-                <div class="card h-100 shadow-sm">
-                    <div class="card-header bg-transparent">
-                        <h5 class="mb-0">Entertainment Spending</h5>
-                    </div>
-                    <div class="card-body">
-                        <canvas id="entertainmentCostChart"></canvas>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card h-100 shadow-sm">
-                    <div class="card-header bg-transparent">
-                        <h5 class="mb-0">Memories Timeline</h5>
-                    </div>
-                    <div class="card-body">
-                        <canvas id="memoriesTimelineChart"></canvas>
-                    </div>
-                </div>
-            </div>
         </div>
     `;
 
@@ -97,13 +64,11 @@ async function loadReportCharts() {
     if (!user) return;
 
     // Fetch Data from all collections
-    const [transactionsSnap, habitsSnap, tasksSnap, goalsSnap, entertainmentSnap, memoriesSnap] = await Promise.all([
+    const [transactionsSnap, habitsSnap, tasksSnap, entertainmentSnap] = await Promise.all([
         db.collection('transactions').where('userId', '==', user.uid).get(),
         db.collection('habits').where('userId', '==', user.uid).where('active', '==', true).get(),
         db.collection('reminders').where('userId', '==', user.uid).get(),
-        db.collection('goals').where('userId', '==', user.uid).get(),
-        db.collection('entertainment').where('userId', '==', user.uid).get(),
-        db.collection('memories').where('userId', '==', user.uid).get()
+        db.collection('entertainment').where('userId', '==', user.uid).get()
     ]);
 
     // --- Process Finance ---
@@ -141,16 +106,6 @@ async function loadReportCharts() {
         else medium++;
     });
 
-    // --- Process Goals ---
-    const goalLabels = [];
-    const goalData = [];
-    goalsSnap.forEach(doc => {
-        const g = doc.data();
-        goalLabels.push(g.title);
-        const progress = g.target > 0 ? Math.min(100, Math.round((g.current / g.target) * 100)) : 0;
-        goalData.push(progress);
-    });
-
     // --- Process Entertainment ---
     const entCosts = { movie: 0, tour: 0, other: 0 };
     entertainmentSnap.forEach(doc => {
@@ -158,20 +113,6 @@ async function loadReportCharts() {
         const type = e.type === 'movie' || e.type === 'tour' ? e.type : 'other';
         entCosts[type] += (e.cost || 0);
     });
-
-    // --- Process Memories ---
-    const memoriesByMonth = {};
-    memoriesSnap.forEach(doc => {
-        const d = new Date(doc.data().date);
-        const key = `${d.getFullYear()}-${d.getMonth() + 1}`;
-        memoriesByMonth[key] = (memoriesByMonth[key] || 0) + 1;
-    });
-    const sortedKeys = Object.keys(memoriesByMonth).sort((a, b) => new Date(a) - new Date(b));
-    const memoryLabels = sortedKeys.map(k => {
-        const [y, m] = k.split('-');
-        return new Date(y, m - 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-    });
-    const memoryData = sortedKeys.map(k => memoriesByMonth[k]);
 
     // --- Render Charts ---
     const isMobile = window.innerWidth < 768;
@@ -275,31 +216,6 @@ async function loadReportCharts() {
         options: commonOptions
     });
 
-    // Goals: Progress
-    new Chart(document.getElementById('goalProgressChart'), {
-        type: 'bar',
-        indexAxis: 'y',
-        data: {
-            labels: goalLabels,
-            datasets: [{
-                label: 'Progress (%)',
-                data: goalData,
-                backgroundColor: 'rgba(67, 97, 238, 0.7)'
-            }]
-        },
-        options: { 
-            ...commonOptions,
-            scales: { 
-                x: { min: 0, max: 100 },
-                y: {
-                    ticks: {
-                        font: { size: isMobile ? 9 : 12 }
-                    }
-                }
-            } 
-        }
-    });
-
     // Entertainment: Cost
     new Chart(document.getElementById('entertainmentCostChart'), {
         type: 'pie',
@@ -311,32 +227,5 @@ async function loadReportCharts() {
             }]
         },
         options: commonOptions
-    });
-
-    // Memories: Timeline
-    new Chart(document.getElementById('memoriesTimelineChart'), {
-        type: 'line',
-        data: {
-            labels: memoryLabels,
-            datasets: [{
-                label: 'Memories Captured',
-                data: memoryData,
-                borderColor: '#f72585',
-                tension: 0.3,
-                fill: true,
-                backgroundColor: 'rgba(247, 37, 133, 0.1)'
-            }]
-        },
-        options: { 
-            ...commonOptions,
-            scales: { 
-                y: { beginAtZero: true, ticks: { stepSize: 1 } },
-                x: {
-                    ticks: {
-                        font: { size: isMobile ? 9 : 12 }
-                    }
-                }
-            } 
-        }
     });
 }
