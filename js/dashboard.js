@@ -848,6 +848,7 @@ class Dashboard {
         try {
             const now = new Date();
             const today = now.toISOString().split('T')[0];
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
 
             // Get today's transactions
             const transactionsSnapshot = await db.collection('transactions')
