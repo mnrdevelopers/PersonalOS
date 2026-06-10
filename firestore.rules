@@ -75,6 +75,24 @@ service cloud.firestore {
       }
     }
 
+    // Investments
+    match /investments/{docId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwnerCreate();
+    }
+
+    // Credit Cards
+    match /credit_cards/{docId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwnerCreate();
+    }
+
+    // Wallets
+    match /wallets/{docId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwnerCreate();
+    }
+
     // Categories
     match /categories/{docId} {
       allow read, update, delete: if isOwner(resource.data.userId);
@@ -83,6 +101,48 @@ service cloud.firestore {
 
     // Expiry Docs (New Section)
     match /expiry_docs/{docId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwnerCreate();
+    }
+
+    // Document Limits
+    match /document_limits/{docId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwnerCreate();
+    }
+
+    // Vehicles
+    match /vehicles/{docId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwnerCreate();
+    }
+
+    // Vehicle Logs
+    match /vehicle_logs/{docId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwnerCreate();
+    }
+
+    // Service Alerts
+    match /service_alerts/{docId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwnerCreate();
+    }
+
+    // Notifications
+    match /notifications/{docId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwnerCreate();
+    }
+
+    // Grocery Items
+    match /grocery_items/{docId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwnerCreate();
+    }
+
+    // Grocery Logs
+    match /grocery_logs/{docId} {
       allow read, update, delete: if isOwner(resource.data.userId);
       allow create: if isOwnerCreate();
     }

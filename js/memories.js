@@ -86,7 +86,7 @@ window.editMemory = async function(id) {
         document.getElementById('memory-date').value = data.date;
         document.getElementById('memory-tags').value = (data.tags || []).join(', ');
         
-        const modal = new bootstrap.Modal(document.getElementById('addMemoryModal'));
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addMemoryModal'));
         modal.show();
     } catch (e) { console.error(e); }
 };

@@ -3,16 +3,20 @@ class Dashboard {
         this.currentUser = null;
         this.currentSection = 'dashboard';
         this.financeChart = null;
-        this.deferredPrompt = null;
+        this.notificationTimeouts = {};
+        this.pendingUpiTransaction = null;
+        this.selectedUpiApp = '';
         this.init();
     }
 
     async init() {
         await this.checkAuth();
+        this.renderMobileNav();
         this.bindEvents();
         this.updateTime();
+        this.updateGreeting();
         this.loadUserProfile();
-        
+
         const hashSection = window.location.hash.substring(1);
         if (hashSection && document.getElementById(`${hashSection}-section`)) {
             this.switchSection(hashSection);
@@ -20,7 +24,8 @@ class Dashboard {
             this.initializeDashboard();
             this.switchSection('dashboard');
         }
-        this.setupServiceWorker();
+        this.startGlobalAlertSystem();
+        this.processRecurringTransactions();
         this.hideLoading();
     }
 
@@ -73,7 +78,13 @@ class Dashboard {
         // Logout
         document.getElementById('logout-btn')?.addEventListener('click', (e) => {
             e.preventDefault();
-            this.logout();
+            this.showLogoutConfirmation();
+        });
+
+        // Mobile Logout
+        document.getElementById('mobile-logout-btn')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.showLogoutConfirmation();
         });
 
         // Chart period change
@@ -106,14 +117,17 @@ class Dashboard {
         // Hamburger Menu Logic
         const hamburger = document.getElementById('hamburger-menu');
         const overlay = document.querySelector('.sidebar-overlay');
-        
+
         const closeSidebar = () => {
             document.body.classList.remove('sidebar-open');
+            if (hamburger) hamburger.setAttribute('aria-expanded', 'false');
         };
 
         if (hamburger && overlay) {
             hamburger.addEventListener('click', () => {
                 document.body.classList.toggle('sidebar-open');
+                const isExpanded = hamburger.getAttribute('aria-expanded') === 'true';
+                hamburger.setAttribute('aria-expanded', !isExpanded);
             });
 
             overlay.addEventListener('click', closeSidebar);
@@ -122,12 +136,74 @@ class Dashboard {
         document.querySelectorAll('.sidebar .nav-link').forEach(link => {
             link.addEventListener('click', closeSidebar);
         });
+
+        // FAB Logic
+        const fabBtn = document.getElementById('fab-main-btn');
+        const fabContainer = document.querySelector('.fab-container');
+
+        if (fabBtn && fabContainer) {
+            fabBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                fabContainer.classList.toggle('active');
+            });
+
+            // Close FAB when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!fabContainer.contains(e.target) && fabContainer.classList.contains('active')) {
+                    fabContainer.classList.remove('active');
+                }
+            });
+
+            // Handle FAB options
+            fabContainer.querySelectorAll('.fab-option').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const action = e.currentTarget.dataset.action;
+                    this.handleQuickAction(action);
+                    fabContainer.classList.remove('active');
+                });
+            });
+        }
+
+        // Calculator
+        document.getElementById('calculator-btn')?.addEventListener('click', () => {
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('calculatorModal'));
+            modal.show();
+        });
+        this.initCalculator();
+
+        // Notifications
+        document.getElementById('notifications-btn')?.addEventListener('click', () => {
+            this.showNotificationsModal();
+        });
+        document.getElementById('mark-all-read')?.addEventListener('click', () => {
+            this.markAllNotificationsRead();
+        });
     }
 
     bindModalEvents() {
         // Transaction modal
         document.getElementById('save-transaction')?.addEventListener('click', () => {
             this.saveTransaction();
+        });
+
+        document.querySelectorAll('#upi-app-list [data-upi-app]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                this.selectedUpiApp = btn.dataset.upiApp;
+                document.querySelectorAll('#upi-app-list [data-upi-app]').forEach((b) => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
+
+        document.getElementById('upi-open-app')?.addEventListener('click', () => {
+            this.openSelectedUpiApp();
+        });
+
+        document.getElementById('upi-save-transaction')?.addEventListener('click', () => {
+            this.completePendingUpiTransaction();
+        });
+
+        document.getElementById('upi-cancel-transaction')?.addEventListener('click', () => {
+            this.cancelPendingUpiTransaction();
         });
 
         // Habit modal
@@ -156,16 +232,213 @@ class Dashboard {
                 this.updateHabitModalUI(e.target.value);
             });
         });
+
+        // Logout Confirm
+        document.getElementById('confirm-logout-btn')?.addEventListener('click', () => {
+            this.logout();
+        });
+
+        // The old select-based __add_new__ listener is replaced by the
+        // custom picker's "+ Add New Category" button (see loadTransactionCategories)
     }
 
-    async installPWA() {
-        if (!this.deferredPrompt) return;
-        this.deferredPrompt.prompt();
-        const { outcome } = await this.deferredPrompt.userChoice;
-        console.log(`User response to the install prompt: ${outcome}`);
-        this.deferredPrompt = null;
-        const installBtn = document.getElementById('install-app-btn');
-        if (installBtn) installBtn.classList.add('d-none');
+    initCalculator() {
+        const display = document.getElementById('calc-display');
+        if (!display) return;
+
+        let currentInput = '0';
+        let previousInput = '';
+        let operator = null;
+        let shouldResetDisplay = false;
+
+        // History Setup
+        let history = [];
+        let historyContainer = document.getElementById('calc-history');
+
+        if (!historyContainer) {
+            historyContainer = document.createElement('div');
+            historyContainer.id = 'calc-history';
+            historyContainer.className = 'mb-3 p-2 border rounded bg-light d-none';
+            historyContainer.style.height = '100px';
+            historyContainer.style.overflowY = 'auto';
+            historyContainer.style.fontSize = '0.85rem';
+            historyContainer.innerHTML = '<div class="text-muted text-center small py-4">No history</div>';
+            display.parentNode.insertBefore(historyContainer, display);
+        }
+
+        // History Toggle
+        let historyToggle = document.getElementById('calc-history-toggle');
+        if (!historyToggle) {
+            const toggleContainer = document.createElement('div');
+            toggleContainer.className = 'd-flex justify-content-end mb-1';
+            historyToggle = document.createElement('button');
+            historyToggle.id = 'calc-history-toggle';
+            historyToggle.className = 'btn btn-sm btn-link text-secondary text-decoration-none p-0';
+            historyToggle.innerHTML = '<i class="fas fa-history me-1"></i> Show History';
+            toggleContainer.appendChild(historyToggle);
+            display.parentNode.insertBefore(toggleContainer, historyContainer);
+
+            historyToggle.addEventListener('click', () => {
+                historyContainer.classList.toggle('d-none');
+                const isHidden = historyContainer.classList.contains('d-none');
+                historyToggle.innerHTML = isHidden ?
+                    '<i class="fas fa-history me-1"></i> Show History' :
+                    '<i class="fas fa-history me-1"></i> Hide History';
+                historyToggle.classList.toggle('text-primary', !isHidden);
+                historyToggle.classList.toggle('text-secondary', isHidden);
+            });
+        }
+
+        const updateHistory = (expr, res) => {
+            history.unshift({ expr, res });
+            if (history.length > 20) history.pop();
+
+            historyContainer.innerHTML = '';
+            history.forEach(item => {
+                const row = document.createElement('div');
+                row.className = 'd-flex justify-content-between border-bottom py-1';
+                row.style.cursor = 'pointer';
+                row.title = 'Click to use result';
+                row.innerHTML = `<span class="text-muted">${item.expr}</span><span class="fw-bold">${item.res}</span>`;
+
+                row.addEventListener('click', () => {
+                    currentInput = item.res;
+                    updateDisplay();
+                    shouldResetDisplay = true;
+                });
+
+                historyContainer.appendChild(row);
+            });
+        };
+
+        const updateDisplay = () => {
+            display.value = currentInput;
+        };
+
+        const updateOperatorVisuals = (activeOp) => {
+            document.querySelectorAll('.calc-btn[data-action="operator"]').forEach(btn => {
+                const op = btn.dataset.value;
+                // Reset to default state
+                if (['/', '*', '-', '+'].includes(op)) {
+                    btn.classList.add('btn-warning');
+                    btn.classList.remove('btn-primary');
+                } else {
+                    btn.classList.add('btn-light');
+                    btn.classList.remove('btn-primary');
+                }
+
+                // Apply active state
+                if (op === activeOp) {
+                    btn.classList.remove('btn-warning', 'btn-light');
+                    btn.classList.add('btn-primary');
+                }
+            });
+        };
+
+        const calculate = () => {
+            let result;
+            const prev = parseFloat(previousInput);
+            const current = parseFloat(currentInput);
+
+            if (isNaN(prev) || isNaN(current)) return;
+
+            const expression = `${prev} ${operator} ${current}`;
+
+            switch (operator) {
+                case '+': result = prev + current; break;
+                case '-': result = prev - current; break;
+                case '*': result = prev * current; break;
+                case '/': result = prev / current; break;
+                case '%': result = prev % current; break;
+                default: return;
+            }
+
+            currentInput = parseFloat(result.toFixed(8)).toString();
+            updateHistory(expression, currentInput);
+            shouldResetDisplay = true;
+        };
+
+        document.querySelectorAll('.calc-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const action = btn.dataset.action;
+                const value = btn.dataset.value;
+
+                if (action === 'number') {
+                    if (currentInput === '0' || shouldResetDisplay) {
+                        currentInput = value;
+                        shouldResetDisplay = false;
+                    } else {
+                        currentInput += value;
+                    }
+                } else if (action === 'decimal') {
+                    if (shouldResetDisplay) {
+                        currentInput = '0.';
+                        shouldResetDisplay = false;
+                    } else if (!currentInput.includes('.')) {
+                        currentInput += '.';
+                    }
+                } else if (action === 'operator') {
+                    if (operator !== null && !shouldResetDisplay) {
+                        calculate();
+                    }
+                    previousInput = currentInput;
+                    operator = value;
+                    shouldResetDisplay = true;
+                    updateOperatorVisuals(operator);
+                } else if (action === 'calculate') {
+                    if (operator !== null) {
+                        calculate();
+                        operator = null;
+                        updateOperatorVisuals(null);
+                    }
+                } else if (action === 'clear') {
+                    currentInput = '0';
+                    previousInput = '';
+                    operator = null;
+                    shouldResetDisplay = false;
+                    updateOperatorVisuals(null);
+                } else if (action === 'backspace') {
+                    if (currentInput.length > 1) {
+                        currentInput = currentInput.slice(0, -1);
+                    } else {
+                        currentInput = '0';
+                    }
+                }
+                updateDisplay();
+            });
+        });
+    }
+
+    renderMobileNav() {
+        const navContainer = document.querySelector('.mobile-quick-nav');
+        if (!navContainer) return;
+
+        const navItems = [
+            { id: 'finance', icon: 'fa-wallet', label: 'Finance', color: '#4361ee' },
+            { id: 'loans', icon: 'fa-hand-holding-usd', label: 'Loans', color: '#f72585' },
+            { id: 'habits', icon: 'fa-check-circle', label: 'Habits', color: '#4cc9f0' },
+            { id: 'reminders', icon: 'fa-tasks', label: 'Tasks', color: '#7209b7' },
+            { id: 'memories', icon: 'fa-images', label: 'Memory', color: '#f8961e' },
+            { id: 'goals', icon: 'fa-bullseye', label: 'Goals', color: '#f94144' },
+            { id: 'entertainment', icon: 'fa-film', label: 'Fun', color: '#90be6d' },
+            { id: 'vehicles', icon: 'fa-car', label: 'Auto', color: '#577590' },
+            { id: 'groceries', icon: 'fa-shopping-basket', label: 'Grocery', color: '#2ec4b6' },
+            { id: 'expiry', icon: 'fa-hourglass-half', label: 'Expiry', color: '#f3722c' },
+            { id: 'reports', icon: 'fa-chart-bar', label: 'Stats', color: '#277da1' },
+            { id: 'profile', icon: 'fa-user', label: 'Profile', color: '#4d908e' },
+            { id: 'settings', icon: 'fa-cog', label: 'Config', color: '#6c757d' }
+        ];
+
+        navContainer.innerHTML = navItems.map((item, index) => `
+            <div class="nav-card animate-nav-item" style="animation-delay: ${index * 0.05}s" data-section="${item.id}">
+                <div class="nav-card-content">
+                    <div class="icon-circle" style="background-color: ${item.color}20; color: ${item.color}; box-shadow: 0 4px 10px ${item.color}30;">
+                        <i class="fas ${item.icon}"></i>
+                    </div>
+                    <span style="color: ${item.color}; font-weight: 600;">${item.label}</span>
+                </div>
+            </div>
+        `).join('');
     }
 
     hideLoading() {
@@ -190,7 +463,7 @@ class Dashboard {
         const targetLabel = document.getElementById('habit-target-label');
         const targetInput = document.getElementById('habit-target');
         const costContainer = document.getElementById('habit-cost-container');
-        
+
         if (type === 'bad') {
             targetLabel.textContent = 'Daily Limit (Max allowed)';
             if (targetInput.value === '1') targetInput.value = '0';
@@ -209,7 +482,7 @@ class Dashboard {
                 hour: '2-digit',
                 minute: '2-digit'
             });
-            
+
             const timeElement = document.getElementById('current-time');
             if (timeElement) {
                 timeElement.textContent = timeString;
@@ -220,33 +493,102 @@ class Dashboard {
         setInterval(updateClock, 60000); // Update every minute
     }
 
+    updateGreeting() {
+        const hour = new Date().getHours();
+        const greetingElement = document.getElementById('welcome-message');
+        const dateElement = document.getElementById('current-date-full');
+        const mobileGreeting = document.getElementById('mobile-welcome-message');
+        const mobileDate = document.getElementById('mobile-date-display');
+
+        if (greetingElement) {
+            let greeting = 'Welcome back!';
+            if (hour < 12) greeting = 'Good Morning,';
+            else if (hour < 18) greeting = 'Good Afternoon,';
+            else greeting = 'Good Evening,';
+
+            if (this.currentUser && this.currentUser.displayName) {
+                greeting += ` ${this.currentUser.displayName.split(' ')[0]}`;
+            }
+            greetingElement.textContent = greeting;
+
+            if (mobileGreeting) {
+                mobileGreeting.textContent = greeting;
+            }
+        }
+        if (dateElement) {
+            const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            dateElement.textContent = dateStr;
+            if (mobileDate) {
+                mobileDate.textContent = dateStr;
+            }
+        }
+    }
+
     async loadUserProfile() {
         try {
             const userDoc = await db.collection('users').doc(this.currentUser.uid).get();
             if (userDoc.exists) {
                 const userData = userDoc.data();
-                
+
                 // Update UI with user info
                 const userNameElements = document.querySelectorAll('#user-name');
                 const userEmailElements = document.querySelectorAll('#user-email');
-                
+
                 userNameElements.forEach(el => {
                     el.textContent = userData.name || 'User';
                 });
-                
+
                 userEmailElements.forEach(el => {
                     el.textContent = this.currentUser.email;
                 });
+
+                // Member Since Badge
+                const memberSinceElement = document.getElementById('member-since-badge');
+                if (memberSinceElement) {
+                    let joinDate = new Date();
+                    if (this.currentUser.metadata && this.currentUser.metadata.creationTime) {
+                        joinDate = new Date(this.currentUser.metadata.creationTime);
+                    } else if (userData.createdAt) {
+                        joinDate = userData.createdAt.toDate();
+                    }
+                    const dateStr = joinDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                    memberSinceElement.innerHTML = `<span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25" style="font-size: 0.65rem; font-weight: 500;">Member since ${dateStr}</span>`;
+                }
+
+                // Profile Completion Logic
+                let completedFields = 0;
+                const totalFields = 4; // Name, Avatar, Currency, Theme
+
+                if (userData.name) completedFields++;
+                if (userData.avatar && userData.avatar !== '👤') completedFields++;
+                if (userData.settings?.currency) completedFields++;
+                if (userData.settings?.theme) completedFields++;
+
+                const completionPercent = Math.round((completedFields / totalFields) * 100);
+                const completionText = document.getElementById('profile-completion-text');
+                const completionBar = document.getElementById('profile-completion-bar');
+
+                if (completionText) completionText.textContent = `${completionPercent}%`;
+                if (completionBar) completionBar.style.width = `${completionPercent}%`;
 
                 // Update Avatar
                 const avatar = userData.avatar || '👤';
                 const avatarElements = document.querySelectorAll('.avatar');
                 avatarElements.forEach(el => {
-                    // Apply emoji style
-                    el.innerHTML = avatar;
-                    el.style.cssText = 'display: flex; align-items: center; justify-content: center; font-size: 1.5rem; width: 40px; height: 40px; background-color: rgba(255,255,255,0.2); border-radius: 50%;';
+                    if (avatar.includes('/') || avatar.includes('.png')) {
+                        // Image Avatar
+                        el.innerHTML = `<img src="${avatar}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+                        el.style.backgroundColor = 'transparent';
+                        el.style.display = 'block';
+                        el.style.width = '40px';
+                        el.style.height = '40px';
+                    } else {
+                        // Emoji Avatar
+                        el.innerHTML = avatar;
+                        el.style.cssText = 'display: flex; align-items: center; justify-content: center; font-size: 1.5rem; width: 40px; height: 40px; background-color: rgba(255,255,255,0.2); border-radius: 50%;';
+                    }
                 });
-                
+
                 // Apply theme
                 const theme = userData.settings?.theme || 'auto';
                 this.applyTheme(theme);
@@ -258,13 +600,13 @@ class Dashboard {
 
     applyTheme(theme) {
         const html = document.documentElement;
-        
+
         if (theme === 'dark' || (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             html.setAttribute('data-theme', 'dark');
         } else {
             html.setAttribute('data-theme', 'light');
         }
-        
+
         // Save to localStorage for consistency
         localStorage.setItem('theme', theme);
     }
@@ -278,51 +620,270 @@ class Dashboard {
             this.updateFinanceChart(),
             this.loadHabitStreaks()
         ]);
-        
-        // Update current date
-        const now = new Date();
-        const dateElement = document.getElementById('current-date');
-        if (dateElement) {
-            dateElement.textContent = now.toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
+        this.setupNotificationListener();
+
+        this.updateGreeting();
+    }
+
+    startGlobalAlertSystem() {
+        // Run immediately
+        this.checkGlobalAlerts();
+
+        // Run every 15 minutes
+        setInterval(() => this.checkGlobalAlerts(), 15 * 60 * 1000);
+    }
+
+    setupNotificationListener() {
+        if (!this.currentUser) return;
+        if (this.notificationListener) return; // Prevent duplicate listeners
+
+        let isFirstLoad = true;
+
+        // Listen for unread notifications count
+        this.notificationListener = db.collection('notifications')
+            .where('userId', '==', this.currentUser.uid)
+            .where('read', '==', false)
+            .onSnapshot(snapshot => {
+                const count = snapshot.size;
+                const badge = document.getElementById('notification-badge');
+                const btn = document.getElementById('notifications-btn');
+
+                if (badge) {
+                    const newText = count > 9 ? '9+' : count;
+                    if (badge.textContent != newText) {
+                        badge.classList.remove('bounce-badge');
+                        void badge.offsetWidth; // Trigger reflow
+                        badge.classList.add('bounce-badge');
+                    }
+                    badge.textContent = newText;
+
+                    if (count > 0) {
+                        badge.classList.remove('d-none');
+                        if (btn) btn.classList.add('notification-pulse');
+                    } else {
+                        badge.classList.add('d-none');
+                        if (btn) btn.classList.remove('notification-pulse');
+                    }
+                }
+
+                // Play sound for new notifications (skip initial load)
+                if (!isFirstLoad) {
+                    const hasNew = snapshot.docChanges().some(change => change.type === 'added');
+                    if (hasNew) {
+                        this.playNotificationSound();
+                    }
+                }
+                isFirstLoad = false;
+            }, error => console.log("Notification listener error:", error));
+    }
+
+    async playNotificationSound() {
+        try {
+            // Check user setting
+            if (this.currentUser) {
+                const userDoc = await db.collection('users').doc(this.currentUser.uid).get();
+                const settings = userDoc.data()?.settings || {};
+                if (settings.notification_sound === false) return;
+            }
+
+            // Premium glass ping sound
+            const audio = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-positive-interface-beep-221.mp3');
+            audio.volume = 0.4;
+            audio.play().catch(e => {
+                // Autoplay policy might block this if no user interaction yet
+                console.log("Notification sound blocked:", e);
             });
+        } catch (e) {
+            console.error("Error playing notification sound:", e);
         }
+    }
+
+    async showNotificationsModal() {
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('notificationsModal'));
+        modal.show();
+        await this.loadNotifications();
+    }
+
+    async loadNotifications() {
+        const container = document.getElementById('notifications-list');
+        if (!container) return;
+
+        container.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div></div>';
+
+        try {
+            const snapshot = await db.collection('notifications')
+                .where('userId', '==', this.currentUser.uid)
+                .orderBy('createdAt', 'desc')
+                .limit(20)
+                .get();
+
+            container.innerHTML = '';
+
+            if (snapshot.empty) {
+                container.innerHTML = `
+                    <div class="text-center py-5 text-muted">
+                        <i class="far fa-bell-slash fa-2x mb-2"></i>
+                        <p class="mb-0">No notifications</p>
+                    </div>`;
+                return;
+            }
+
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const item = document.createElement('div');
+                item.className = `list-group-item list-group-item-action p-3 ${!data.read ? 'bg-light' : ''}`;
+                item.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="me-3">
+                            <div class="d-flex align-items-center mb-1">
+                                ${!data.read ? '<span class="badge bg-primary rounded-circle p-1 me-2" style="width: 8px; height: 8px;"> </span>' : ''}
+                                <h6 class="mb-0">${data.title}</h6>
+                            </div>
+                            <p class="mb-1 small text-muted">${data.message}</p>
+                            <small class="text-muted" style="font-size: 0.75rem;">${data.createdAt ? new Date(data.createdAt.toDate()).toLocaleString() : ''}</small>
+                        </div>
+                        <div class="dropdown">
+                            <button class="btn btn-link text-muted p-0" data-bs-toggle="dropdown">
+                                <i class="fas fa-ellipsis-v"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                ${!data.read ? `<li><a class="dropdown-item" href="#" onclick="window.dashboard.markNotificationRead('${doc.id}')"><i class="fas fa-check me-2"></i>Mark as read</a></li>` : ''}
+                                <li><a class="dropdown-item text-danger" href="#" onclick="window.dashboard.deleteNotification('${doc.id}')"><i class="fas fa-trash me-2"></i>Delete</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        } catch (error) {
+            console.error("Error loading notifications:", error);
+            container.innerHTML = '<div class="text-center py-3 text-danger">Error loading notifications</div>';
+        }
+    }
+
+    async markNotificationRead(id) {
+        try {
+            await db.collection('notifications').doc(id).update({ read: true });
+            this.loadNotifications(); // Refresh list
+        } catch (error) {
+            console.error("Error marking read:", error);
+        }
+    }
+
+    async deleteNotification(id) {
+        try {
+            await db.collection('notifications').doc(id).delete();
+            this.loadNotifications(); // Refresh list
+        } catch (error) {
+            console.error("Error deleting notification:", error);
+        }
+    }
+
+    async markAllNotificationsRead() {
+        try {
+            const batch = db.batch();
+            const snapshot = await db.collection('notifications')
+                .where('userId', '==', this.currentUser.uid)
+                .where('read', '==', false)
+                .get();
+
+            if (snapshot.empty) return;
+
+            snapshot.forEach(doc => {
+                batch.update(doc.ref, { read: true });
+            });
+
+            await batch.commit();
+            this.loadNotifications();
+            this.showNotification('All notifications marked as read', 'success');
+        } catch (error) {
+            console.error("Error marking all read:", error);
+        }
+    }
+
+    calculateNextDate(dateStr, frequency) {
+        const date = new Date(dateStr);
+        if (frequency === 'weekly') date.setDate(date.getDate() + 7);
+        else if (frequency === 'monthly') date.setMonth(date.getMonth() + 1);
+        else if (frequency === 'yearly') date.setFullYear(date.getFullYear() + 1);
+        return date.toISOString().split('T')[0];
+    }
+
+    async processRecurringTransactions() {
+        if (!this.currentUser) return;
+        const today = new Date().toISOString().split('T')[0];
+
+        try {
+            const snapshot = await db.collection('transactions')
+                .where('userId', '==', this.currentUser.uid)
+                .where('recurring', '==', true)
+                .where('nextDueDate', '<=', today)
+                .get();
+
+            if (snapshot.empty) return;
+
+            const batch = db.batch();
+            let count = 0;
+
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                let nextDate = data.nextDueDate;
+                let iterations = 0;
+
+                // Process missed occurrences (limit to 12 to prevent infinite loops)
+                while (nextDate <= today && iterations < 12) {
+                    const newRef = db.collection('transactions').doc();
+                    const newTx = { ...data, date: nextDate, createdAt: firebase.firestore.FieldValue.serverTimestamp(), recurring: false, parentTransactionId: doc.id, nextDueDate: null, frequency: null };
+                    delete newTx.id;
+                    batch.set(newRef, newTx);
+                    nextDate = this.calculateNextDate(nextDate, data.frequency);
+                    count++;
+                    iterations++;
+                }
+                batch.update(doc.ref, { nextDueDate: nextDate });
+            });
+
+            if (count > 0) {
+                await batch.commit();
+                this.showNotification(`Processed ${count} recurring transactions`, 'info');
+                this.updateStats();
+                this.loadRecentTransactions();
+                if (this.currentSection === 'finance' && window.loadFinanceData) window.loadFinanceData();
+            }
+        } catch (e) { console.error("Recurring tx error:", e); }
     }
 
     async updateStats() {
         try {
             const now = new Date();
             const today = now.toISOString().split('T')[0];
-            
+
             // Get today's transactions
             const transactionsSnapshot = await db.collection('transactions')
                 .where('userId', '==', this.currentUser.uid)
                 .where('date', '==', today)
                 .get();
-            
+
             let totalIncome = 0;
             let totalExpense = 0;
             let totalMoneySaved = 0;
-            
+
             transactionsSnapshot.forEach(doc => {
                 const data = doc.data();
                 if (data.type === 'income') {
                     totalIncome += data.amount;
-                } else {
+                } else if (data.type === 'expense') {
                     totalExpense += data.amount;
                 }
             });
-            
+
             const balance = totalIncome - totalExpense;
-            
+
             // Update balance stats
             document.getElementById('today-balance').textContent = `₹${balance.toFixed(2)}`;
             document.getElementById('income-today').textContent = `₹${totalIncome.toFixed(2)}`;
             document.getElementById('expense-today').textContent = `₹${totalExpense.toFixed(2)}`;
-            
+
             // Get active habits count
             const habitsSnapshot = await db.collection('habits')
                 .where('userId', '==', this.currentUser.uid)
@@ -341,16 +902,23 @@ class Dashboard {
                     totalMoneySaved += cleanDays * habit.cost;
                 }
             });
-            
+
             // Get today's completed habits
             const todayHabitsSnapshot = await db.collection('habit_logs')
                 .where('userId', '==', this.currentUser.uid)
                 .where('date', '==', today)
                 .where('completed', '==', true)
                 .get();
-            
+
             document.getElementById('active-habits').textContent = habitsSnapshot.size;
             document.getElementById('completed-today').textContent = todayHabitsSnapshot.size;
+
+            // Update habit progress bar
+            const progressElement = document.getElementById('habits-progress');
+            if (progressElement) {
+                const percent = habitsSnapshot.size > 0 ? (todayHabitsSnapshot.size / habitsSnapshot.size) * 100 : 0;
+                progressElement.style.width = `${percent}%`;
+            }
 
             const moneySavedContainer = document.getElementById('money-saved-container');
             if (totalMoneySaved > 0) {
@@ -359,56 +927,106 @@ class Dashboard {
             } else {
                 moneySavedContainer.classList.add('d-none');
             }
-            
+
             // Get pending tasks
             const tasksSnapshot = await db.collection('reminders')
                 .where('userId', '==', this.currentUser.uid)
                 .where('completed', '==', false)
                 .get();
-            
+
             // Get tasks due today
             const todayTasksSnapshot = await db.collection('reminders')
                 .where('userId', '==', this.currentUser.uid)
                 .where('dueDate', '==', today)
                 .where('completed', '==', false)
                 .get();
-            
+
             document.getElementById('pending-tasks').textContent = tasksSnapshot.size;
             document.getElementById('due-today').textContent = todayTasksSnapshot.size;
-            
+
             // Get total memories
             const memoriesSnapshot = await db.collection('memories')
                 .where('userId', '==', this.currentUser.uid)
                 .get();
-            
+
             // Get this month's memories
             const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
             const monthMemoriesSnapshot = await db.collection('memories')
                 .where('userId', '==', this.currentUser.uid)
                 .where('date', '>=', startOfMonth)
                 .get();
-            
-            document.getElementById('total-memories').textContent = memoriesSnapshot.size;
-            document.getElementById('memories-this-month').textContent = monthMemoriesSnapshot.size;
-            
+
+            if (document.getElementById('total-memories')) {
+                document.getElementById('total-memories').textContent = memoriesSnapshot.size;
+            }
+            if (document.getElementById('memories-this-month')) {
+                document.getElementById('memories-this-month').textContent = monthMemoriesSnapshot.size;
+            }
+
             // Update Loan Stats
             const loansSnapshot = await db.collection('loans')
                 .where('userId', '==', this.currentUser.uid)
                 .where('status', '==', 'active')
                 .get();
-                
+
             let totalLiability = 0;
             let totalAsset = 0;
-            
+            let totalMonthlyEmi = 0;
+
             loansSnapshot.forEach(doc => {
                 const data = doc.data();
                 const remaining = data.totalAmount - (data.paidAmount || 0);
-                if (data.type === 'borrowed' || data.type === 'emi') totalLiability += remaining;
+                if (data.type === 'borrowed' || data.type === 'emi') {
+                    totalLiability += remaining;
+                    if (data.emiAmount && remaining > 0) totalMonthlyEmi += data.emiAmount;
+                }
                 else if (data.type === 'lent') totalAsset += remaining;
             });
-            
-            if(document.getElementById('total-liability')) document.getElementById('total-liability').textContent = `₹${totalLiability.toFixed(0)}`;
-            if(document.getElementById('total-asset')) document.getElementById('total-asset').textContent = `₹${totalAsset.toFixed(0)}`;
+
+            if (document.getElementById('total-liability')) document.getElementById('total-liability').textContent = `₹${totalLiability.toFixed(0)}`;
+            if (document.getElementById('total-asset')) document.getElementById('total-asset').textContent = `₹${totalAsset.toFixed(0)}`;
+            if (document.getElementById('total-monthly-emi')) document.getElementById('total-monthly-emi').textContent = `₹${totalMonthlyEmi.toFixed(0)}`;
+
+            // Vehicle Distance Stats (This Month)
+            const [vehicleLogsSnapshot, vehiclesSnapshot] = await Promise.all([
+                db.collection('vehicle_logs')
+                    .where('userId', '==', this.currentUser.uid)
+                    .where('date', '>=', startOfMonth)
+                    .get(),
+                db.collection('vehicles')
+                    .where('userId', '==', this.currentUser.uid)
+                    .get()
+            ]);
+
+            const vehicleCurrentOdos = {};
+            vehiclesSnapshot.forEach(doc => {
+                vehicleCurrentOdos[doc.id] = doc.data().currentOdometer || 0;
+            });
+
+            const vehicleOdometer = {};
+            vehicleLogsSnapshot.forEach(doc => {
+                const data = doc.data();
+                if (!vehicleOdometer[data.vehicleId]) {
+                    vehicleOdometer[data.vehicleId] = { min: data.odometer, max: data.odometer };
+                } else {
+                    vehicleOdometer[data.vehicleId].min = Math.min(vehicleOdometer[data.vehicleId].min, data.odometer);
+                    vehicleOdometer[data.vehicleId].max = Math.max(vehicleOdometer[data.vehicleId].max, data.odometer);
+                }
+            });
+
+            let totalDistance = 0;
+            Object.keys(vehicleOdometer).forEach(vId => {
+                let stats = vehicleOdometer[vId];
+                // Use current odometer if it's higher than the max log (implies recent driving without log)
+                if (vehicleCurrentOdos[vId] && vehicleCurrentOdos[vId] > stats.max) {
+                    stats.max = vehicleCurrentOdos[vId];
+                }
+                totalDistance += (stats.max - stats.min);
+            });
+
+            if (document.getElementById('total-distance-month')) {
+                document.getElementById('total-distance-month').textContent = `${totalDistance} km`;
+            }
 
         } catch (error) {
             console.error('Error updating stats:', error);
@@ -427,9 +1045,9 @@ class Dashboard {
                 .orderBy('createdAt', 'desc')
                 .limit(5)
                 .get();
-            
+
             container.innerHTML = '';
-            
+
             if (snapshot.empty) {
                 container.innerHTML = `
                     <div class="text-center py-4">
@@ -442,13 +1060,13 @@ class Dashboard {
                 `;
                 return;
             }
-            
+
             snapshot.forEach(doc => {
                 const data = doc.data();
                 const element = this.createTransactionElement(data);
                 container.appendChild(element);
             });
-            
+
         } catch (error) {
             console.error('Error loading transactions:', error);
             container.innerHTML = '<p class="text-danger">Error loading transactions</p>';
@@ -458,21 +1076,25 @@ class Dashboard {
     createTransactionElement(data) {
         const div = document.createElement('div');
         div.className = 'transaction-item';
-        
+
         const isIncome = data.type === 'income';
-        const amountClass = isIncome ? 'transaction-income' : 'transaction-expense';
-        const amountPrefix = isIncome ? '+' : '-';
-        const icon = isIncome ? 'fa-arrow-down' : 'fa-arrow-up';
-        
+        const isTransfer = data.type === 'transfer';
+        const amountClass = isTransfer ? 'text-primary fw-bold' : (isIncome ? 'transaction-income' : 'transaction-expense');
+        const amountPrefix = isTransfer ? '' : (isIncome ? '+' : '-');
+        const icon = isTransfer ? 'fa-right-left' : (isIncome ? 'fa-arrow-down' : 'fa-arrow-up');
+        const iconClass = isTransfer ? 'text-primary' : (isIncome ? 'text-success' : 'text-danger');
+        const title = isTransfer ? (data.accountLabel || 'Transfer') : data.category;
+        const subtitle = data.description || (isTransfer ? 'Internal transfer' : 'No description');
+
         div.innerHTML = `
             <div class="transaction-info">
                 <div class="d-flex align-items-center gap-2">
-                    <div class="transaction-icon ${isIncome ? 'text-success' : 'text-danger'}">
+                    <div class="transaction-icon ${iconClass}">
                         <i class="fas ${icon}"></i>
                     </div>
                     <div>
-                        <h6 class="mb-0">${data.category}</h6>
-                        <small class="text-muted">${data.description || 'No description'}</small>
+                        <h6 class="mb-0">${title}</h6>
+                        <small class="text-muted">${subtitle}</small>
                     </div>
                 </div>
             </div>
@@ -480,7 +1102,7 @@ class Dashboard {
                 ${amountPrefix}₹${data.amount.toFixed(2)}
             </div>
         `;
-        
+
         return div;
     }
 
@@ -490,16 +1112,16 @@ class Dashboard {
 
         try {
             const today = new Date().toISOString().split('T')[0];
-            
+
             // Get habits for today
             const habitsSnapshot = await db.collection('habits')
                 .where('userId', '==', this.currentUser.uid)
                 .where('active', '==', true)
                 .limit(5)
                 .get();
-            
+
             container.innerHTML = '';
-            
+
             if (habitsSnapshot.empty) {
                 container.innerHTML = `
                     <div class="text-center py-4">
@@ -512,20 +1134,20 @@ class Dashboard {
                 `;
                 return;
             }
-            
+
             // Get today's habit logs
             const logsSnapshot = await db.collection('habit_logs')
                 .where('userId', '==', this.currentUser.uid)
                 .where('date', '==', today)
                 .get();
-            
+
             const completedHabits = new Set();
             logsSnapshot.forEach(doc => {
                 if (doc.data().completed) {
                     completedHabits.add(doc.data().habitId);
                 }
             });
-            
+
             habitsSnapshot.forEach(doc => {
                 const habit = doc.data();
                 habit.id = doc.id;
@@ -533,7 +1155,7 @@ class Dashboard {
                 const element = this.createHabitElement(habit);
                 container.appendChild(element);
             });
-            
+
         } catch (error) {
             console.error('Error loading habits:', error);
             container.innerHTML = '<p class="text-danger">Error loading habits</p>';
@@ -544,15 +1166,15 @@ class Dashboard {
         const div = document.createElement('div');
         div.className = 'habit-item';
         div.dataset.habitId = habit.id;
-        
+
         const isBad = habit.type === 'bad';
-        const btnClass = isBad 
-            ? (habit.completed ? 'btn-danger' : 'btn-outline-danger') 
+        const btnClass = isBad
+            ? (habit.completed ? 'btn-danger' : 'btn-outline-danger')
             : (habit.completed ? 'btn-success' : 'btn-outline-success');
-        const iconClass = isBad 
-            ? (habit.completed ? 'fa-skull' : 'fa-ban') 
+        const iconClass = isBad
+            ? (habit.completed ? 'fa-skull' : 'fa-ban')
             : 'fa-check';
-            
+
         // Add tooltip title for clarity
         const btnTitle = isBad
             ? (habit.completed ? 'Undo Relapse' : 'Log Relapse (I did it)')
@@ -575,7 +1197,7 @@ class Dashboard {
                 </button>
             </div>
         `;
-        
+
         return div;
     }
 
@@ -598,11 +1220,11 @@ class Dashboard {
             const offset = now.getTimezoneOffset();
             const todayDate = new Date(now.getTime() - (offset * 60 * 1000));
             const today = todayDate.toISOString().split('T')[0];
-            
+
             const nextWeekDate = new Date(now.getTime() - (offset * 60 * 1000));
             nextWeekDate.setDate(nextWeekDate.getDate() + 7);
             const nextWeekString = nextWeekDate.toISOString().split('T')[0];
-            
+
             const snapshot = await db.collection('reminders')
                 .where('userId', '==', this.currentUser.uid)
                 .where('completed', '==', false)
@@ -611,9 +1233,9 @@ class Dashboard {
                 .orderBy('dueDate')
                 .limit(5)
                 .get();
-            
+
             container.innerHTML = '';
-            
+
             if (snapshot.empty) {
                 container.innerHTML = `
                     <div class="text-center py-4">
@@ -626,14 +1248,14 @@ class Dashboard {
                 `;
                 return;
             }
-            
+
             snapshot.forEach(doc => {
                 const task = doc.data();
                 task.id = doc.id;
                 const element = this.createTaskElement(task);
                 container.appendChild(element);
             });
-            
+
         } catch (error) {
             console.error('Error loading tasks:', error);
             container.innerHTML = '<p class="text-danger">Error loading tasks</p>';
@@ -644,12 +1266,12 @@ class Dashboard {
         const div = document.createElement('div');
         div.className = 'task-item';
         div.dataset.taskId = task.id;
-        
+
         const priorityClass = `priority-${task.priority || 'medium'}`;
         const dueDate = new Date(task.dueDate);
         const today = new Date();
         const isToday = dueDate.toDateString() === today.toDateString();
-        
+
         div.innerHTML = `
             <div class="task-checkbox">
                 <input type="checkbox" class="form-check-input" 
@@ -669,7 +1291,7 @@ class Dashboard {
                 ${task.priority || 'medium'}
             </div>
         `;
-        
+
         return div;
     }
 
@@ -683,27 +1305,27 @@ class Dashboard {
                 .where('active', '==', true)
                 .limit(5)
                 .get();
-            
+
             container.innerHTML = '';
-            
+
             if (snapshot.empty) {
                 container.innerHTML = '<p class="text-muted text-center">No active habits</p>';
                 return;
             }
-            
+
             // Get streak data for each habit
             const habitPromises = snapshot.docs.map(async doc => {
                 const habit = doc.data();
                 habit.id = doc.id;
-                
+
                 let streak = 0;
-                
+
                 if (habit.type === 'bad') {
                     // Bad Habit: Days since last log (Relapse)
                     const today = new Date();
                     const startDate = habit.createdAt ? habit.createdAt.toDate() : today;
                     const lastRelapse = habit.lastLogDate ? new Date(habit.lastLogDate) : startDate;
-                    
+
                     // If logged today, streak is 0
                     // We need to check if logged today, but for the widget we can approximate
                     // or fetch today's log. For simplicity, we use the diff.
@@ -718,14 +1340,14 @@ class Dashboard {
                         .orderBy('date', 'desc')
                         .limit(30)
                         .get();
-                    
+
                     const today = new Date();
                     let currentDate = new Date(today);
-                    
+
                     for (let i = 0; i < 30; i++) {
                         const dateString = currentDate.toISOString().split('T')[0];
                         const hasLog = logsSnapshot.docs.some(log => log.data().date === dateString);
-                        
+
                         if (hasLog) {
                             streak++;
                             currentDate.setDate(currentDate.getDate() - 1);
@@ -734,18 +1356,18 @@ class Dashboard {
                         }
                     }
                 }
-                
+
                 habit.streak = streak;
                 return habit;
             });
-            
+
             const habits = await Promise.all(habitPromises);
-            
+
             habits.forEach(habit => {
                 const element = this.createStreakElement(habit);
                 container.appendChild(element);
             });
-            
+
         } catch (error) {
             console.error('Error loading habit streaks:', error);
             container.innerHTML = '<p class="text-danger">Error loading streaks</p>';
@@ -756,7 +1378,7 @@ class Dashboard {
         const div = document.createElement('div');
         div.className = 'streak-item mb-3';
         const label = habit.type === 'bad' ? 'Days Clean' : 'Current streak';
-        
+
         div.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
                 <div>
@@ -774,7 +1396,7 @@ class Dashboard {
                 </div>
             </div>
         `;
-        
+
         return div;
     }
 
@@ -783,7 +1405,7 @@ class Dashboard {
             const period = document.getElementById('chart-period')?.value || 'week';
             let startDate, endDate;
             const today = new Date();
-            
+
             switch (period) {
                 case 'week':
                     startDate = new Date(today);
@@ -798,45 +1420,45 @@ class Dashboard {
                     endDate = new Date(today.getFullYear(), 11, 31);
                     break;
             }
-            
+
             // Format dates for query
             const startDateString = startDate.toISOString().split('T')[0];
             const endDateString = (endDate || today).toISOString().split('T')[0];
-            
+
             // Get transactions for the period
             const snapshot = await db.collection('transactions')
                 .where('userId', '==', this.currentUser.uid)
                 .where('date', '>=', startDateString)
                 .where('date', '<=', endDateString)
                 .get();
-            
+
             // Process data for chart
             const incomeData = {};
             const expenseData = {};
-            
+
             snapshot.forEach(doc => {
                 const data = doc.data();
                 const date = data.date;
-                
+
                 if (data.type === 'income') {
                     incomeData[date] = (incomeData[date] || 0) + data.amount;
-                } else {
+                } else if (data.type === 'expense') {
                     expenseData[date] = (expenseData[date] || 0) + data.amount;
                 }
             });
-            
+
             // Generate labels based on period
             const labels = [];
             const incomeValues = [];
             const expenseValues = [];
-            
+
             let currentDate = new Date(startDate);
             while (currentDate <= (endDate || today)) {
                 const dateString = currentDate.toISOString().split('T')[0];
                 labels.push(this.formatChartLabel(dateString, period));
                 incomeValues.push(incomeData[dateString] || 0);
                 expenseValues.push(expenseData[dateString] || 0);
-                
+
                 if (period === 'week') {
                     currentDate.setDate(currentDate.getDate() + 1);
                 } else if (period === 'month') {
@@ -845,15 +1467,17 @@ class Dashboard {
                     currentDate.setMonth(currentDate.getMonth() + 1);
                 }
             }
-            
+
             // Create or update chart
             const ctx = document.getElementById('financeChart')?.getContext('2d');
             if (!ctx) return;
-            
+
             if (this.financeChart) {
                 this.financeChart.destroy();
             }
-            
+
+            const isMobile = window.innerWidth < 768;
+
             this.financeChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
@@ -864,14 +1488,18 @@ class Dashboard {
                             data: incomeValues,
                             backgroundColor: 'rgba(6, 214, 160, 0.7)',
                             borderColor: 'rgba(6, 214, 160, 1)',
-                            borderWidth: 1
+                            borderWidth: 1,
+                            barPercentage: isMobile ? 0.7 : 0.9,
+                            categoryPercentage: isMobile ? 0.8 : 0.9
                         },
                         {
                             label: 'Expense',
                             data: expenseValues,
                             backgroundColor: 'rgba(239, 71, 111, 0.7)',
                             borderColor: 'rgba(239, 71, 111, 1)',
-                            borderWidth: 1
+                            borderWidth: 1,
+                            barPercentage: isMobile ? 0.7 : 0.9,
+                            categoryPercentage: isMobile ? 0.8 : 0.9
                         }
                     ]
                 },
@@ -882,27 +1510,45 @@ class Dashboard {
                         y: {
                             beginAtZero: true,
                             grid: {
-                                color: 'rgba(0, 0, 0, 0.1)'
+                                color: 'rgba(0, 0, 0, 0.05)'
                             },
                             ticks: {
-                                callback: function(value) {
+                                callback: function (value) {
+                                    if (isMobile && value >= 1000) return '₹' + (value / 1000).toFixed(1) + 'k';
                                     return '₹' + value;
+                                },
+                                font: {
+                                    size: isMobile ? 10 : 12
                                 }
                             }
                         },
                         x: {
                             grid: {
                                 display: false
+                            },
+                            ticks: {
+                                font: {
+                                    size: isMobile ? 10 : 12
+                                },
+                                maxRotation: 45,
+                                minRotation: 0
                             }
                         }
                     },
                     plugins: {
                         legend: {
                             position: 'top',
+                            labels: {
+                                boxWidth: isMobile ? 12 : 40,
+                                padding: isMobile ? 10 : 20,
+                                font: {
+                                    size: isMobile ? 11 : 12
+                                }
+                            }
                         },
                         tooltip: {
                             callbacks: {
-                                label: function(context) {
+                                label: function (context) {
                                     return context.dataset.label + ': ₹' + context.parsed.y.toFixed(2);
                                 }
                             }
@@ -910,7 +1556,7 @@ class Dashboard {
                     }
                 }
             });
-            
+
         } catch (error) {
             console.error('Error updating finance chart:', error);
         }
@@ -918,7 +1564,7 @@ class Dashboard {
 
     formatChartLabel(dateString, period) {
         const date = new Date(dateString);
-        
+
         switch (period) {
             case 'week':
                 return date.toLocaleDateString('en-US', { weekday: 'short' });
@@ -942,30 +1588,48 @@ class Dashboard {
         document.querySelectorAll('[data-section]').forEach(element => {
             element.classList.toggle('active', element.dataset.section === section);
         });
-        
+
         // Hide all sections
         document.querySelectorAll('.content-section').forEach(section => {
             section.classList.add('d-none');
         });
-        
+
         // Show selected section
         const sectionElement = document.getElementById(`${section}-section`);
         if (sectionElement) {
             sectionElement.classList.remove('d-none');
-            
+
             // Load section-specific content
             this.loadSectionContent(section).catch(error => {
                 console.error(`Error loading section ${section}:`, error);
             });
         }
-        
+
         this.currentSection = section;
+
+        // Handle Mobile Navigation State & Back Button
+        const body = document.body;
+        const backBtn = document.getElementById('nav-back-btn');
+
+        if (section === 'dashboard') {
+            body.classList.add('is-dashboard');
+            if (backBtn) backBtn.classList.add('d-none');
+        } else {
+            body.classList.remove('is-dashboard');
+            if (backBtn) {
+                backBtn.classList.remove('d-none');
+                backBtn.onclick = () => this.switchSection('dashboard');
+            }
+        }
     }
 
     async loadSectionContent(section) {
         switch (section) {
             case 'dashboard':
                 await this.initializeDashboard();
+                break;
+            case 'notifications':
+                if (window.loadNotificationsSection) await window.loadNotificationsSection();
                 break;
             case 'finance':
                 await window.loadFinanceSection();
@@ -1003,6 +1667,16 @@ class Dashboard {
             case 'expiry':
                 if (window.loadExpirySection) await window.loadExpirySection();
                 break;
+            case 'vehicles':
+                if (window.loadVehiclesSection) await window.loadVehiclesSection();
+                break;
+            case 'groceries':
+                if (window.loadGroceriesSection) {
+                    await window.loadGroceriesSection();
+                } else {
+                    document.getElementById('groceries-section').innerHTML = '<div class="col-12 text-center py-5 text-danger"><i class="fas fa-exclamation-triangle fa-2x mb-3"></i><br>Groceries module not loaded.<br>Please refresh the page.</div>';
+                }
+                break;
         }
     }
 
@@ -1029,14 +1703,41 @@ class Dashboard {
             case 'add-expiry':
                 if (window.showAddExpiryModal) window.showAddExpiryModal();
                 break;
+            case 'add-grocery':
+                if (window.showAddGroceryItemModal) window.showAddGroceryItemModal();
+                break;
         }
+    }
+
+    async populateTransactionCCSelect() {
+        const select = document.getElementById('transaction-credit-card');
+        if (!select) return;
+
+        const snapshot = await db.collection('credit_cards').where('userId', '==', this.currentUser.uid).get();
+
+        select.innerHTML = '<option value="" selected disabled>Choose a card...</option>';
+        snapshot.forEach(doc => {
+            select.innerHTML += `<option value="${doc.id}">${doc.data().name} (..${doc.data().last4 || ''})</option>`;
+        });
+    }
+
+    async populateTransactionWalletSelect() {
+        const select = document.getElementById('transaction-wallet');
+        if (!select) return;
+
+        const snapshot = await db.collection('wallets').where('userId', '==', this.currentUser.uid).get();
+
+        select.innerHTML = '<option value="" selected disabled>Choose a wallet...</option>';
+        snapshot.forEach(doc => {
+            select.innerHTML += `<option value="${doc.id}">${doc.data().name} (₹${doc.data().balance})</option>`;
+        });
     }
 
     showTransactionModal(type = 'income') {
         // Load categories first
         this.loadTransactionCategories().then(() => {
-            const modal = new bootstrap.Modal(document.getElementById('addTransactionModal'));
-            
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addTransactionModal'));
+
             // Set default values
             document.getElementById('type-income').checked = type === 'income';
             document.getElementById('type-expense').checked = type === 'expense';
@@ -1045,7 +1746,24 @@ class Dashboard {
             document.getElementById('transaction-id').value = '';
             document.getElementById('transaction-amount').value = '';
             document.getElementById('transaction-description').value = '';
-            
+            document.getElementById('transaction-credit-card').value = '';
+            document.getElementById('transaction-wallet').value = '';
+            document.getElementById('recurring-transaction').checked = false;
+            document.getElementById('recurring-options').classList.add('d-none');
+            document.getElementById('transaction-frequency').value = 'monthly';
+
+            // Reset the searchable category picker
+            if (window.resetCatSearchPicker) window.resetCatSearchPicker();
+
+            // Populate CCs
+            this.populateTransactionCCSelect();
+            this.populateTransactionWalletSelect();
+            document.getElementById('transaction-mode').dispatchEvent(new Event('change'));
+
+            // Reset button state
+            const btn = document.getElementById('save-transaction');
+            if (btn) window.setBtnLoading(btn, false);
+
             modal.show();
         });
     }
@@ -1056,51 +1774,46 @@ class Dashboard {
                 .where('userId', '==', this.currentUser.uid)
                 .where('type', '==', 'income')
                 .get();
-            
+
             const expenseSnapshot = await db.collection('categories')
                 .where('userId', '==', this.currentUser.uid)
                 .where('type', '==', 'expense')
                 .get();
-            
-            const select = document.getElementById('transaction-category');
-            if (!select) return;
-            
-            select.innerHTML = '';
-            
-            // Add income categories
-            if (!incomeSnapshot.empty) {
-                const optgroup = document.createElement('optgroup');
-                optgroup.label = 'Income Categories';
-                incomeSnapshot.forEach(doc => {
-                    const option = document.createElement('option');
-                    option.value = doc.data().name;
-                    option.textContent = doc.data().name;
-                    option.style.color = doc.data().color;
-                    optgroup.appendChild(option);
-                });
-                select.appendChild(optgroup);
-            }
-            
-            // Add expense categories
-            if (!expenseSnapshot.empty) {
-                const optgroup = document.createElement('optgroup');
-                optgroup.label = 'Expense Categories';
-                expenseSnapshot.forEach(doc => {
-                    const option = document.createElement('option');
-                    option.value = doc.data().name;
-                    option.textContent = doc.data().name;
-                    option.style.color = doc.data().color;
-                    optgroup.appendChild(option);
-                });
-                select.appendChild(optgroup);
-            }
-            
+
+            // Collect and sort alphabetically
+            const incomeCategories = [];
+            incomeSnapshot.forEach(doc => {
+                const data = doc.data();
+                incomeCategories.push(data);
+            });
+            incomeCategories.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+            const expenseCategories = [];
+            expenseSnapshot.forEach(doc => {
+                const data = doc.data();
+                expenseCategories.push(data);
+            });
+            expenseCategories.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+            // Store categories on the window for filtering
+            window._catSearchAllCategories = [
+                ...incomeCategories.map(d => ({ ...d, _group: 'Income' })),
+                ...expenseCategories.map(d => ({ ...d, _group: 'Expense' }))
+            ];
+
+            window._catSearchRenderAll = function() {
+                window.renderCatSearchList(window._catSearchAllCategories);
+            };
+
+            window.renderCatSearchList(window._catSearchAllCategories);
+
         } catch (error) {
             console.error('Error loading categories:', error);
         }
     }
 
     async saveTransaction() {
+        const btn = document.getElementById('save-transaction');
         try {
             const id = document.getElementById('transaction-id').value;
             const type = document.querySelector('input[name="transaction-type"]:checked')?.value;
@@ -1110,61 +1823,197 @@ class Dashboard {
             const description = document.getElementById('transaction-description').value;
             const date = document.getElementById('transaction-date').value;
             const isRecurring = document.getElementById('recurring-transaction').checked;
-            
+            const frequency = document.getElementById('transaction-frequency').value;
+            const creditCardId = document.getElementById('transaction-credit-card').value;
+            const walletId = document.getElementById('transaction-wallet').value;
+
             if (!type || !amount || !category || !date) {
                 this.showNotification('Please fill all required fields', 'danger');
                 return;
             }
-            
+
             if (amount <= 0) {
                 this.showNotification('Amount must be greater than 0', 'danger');
                 return;
             }
-            
+
+            window.setBtnLoading(btn, true);
+
+            const accountMeta = window.getTransactionAccountMeta
+                ? window.getTransactionAccountMeta(paymentMode)
+                : { type: paymentMode === 'cash' ? 'cash' : 'bank', label: paymentMode === 'cash' ? 'Cash' : 'Bank' };
+
             const transaction = {
                 type: type,
                 amount: amount,
                 paymentMode: paymentMode,
+                accountType: accountMeta.type,
+                accountLabel: accountMeta.label,
                 category: category,
                 description: description,
                 date: date,
                 userId: this.currentUser.uid,
-                recurring: isRecurring
+                recurring: isRecurring,
+                frequency: isRecurring ? frequency : null,
+                nextDueDate: isRecurring ? this.calculateNextDate(date, frequency) : null,
+                relatedId: (paymentMode === 'credit-card' && creditCardId) ? creditCardId : ((paymentMode === 'wallet' && walletId) ? walletId : null)
             };
-            
+
+            if (!id && type === 'expense' && this.isUpiPaymentMode(paymentMode)) {
+                this.pendingUpiTransaction = transaction;
+                this.selectedUpiApp = paymentMode === 'upi' ? '' : paymentMode;
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('addTransactionModal')).hide();
+                this.openUpiPaymentModal(transaction);
+                window.setBtnLoading(btn, false);
+                return;
+            }
+
             if (id) {
                 transaction.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
                 await db.collection('transactions').doc(id).update(transaction);
             } else {
                 transaction.createdAt = firebase.firestore.FieldValue.serverTimestamp();
                 await db.collection('transactions').add(transaction);
+
+                // Handle Credit Card Deduction (Increase Outstanding)
+                if (type === 'expense' && paymentMode === 'credit-card' && creditCardId) {
+                    await db.collection('credit_cards').doc(creditCardId).update({
+                        currentOutstanding: firebase.firestore.FieldValue.increment(amount)
+                    });
+                }
+
+                // Handle Wallet Deduction
+                if (type === 'expense' && paymentMode === 'wallet' && walletId) {
+                    await db.collection('wallets').doc(walletId).update({
+                        balance: firebase.firestore.FieldValue.increment(-amount)
+                    });
+                }
             }
-            
+
             // Close modal
-            bootstrap.Modal.getInstance(document.getElementById('addTransactionModal')).hide();
-            
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('addTransactionModal')).hide();
+
             // Reset form
             document.getElementById('transaction-form').reset();
-            
+
             // Update dashboard
             this.updateStats();
             this.loadRecentTransactions();
             this.updateFinanceChart();
-            
+
+            // Reload finance table if active
+            if (this.currentSection === 'finance' && typeof window.loadFinanceData === 'function') {
+                window.loadFinanceData();
+            }
+            if (typeof window.loadTransactionsSection === 'function' && document.getElementById('transactions-section')?.innerHTML.trim()) {
+                window.loadTransactionsSection();
+            }
+
             this.showNotification(id ? 'Transaction updated successfully!' : 'Transaction added successfully!', 'success');
-            
+            window.setBtnLoading(btn, false);
+
         } catch (error) {
+            window.setBtnLoading(btn, false);
             console.error('Error saving transaction:', error);
             this.showNotification('Error saving transaction: ' + error.message, 'danger');
         }
     }
 
+    isUpiPaymentMode(mode) {
+        return mode === 'upi' || (typeof mode === 'string' && mode.startsWith('upi-'));
+    }
+
+    openUpiPaymentModal(transaction) {
+        const summary = document.getElementById('upi-payment-summary');
+        if (summary) {
+            summary.textContent = `Amount: ₹${Number(transaction.amount || 0).toFixed(2)} | Category: ${transaction.category || '-'} | Date: ${transaction.date || '-'}`;
+        }
+
+        document.querySelectorAll('#upi-app-list [data-upi-app]').forEach((btn) => btn.classList.remove('active'));
+        if (this.selectedUpiApp) {
+            const selectedBtn = document.querySelector(`#upi-app-list [data-upi-app="${this.selectedUpiApp}"]`);
+            if (selectedBtn) selectedBtn.classList.add('active');
+        }
+
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('upiPaymentModal'));
+        modal.show();
+    }
+
+    openSelectedUpiApp() {
+        if (!this.pendingUpiTransaction) return;
+        if (!this.selectedUpiApp) {
+            this.showNotification('Select a UPI app first', 'warning');
+            return;
+        }
+
+        const appLinks = {
+            'upi-bhim': 'bhim://',
+            'upi-phonepe': 'phonepe://',
+            'upi-gpay': 'tez://',
+            'upi-navi': 'navi://',
+            'upi-cred': 'credpay://',
+            'upi-paytm': 'paytmmp://'
+        };
+
+        const link = appLinks[this.selectedUpiApp] || 'upi://pay';
+        window.location.href = link;
+        this.showNotification('Complete payment in UPI app, then return and tap Payment Done & Save', 'info');
+    }
+
+    async completePendingUpiTransaction() {
+        if (!this.pendingUpiTransaction) return;
+
+        const paymentMode = this.selectedUpiApp || this.pendingUpiTransaction.paymentMode;
+        const accountMeta = window.getTransactionAccountMeta
+            ? window.getTransactionAccountMeta(paymentMode)
+            : { type: 'bank', label: 'Bank' };
+
+        const tx = {
+            ...this.pendingUpiTransaction,
+            paymentMode,
+            accountType: accountMeta.type,
+            accountLabel: accountMeta.label,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        try {
+            await db.collection('transactions').add(tx);
+
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('upiPaymentModal')).hide();
+            this.pendingUpiTransaction = null;
+            this.selectedUpiApp = '';
+            document.getElementById('transaction-form')?.reset();
+
+            this.updateStats();
+            this.loadRecentTransactions();
+            this.updateFinanceChart();
+            if (this.currentSection === 'finance' && typeof window.loadFinanceData === 'function') {
+                window.loadFinanceData();
+            }
+            if (typeof window.loadTransactionsSection === 'function' && document.getElementById('transactions-section')?.innerHTML.trim()) {
+                window.loadTransactionsSection();
+            }
+
+            this.showNotification('Expense saved after UPI payment', 'success');
+        } catch (error) {
+            console.error('Error saving UPI transaction:', error);
+            this.showNotification('Error saving UPI transaction: ' + error.message, 'danger');
+        }
+    }
+
+    cancelPendingUpiTransaction() {
+        this.pendingUpiTransaction = null;
+        this.selectedUpiApp = '';
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('upiPaymentModal')).hide();
+        this.showNotification('UPI payment flow cancelled. Transaction not saved.', 'warning');
+    }
+
     showHabitModal() {
-        const modal = new bootstrap.Modal(document.getElementById('addHabitModal'));
-        
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addHabitModal'));
+
         // Setup color picker
         this.setupColorPicker();
-        
+
         // Set default values
         document.getElementById('type-good').checked = true;
         document.getElementById('habit-id').value = '';
@@ -1175,7 +2024,7 @@ class Dashboard {
         document.getElementById('habit-reminder-time').value = '';
         document.getElementById('habit-cost').value = '';
         this.updateHabitModalUI('good');
-        
+
         modal.show();
     }
 
@@ -1184,12 +2033,12 @@ class Dashboard {
             '#4361ee', '#3a0ca3', '#4cc9f0', '#f72585',
             '#7209b7', '#ff9e00', '#06d6a0', '#ef476f'
         ];
-        
+
         const container = document.getElementById('color-picker');
         if (!container) return;
-        
+
         container.innerHTML = '';
-        
+
         colors.forEach(color => {
             const colorBtn = document.createElement('button');
             colorBtn.type = 'button';
@@ -1203,17 +2052,17 @@ class Dashboard {
                 cursor: pointer;
             `;
             colorBtn.dataset.color = color;
-            
+
             colorBtn.addEventListener('click', () => {
                 document.querySelectorAll('.color-option').forEach(btn => {
                     btn.style.borderColor = 'transparent';
                 });
                 colorBtn.style.borderColor = '#000';
             });
-            
+
             container.appendChild(colorBtn);
         });
-        
+
         // Select first color by default
         if (container.firstChild) {
             container.firstChild.style.borderColor = '#000';
@@ -1221,6 +2070,7 @@ class Dashboard {
     }
 
     async saveHabit() {
+        const btn = document.getElementById('save-habit');
         try {
             const type = document.querySelector('input[name="habit-type"]:checked')?.value || 'good';
             const id = document.getElementById('habit-id').value;
@@ -1231,12 +2081,12 @@ class Dashboard {
             const reminderTime = document.getElementById('habit-reminder-time').value;
             const cost = parseFloat(document.getElementById('habit-cost').value) || 0;
             const selectedColor = document.querySelector('.color-option[style*="border-color: rgb(0, 0, 0)"]')?.dataset.color || '#4361ee';
-            
+
             if (!name) {
                 this.showNotification('Please enter habit name', 'danger');
                 return;
             }
-            
+
             if (type === 'good' && target < 1) {
                 this.showNotification('Target must be at least 1', 'danger');
                 return;
@@ -1246,7 +2096,9 @@ class Dashboard {
                 this.showNotification('Limit cannot be negative', 'danger');
                 return;
             }
-            
+
+            window.setBtnLoading(btn, true);
+
             const habit = {
                 type: type,
                 name: name,
@@ -1262,7 +2114,7 @@ class Dashboard {
                 totalCompletions: 0,
                 longestStreak: 0
             };
-            
+
             if (id) {
                 habit.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
                 await db.collection('habits').doc(id).update(habit);
@@ -1270,29 +2122,31 @@ class Dashboard {
                 habit.createdAt = firebase.firestore.FieldValue.serverTimestamp();
                 await db.collection('habits').add(habit);
             }
-            
+
             // Close modal
-            bootstrap.Modal.getInstance(document.getElementById('addHabitModal')).hide();
-            
+            window.setBtnLoading(btn, false);
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('addHabitModal')).hide();
+
             // Reset form
             document.getElementById('habit-form').reset();
-            
+
             // Update dashboard
             this.updateStats();
             this.loadTodaysHabits();
             this.loadHabitStreaks();
-            
+
             this.showNotification(id ? 'Habit updated successfully!' : 'Habit created successfully!', 'success');
-            
+
         } catch (error) {
+            window.setBtnLoading(btn, false);
             console.error('Error saving habit:', error);
             this.showNotification('Error saving habit: ' + error.message, 'danger');
         }
     }
 
     showReminderModal() {
-        const modal = new bootstrap.Modal(document.getElementById('addReminderModal'));
-        
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addReminderModal'));
+
         // Set default values
         document.getElementById('reminder-id').value = '';
         const today = new Date().toISOString().split('T')[0];
@@ -1302,11 +2156,12 @@ class Dashboard {
         document.getElementById('reminder-time').value = '';
         document.getElementById('reminder-priority').value = 'medium';
         document.getElementById('reminder-notification').checked = true;
-        
+
         modal.show();
     }
 
     async saveReminder() {
+        const btn = document.getElementById('save-reminder');
         try {
             const id = document.getElementById('reminder-id').value;
             const title = document.getElementById('reminder-title').value;
@@ -1315,12 +2170,15 @@ class Dashboard {
             const time = document.getElementById('reminder-time').value;
             const priority = document.getElementById('reminder-priority').value;
             const sendNotification = document.getElementById('reminder-notification').checked;
-            
+            const alertDaysBefore = parseInt(document.getElementById('reminder-alert-days').value) || 0;
+
             if (!title || !dueDate) {
                 this.showNotification('Please fill all required fields', 'danger');
                 return;
             }
-            
+
+            window.setBtnLoading(btn, true);
+
             const reminder = {
                 title: title,
                 description: description,
@@ -1328,66 +2186,117 @@ class Dashboard {
                 time: time || null,
                 priority: priority,
                 sendNotification: sendNotification,
+                alertDaysBefore: alertDaysBefore,
                 completed: false,
                 userId: this.currentUser.uid,
             };
-            
+
             if (id) {
                 reminder.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
                 await db.collection('reminders').doc(id).update(reminder);
+                reminder.id = id;
             } else {
                 reminder.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-                await db.collection('reminders').add(reminder);
+                const docRef = await db.collection('reminders').add(reminder);
+                reminder.id = docRef.id;
             }
-            
+
             // Close modal
-            bootstrap.Modal.getInstance(document.getElementById('addReminderModal')).hide();
-            
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('addReminderModal')).hide();
+
             // Reset form
             document.getElementById('reminder-form').reset();
-            
+
             // Update dashboard
             this.updateStats();
             this.loadUpcomingTasks();
-            
-            this.showNotification(id ? 'Task updated successfully!' : 'Task added successfully!', 'success');
-            
-            // Schedule notification if enabled
-            if (sendNotification && 'Notification' in window && Notification.permission === 'granted') {
-                this.scheduleNotification(reminder);
+
+            // Refresh Reminders Section if active
+            if (this.currentSection === 'reminders' && window.loadTasks) {
+                const activeTab = document.querySelector('#reminders-section .nav-link.active');
+                const status = activeTab && activeTab.textContent.trim() === 'Completed' ? 'completed' : 'pending';
+                window.loadTasks(status);
             }
-            
+
+            this.showNotification(id ? 'Task updated successfully!' : 'Task added successfully!', 'success');
+
+            // Schedule or Cancel notification
+            if (sendNotification) {
+                this.scheduleNotification(reminder);
+            } else if (id && this.notificationTimeouts[id]) {
+                clearTimeout(this.notificationTimeouts[id]);
+                delete this.notificationTimeouts[id];
+            }
+
+            window.setBtnLoading(btn, false);
+
         } catch (error) {
+            window.setBtnLoading(btn, false);
             console.error('Error saving reminder:', error);
             this.showNotification('Error saving task: ' + error.message, 'danger');
         }
     }
 
-    scheduleNotification(reminder) {
-        const dueDateTime = new Date(reminder.dueDate);
+    async scheduleNotification(reminder) {
+        // Clear existing timeout if any (prevent duplicates on edit)
+        if (this.notificationTimeouts[reminder.id]) {
+            clearTimeout(this.notificationTimeouts[reminder.id]);
+            delete this.notificationTimeouts[reminder.id];
+        }
+
+        // Request permission if needed
+        if ('Notification' in window && Notification.permission === 'default') {
+            await Notification.requestPermission();
+        }
+
+        // Parse date as Local Time (append T00:00:00)
+        const dueDateTime = new Date(reminder.dueDate + 'T00:00:00');
+
         if (reminder.time) {
             const [hours, minutes] = reminder.time.split(':');
             dueDateTime.setHours(parseInt(hours), parseInt(minutes));
+        } else {
+            // Default to 9:00 AM if no time specified
+            dueDateTime.setHours(9, 0, 0);
         }
-        
+
+        // Adjust for "Days Before"
+        if (reminder.alertDaysBefore && reminder.alertDaysBefore > 0) {
+            dueDateTime.setDate(dueDateTime.getDate() - parseInt(reminder.alertDaysBefore));
+        }
+
         const now = new Date();
         const timeUntilDue = dueDateTime.getTime() - now.getTime();
-        
+
         if (timeUntilDue > 0) {
-            setTimeout(() => {
+            this.notificationTimeouts[reminder.id] = setTimeout(() => {
                 if ('Notification' in window && Notification.permission === 'granted') {
                     new Notification('Task Reminder', {
                         body: `${reminder.title} is due now!`,
                         icon: '/icons/icon-192.png'
                     });
                 }
+
+                // Create in-app notification
+                db.collection('notifications').add({
+                    userId: this.currentUser.uid,
+                    title: 'Task Due',
+                    message: `${reminder.title} is due now!`,
+                    read: false,
+                    type: 'reminder',
+                    relatedId: reminder.id || null,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                // Cleanup timeout reference
+                delete this.notificationTimeouts[reminder.id];
             }, timeUntilDue);
         }
     }
 
     showMemoryModal() {
-        const modal = new bootstrap.Modal(document.getElementById('addMemoryModal'));
-        
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addMemoryModal'));
+
         // Set default values
         document.getElementById('memory-id').value = '';
         const today = new Date().toISOString().split('T')[0];
@@ -1396,13 +2305,13 @@ class Dashboard {
         document.getElementById('memory-date').value = today;
         document.getElementById('memory-image').value = '';
         document.getElementById('memory-tags').value = '';
-        
+
         // Clear preview
         const previewContainer = document.querySelector('.preview-container');
         if (previewContainer) {
             previewContainer.classList.add('d-none');
         }
-        
+
         modal.show();
     }
 
@@ -1410,10 +2319,10 @@ class Dashboard {
         const file = event.target.files[0];
         const preview = document.getElementById('image-preview');
         const previewContainer = document.querySelector('.preview-container');
-        
+
         if (file && preview && previewContainer) {
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = function (e) {
                 preview.src = e.target.result;
                 previewContainer.classList.remove('d-none');
             };
@@ -1422,6 +2331,7 @@ class Dashboard {
     }
 
     async saveMemory() {
+        const btn = document.getElementById('save-memory');
         try {
             const id = document.getElementById('memory-id').value;
             const title = document.getElementById('memory-title').value;
@@ -1429,14 +2339,16 @@ class Dashboard {
             const date = document.getElementById('memory-date').value;
             const tags = document.getElementById('memory-tags').value.split(',').map(tag => tag.trim()).filter(tag => tag);
             const imageFile = document.getElementById('memory-image').files[0];
-            
+
             if (!title) {
                 this.showNotification('Please enter a title', 'danger');
                 return;
             }
-            
+
+            window.setBtnLoading(btn, true);
+
             let imageUrl = null;
-            
+
             // Upload image if exists
             if (imageFile) {
                 const storageRef = storage.ref();
@@ -1444,7 +2356,7 @@ class Dashboard {
                 await imageRef.put(imageFile);
                 imageUrl = await imageRef.getDownloadURL();
             }
-            
+
             const memory = {
                 title: title,
                 description: description,
@@ -1453,7 +2365,7 @@ class Dashboard {
                 imageUrl: imageUrl,
                 userId: this.currentUser.uid,
             };
-            
+
             if (id) {
                 memory.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
                 if (!imageUrl) delete memory.imageUrl; // Don't overwrite image if not changed
@@ -1462,23 +2374,25 @@ class Dashboard {
                 memory.createdAt = firebase.firestore.FieldValue.serverTimestamp();
                 await db.collection('memories').add(memory);
             }
-            
+
             // Close modal
-            bootstrap.Modal.getInstance(document.getElementById('addMemoryModal')).hide();
-            
+            window.setBtnLoading(btn, false);
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('addMemoryModal')).hide();
+
             // Reset form
             document.getElementById('memory-form').reset();
             const previewContainer = document.querySelector('.preview-container');
             if (previewContainer) {
                 previewContainer.classList.add('d-none');
             }
-            
+
             // Update dashboard
             this.updateStats();
-            
+
             this.showNotification(id ? 'Memory updated successfully!' : 'Memory saved successfully!', 'success');
-            
+
         } catch (error) {
+            window.setBtnLoading(btn, false);
             console.error('Error saving memory:', error);
             this.showNotification('Error saving memory: ' + error.message, 'danger');
         }
@@ -1489,14 +2403,14 @@ class Dashboard {
             const today = new Date().toISOString().split('T')[0];
             const habitDoc = await db.collection('habits').doc(habitId).get();
             const habitData = habitDoc.data();
-            
+
             // Check if already logged today
             const existingLog = await db.collection('habit_logs')
                 .where('userId', '==', this.currentUser.uid)
                 .where('habitId', '==', habitId)
                 .where('date', '==', today)
                 .get();
-            
+
             // Confirmation for Bad Habits (Relapse)
             if (habitData.type === 'bad' && existingLog.empty) {
                 if (!confirm("Are you sure you want to log a relapse? This will reset your streak.")) {
@@ -1508,17 +2422,45 @@ class Dashboard {
                 // Update existing log
                 const logDoc = existingLog.docs[0];
                 const currentStatus = logDoc.data().completed;
-                
+
+                // If undoing a bad habit relapse (setting to false), restore lastLogDate
+                if (habitData.type === 'bad' && currentStatus === true) {
+                    const prevLogSnap = await db.collection('habit_logs')
+                        .where('userId', '==', this.currentUser.uid)
+                        .where('habitId', '==', habitId)
+                        .where('completed', '==', true)
+                        .where('date', '<', today)
+                        .orderBy('date', 'desc')
+                        .limit(1)
+                        .get();
+
+                    const newLastLogDate = !prevLogSnap.empty ? prevLogSnap.docs[0].data().date : (habitData.createdAt ? new Date(habitData.createdAt.toDate()).toISOString().split('T')[0] : null);
+                    await db.collection('habits').doc(habitId).update({ lastLogDate: newLastLogDate });
+                }
+
                 await db.collection('habit_logs').doc(logDoc.id).update({
                     completed: !currentStatus,
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                
-                const msg = habitData.type === 'bad' 
-                    ? (!currentStatus ? 'Relapse logged.' : 'Relapse undone.') 
+
+                const msg = habitData.type === 'bad'
+                    ? (!currentStatus ? 'Relapse logged.' : 'Relapse undone.')
                     : (!currentStatus ? 'Habit completed!' : 'Habit unchecked.');
                 this.showNotification(msg, 'success');
             } else {
+                // If logging a bad habit relapse (creating new log), update longest streak
+                if (habitData.type === 'bad') {
+                    const lastDate = habitData.lastLogDate ? new Date(habitData.lastLogDate) : (habitData.createdAt ? habitData.createdAt.toDate() : new Date());
+                    const todayDate = new Date();
+                    const diffTime = Math.abs(todayDate - lastDate);
+                    const daysClean = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+                    const currentLongest = habitData.longestStreak || 0;
+                    if (daysClean > currentLongest) {
+                        await db.collection('habits').doc(habitId).update({ longestStreak: daysClean });
+                    }
+                }
+
                 // Update habit total completions
                 await db.collection('habits').doc(habitId).update({
                     totalCompletions: firebase.firestore.FieldValue.increment(1),
@@ -1533,11 +2475,11 @@ class Dashboard {
                     completed: true,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                
+
                 const msg = habitData.type === 'bad' ? 'Relapse recorded.' : 'Habit completed!';
                 this.showNotification(msg, 'success');
             }
-            
+
             // Handle updating totalCompletions for existing log toggle
             if (!existingLog.empty) {
                 const logDoc = existingLog.docs[0];
@@ -1551,7 +2493,7 @@ class Dashboard {
             this.loadTodaysHabits();
             this.updateStats();
             this.loadHabitStreaks();
-            
+
         } catch (error) {
             console.error('Error toggling habit:', error);
             this.showNotification('Error updating habit', 'danger');
@@ -1564,13 +2506,13 @@ class Dashboard {
                 completed: completed,
                 completedAt: completed ? firebase.firestore.FieldValue.serverTimestamp() : null
             });
-            
+
             this.showNotification(`Task ${completed ? 'completed' : 'reopened'}!`, 'success');
-            
+
             // Update UI
             this.updateStats();
             this.loadUpcomingTasks();
-            
+
         } catch (error) {
             console.error('Error toggling task:', error);
             this.showNotification('Error updating task', 'danger');
@@ -1580,16 +2522,16 @@ class Dashboard {
     showNotification(message, type = 'info') {
         const toastElement = document.getElementById('notification-toast');
         const toastBody = toastElement.querySelector('.toast-body');
-        
+
         if (!toastElement || !toastBody) return;
-        
+
         // Set message
         toastBody.textContent = message;
-        
+
         // Set icon based on type
         const toastHeader = toastElement.querySelector('.toast-header');
         const icon = toastHeader.querySelector('i');
-        
+
         switch (type) {
             case 'success':
                 icon.className = 'fas fa-check-circle text-success me-2';
@@ -1603,7 +2545,7 @@ class Dashboard {
             default:
                 icon.className = 'fas fa-info-circle text-primary me-2';
         }
-        
+
         // Show toast
         const toast = new bootstrap.Toast(toastElement);
         toast.show();
@@ -1614,6 +2556,11 @@ class Dashboard {
         await this.initializeDashboard();
         this.showNotification('Dashboard refreshed!', 'success');
         this.hideLoading();
+    }
+
+    showLogoutConfirmation() {
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('logoutConfirmModal'));
+        modal.show();
     }
 
     async logout() {
@@ -1627,20 +2574,203 @@ class Dashboard {
         }
     }
 
-    setupServiceWorker() {
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(registration => {
-                        console.log('ServiceWorker registration successful');
-                    })
-                    .catch(error => {
-                        console.log('ServiceWorker registration failed:', error);
+    async checkGlobalAlerts() {
+        if (!this.currentUser) return;
+
+        try {
+            // 1. Get User Settings
+            const userDoc = await db.collection('users').doc(this.currentUser.uid).get();
+            const settings = userDoc.data()?.settings || {};
+
+            // Master switch
+            if (settings.notifications === false) return;
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayStr = today.toISOString().split('T')[0];
+
+            // Helper to check if we notified today
+            const notifiedToday = (data) => {
+                if (!data.lastAlertDate) return false;
+                const last = data.lastAlertDate.toDate ? data.lastAlertDate.toDate() : new Date(data.lastAlertDate);
+                const now = new Date();
+                return last.getDate() === now.getDate() &&
+                    last.getMonth() === now.getMonth() &&
+                    last.getFullYear() === now.getFullYear();
+            };
+
+            // Helper to check if we already notified for this item
+            const shouldNotify = async (relatedId) => {
+                const existing = await db.collection('notifications')
+                    .where('userId', '==', this.currentUser.uid)
+                    .where('relatedId', '==', relatedId)
+                    .where('read', '==', false) // Only check unread. If user read it, we might remind again if still urgent? For now, avoid spam.
+                    .limit(1)
+                    .get();
+                return existing.empty;
+            };
+
+            // Helper to send alert
+            const sendAlert = async (title, message, type, relatedId, priority = 'normal', collection = null) => {
+                if (await shouldNotify(relatedId)) {
+                    // DB Notification
+                    await db.collection('notifications').add({
+                        userId: this.currentUser.uid,
+                        title, message, type, relatedId,
+                        read: false,
+                        priority,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
-            });
+
+                    // Browser Notification
+                    if (settings.notifications_browser !== false && 'Notification' in window && Notification.permission === 'granted') {
+                        new Notification(title, { body: message, icon: '/icons/icon-192.png' });
+                    }
+
+                    // Toast
+                    this.showNotification(`${title}: ${message}`, priority === 'high' ? 'danger' : 'info');
+
+                    // Update source doc to prevent spam today
+                    if (collection) {
+                        db.collection(collection).doc(relatedId).update({
+                            lastAlertDate: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    }
+                }
+            };
+
+            // --- 2. Check Tasks ---
+            if (settings.notifications_tasks !== false) {
+                const tasksSnap = await db.collection('reminders')
+                    .where('userId', '==', this.currentUser.uid)
+                    .where('completed', '==', false)
+                    .where('dueDate', '<=', todayStr)
+                    .get();
+
+                tasksSnap.forEach(doc => {
+                    const task = doc.data();
+                    if (notifiedToday(task)) return;
+
+                    // Simple logic: If due today or overdue
+                    const isOverdue = new Date(task.dueDate) < today;
+                    sendAlert(
+                        isOverdue ? 'Task Overdue' : 'Task Due Today',
+                        task.title,
+                        'task',
+                        doc.id,
+                        task.priority === 'high' ? 'high' : 'normal',
+                        'reminders'
+                    );
+                });
+            }
+
+            // --- 3. Check Expiry Docs ---
+            if (settings.notifications_expiry !== false) {
+                const expirySnap = await db.collection('expiry_docs')
+                    .where('userId', '==', this.currentUser.uid)
+                    .get();
+
+                expirySnap.forEach(doc => {
+                    const data = doc.data();
+                    if (notifiedToday(data)) return;
+
+                    const expiryDate = new Date(data.expiryDate);
+                    const diffTime = expiryDate - today;
+                    const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    const reminderDays = data.reminderDays || 30;
+
+                    if (daysRemaining <= reminderDays && daysRemaining >= 0) {
+                        sendAlert('Document Expiring', `${data.title} expires in ${daysRemaining} days`, 'expiry', doc.id, 'high', 'expiry_docs');
+                    } else if (daysRemaining < 0) {
+                        // Optional: Remind once about expired?
+                    }
+                });
+            }
+
+            // --- 4. Check Loans ---
+            if (settings.notifications_loans !== false) {
+                const alertDays = settings.notifications_loans_days !== undefined ? settings.notifications_loans_days : 0;
+                const loansSnap = await db.collection('loans')
+                    .where('userId', '==', this.currentUser.uid)
+                    .where('status', '==', 'active')
+                    .get();
+
+                loansSnap.forEach(doc => {
+                    const loan = doc.data();
+                    if (notifiedToday(loan)) return;
+
+                    if (loan.dueDate) {
+                        const due = new Date(loan.dueDate);
+                        const diffTime = due - today;
+                        const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                        if (daysRemaining <= alertDays) {
+                            let msg = `Payment for ${loan.name} is due`;
+                            if (daysRemaining < 0) msg += ` (Overdue by ${Math.abs(daysRemaining)} days)`;
+                            else if (daysRemaining === 0) msg += ` today`;
+                            else msg += ` in ${daysRemaining} days`;
+
+                            sendAlert('Loan Repayment Due', msg, 'loan', doc.id, 'high', 'loans');
+                        }
+                    }
+                });
+            }
+
+            // --- 5. Check Vehicles (Service) ---
+            if (settings.notifications_vehicles !== false) {
+                // Need vehicles to compare odometer
+                const vehiclesSnap = await db.collection('vehicles').where('userId', '==', this.currentUser.uid).get();
+                const vehicles = {};
+                vehiclesSnap.forEach(v => vehicles[v.id] = v.data());
+
+                const alertsSnap = await db.collection('service_alerts').where('userId', '==', this.currentUser.uid).get();
+                alertsSnap.forEach(doc => {
+                    const alert = doc.data();
+                    if (notifiedToday(alert)) return;
+
+                    const vehicle = vehicles[alert.vehicleId];
+                    if (vehicle && vehicle.currentOdometer >= alert.dueOdometer - 100) { // Alert 100km before
+                        sendAlert('Vehicle Service Due', `${alert.title} for ${vehicle.name} is due soon`, 'vehicle', doc.id, 'high', 'service_alerts');
+                    }
+                });
+            }
+
+            // --- 6. Check Document Limits ---
+            if (settings.notifications_expiry !== false) {
+                const limitsSnap = await db.collection('document_limits')
+                    .where('userId', '==', this.currentUser.uid)
+                    .get();
+
+                limitsSnap.forEach(doc => {
+                    const data = doc.data();
+                    if (notifiedToday(data)) return;
+
+                    const remaining = (data.maxLimit || 0) - (data.usedCount || 0);
+
+                    if (remaining <= 0) {
+                        sendAlert('Limit Reached', `Limit reached for ${data.actionName} on ${data.documentName}`, 'expiry', doc.id, 'high', 'document_limits');
+                    }
+                });
+            }
+
+        } catch (e) {
+            console.error("Global Alert Check Failed:", e);
         }
     }
 }
+
+// Global Utility for Button Loading State
+window.setBtnLoading = function (btn, isLoading) {
+    if (!btn) return;
+    if (isLoading) {
+        btn.dataset.originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Processing...';
+    } else {
+        btn.disabled = false;
+        btn.innerHTML = btn.dataset.originalText || 'Save';
+    }
+};
 
 // Initialize dashboard when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
@@ -1648,25 +2778,25 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Global functions for inline event handlers
-window.switchSection = function(section) {
+window.switchSection = function (section) {
     if (window.dashboard) {
         window.dashboard.switchSection(section);
     }
 };
 
-window.handleQuickAction = function(action) {
+window.handleQuickAction = function (action) {
     if (window.dashboard) {
         window.dashboard.handleQuickAction(action);
     }
 };
 
-window.toggleHabitCompletion = function(habitId) {
+window.toggleHabitCompletion = function (habitId) {
     if (window.dashboard) {
         return window.dashboard.toggleHabitCompletion(habitId);
     }
 };
 
-window.toggleTaskCompletion = function(taskId, completed) {
+window.toggleTaskCompletion = function (taskId, completed) {
     if (window.dashboard) {
         window.dashboard.toggleTaskCompletion(taskId, completed);
     }

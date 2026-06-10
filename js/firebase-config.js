@@ -16,10 +16,11 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 const storage = firebase.storage();
+
 const remoteConfig = firebase.remoteConfig();
 
 remoteConfig.settings = {
-    minimumFetchIntervalMillis: 3600000 // 1 hour
+    minimumFetchIntervalMillis: 0 // Set to 0 for development to fetch immediately
 };
 remoteConfig.defaultConfig = {
     "watchmode_api_key": ""

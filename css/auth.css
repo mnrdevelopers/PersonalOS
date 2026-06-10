@@ -1,13 +1,23 @@
 :root {
-    --primary-color: #1F2937;
-    --secondary-color: #2563EB;
-    --success-color: #16A34A;
-    --danger-color: #DC2626;
-    --warning-color: #F59E0B;
-    --info-color: #2563EB;
-    --light-color: #F9FAFB;
-    --dark-color: #111827;
-    --sidebar-width: 250px;
+    --primary-color: #6a0572; /* Darker purple */
+    --secondary-color: #8e2de2; /* Lighter purple */
+    --accent-color: #4a00e0; /* A vibrant accent */
+    --text-color-dark: #212529;
+    --text-color-light: #f8f9fa;
+    --bg-light: #f0f2f5;
+    --bg-dark: #1a1a2e;
+    --card-bg-light: rgba(255, 255, 255, 0.95);
+    --card-bg-dark: rgba(30, 30, 40, 0.95);
+    --input-border-light: #ced4da;
+    --input-border-focus-light: #8e2de2;
+    --input-bg-light: #ffffff;
+    --input-text-light: #212529;
+    --input-border-dark: #444;
+    --input-border-focus-dark: #8e2de2;
+    --input-bg-dark: #2d2d3e;
+    --input-text-dark: #f8f9fa;
+    --shadow-light: 0 10px 40px rgba(0, 0, 0, 0.15);
+    --shadow-dark: 0 10px 40px rgba(0, 0, 0, 0.3);
 }
 
 * {
@@ -18,10 +28,11 @@
 
 body {
     font-family: 'Inter', sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #a855f7 0%, #6a0572 100%); /* Elegant purple gradient */
     min-height: 100vh;
     display: flex;
     align-items: center;
+    justify-content: center; /* Center content vertically and horizontally */
     padding: 20px;
     -webkit-tap-highlight-color: transparent;
     padding-top: env(safe-area-inset-top);

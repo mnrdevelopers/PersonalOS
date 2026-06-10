@@ -13,7 +13,7 @@ window.loadGoalsSection = async function() {
         
         <!-- Add Goal Modal -->
         <div class="modal fade" id="addGoalModal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Set New Goal</h5>
@@ -61,7 +61,7 @@ window.loadGoalsSection = async function() {
 };
 
 window.showAddGoalModal = function() {
-    const modal = new bootstrap.Modal(document.getElementById('addGoalModal'));
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addGoalModal'));
     document.getElementById('goal-id').value = '';
     modal.show();
 };
@@ -190,7 +190,7 @@ window.editGoal = async function(id) {
         document.getElementById('goal-deadline').value = data.deadline;
         document.getElementById('goal-category').value = data.category;
         
-        const modal = new bootstrap.Modal(document.getElementById('addGoalModal'));
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addGoalModal'));
         modal.show();
     } catch (e) { console.error(e); }
 };

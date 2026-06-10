@@ -53,6 +53,7 @@ async function loadTasks(status) {
         const task = doc.data();
         const priorityColors = { low: 'success', medium: 'warning', high: 'danger' };
         const priorityColor = priorityColors[task.priority] || 'secondary';
+        const notifIcon = task.sendNotification ? '<i class="fas fa-bell text-warning ms-2" title="Notification Enabled"></i>' : '';
         
         const item = document.createElement('div');
         item.className = `list-group-item list-group-item-action d-flex justify-content-between align-items-center p-3 ${task.completed ? 'bg-light' : ''}`;
@@ -62,7 +63,7 @@ async function loadTasks(status) {
                     ${task.completed ? 'checked' : ''} 
                     onchange="window.toggleTaskCompletion('${doc.id}', this.checked); setTimeout(() => loadTasks('${status}'), 500);">
                 <div>
-                    <h6 class="mb-1 ${task.completed ? 'text-decoration-line-through text-muted' : ''}">${task.title}</h6>
+                    <h6 class="mb-1 ${task.completed ? 'text-decoration-line-through text-muted' : ''}">${task.title} ${notifIcon}</h6>
                     <small class="text-muted">
                         <i class="far fa-calendar me-1"></i> ${new Date(task.dueDate).toLocaleDateString()}
                         ${task.time ? `<i class="far fa-clock ms-2 me-1"></i> ${task.time}` : ''}
@@ -71,6 +72,9 @@ async function loadTasks(status) {
             </div>
             <div class="d-flex align-items-center">
                 <span class="badge bg-${priorityColor} me-3">${task.priority}</span>
+                <button class="btn btn-sm btn-outline-info me-1" onclick="viewTask('${doc.id}')" title="View Details">
+                    <i class="fas fa-eye"></i>
+                </button>
                 <button class="btn btn-sm btn-outline-primary me-1" onclick="editReminder('${doc.id}')">
                     <i class="fas fa-edit"></i>
                 </button>
@@ -99,8 +103,10 @@ window.editReminder = async function(id) {
         document.getElementById('reminder-due-date').value = data.dueDate;
         document.getElementById('reminder-time').value = data.time || '';
         document.getElementById('reminder-priority').value = data.priority;
+        document.getElementById('reminder-notification').checked = data.sendNotification || false;
+        document.getElementById('reminder-alert-days').value = data.alertDaysBefore || 0;
         
-        const modal = new bootstrap.Modal(document.getElementById('addReminderModal'));
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addReminderModal'));
         modal.show();
     } catch (e) { console.error(e); }
 };
@@ -109,8 +115,72 @@ window.deleteTask = async function(id) {
     if(confirm('Delete this task?')) {
         await db.collection('reminders').doc(id).delete();
         const activeTab = document.querySelector('#reminders-section .nav-link.active');
-        const status = activeTab.textContent.toLowerCase();
+        const status = activeTab ? activeTab.textContent.toLowerCase() : 'pending';
         loadTasks(status);
         if(window.dashboard) window.dashboard.updateStats();
     }
+};
+
+window.viewTask = async function(id) {
+    try {
+        const doc = await db.collection('reminders').doc(id).get();
+        if (!doc.exists) return;
+        const data = doc.data();
+        
+        document.getElementById('view-task-title').textContent = data.title;
+        document.getElementById('view-task-desc').textContent = data.description || 'No description provided.';
+        document.getElementById('view-task-date').textContent = new Date(data.dueDate).toLocaleDateString();
+        document.getElementById('view-task-time').textContent = data.time || 'All day';
+        
+        const priorityBadge = document.getElementById('view-task-priority');
+        priorityBadge.textContent = data.priority.toUpperCase();
+        priorityBadge.className = `badge bg-${data.priority === 'high' ? 'danger' : (data.priority === 'medium' ? 'warning' : 'success')}`;
+        
+        const statusBadge = document.getElementById('view-task-status');
+        statusBadge.textContent = data.completed ? 'Completed' : 'Pending';
+        statusBadge.className = `badge bg-${data.completed ? 'success' : 'secondary'} me-2`;
+
+        document.getElementById('view-task-edit-btn').onclick = () => {
+            bootstrap.Modal.getInstance(document.getElementById('viewTaskModal')).hide();
+            editReminder(id);
+        };
+
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('viewTaskModal'));
+        modal.show();
+    } catch (e) { console.error(e); }
+};
+
+window.getReminderEvents = async function() {
+    const user = auth.currentUser;
+    if (!user) return [];
+    // Get pending tasks
+    const snapshot = await db.collection('reminders')
+        .where('userId', '==', user.uid)
+        .where('completed', '==', false)
+        .get();
+        
+    const events = [];
+    const today = new Date();
+    
+    snapshot.forEach(doc => {
+        const data = doc.data();
+        const due = new Date(data.dueDate);
+        if (data.time) {
+            const [h, m] = data.time.split(':');
+            due.setHours(h, m);
+        }
+        
+        const diffTime = due - today;
+        const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        events.push({
+            ...data,
+            id: doc.id,
+            date: due,
+            daysRemaining: daysRemaining,
+            status: daysRemaining < 0 ? 'overdue' : 'pending',
+            subtitle: data.priority + ' priority'
+        });
+    });
+    return events;
 };

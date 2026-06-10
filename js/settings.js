@@ -28,10 +28,50 @@ window.loadSettingsSection = async function() {
                         <option value="EUR" ${settings.currency === 'EUR' ? 'selected' : ''}>Euro (€)</option>
                     </select>
                 </div>
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="setting-notif" 
-                        ${settings.notifications ? 'checked' : ''} onchange="updateSetting('notifications', this.checked)">
-                    <label class="form-check-label" for="setting-notif">Enable Notifications</label>
+                
+                <h6 class="mt-4 mb-3 border-bottom pb-2">Notification Preferences</h6>
+                <div class="list-group list-group-flush">
+                    <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="fw-bold">Browser Notifications</div>
+                            <div class="small text-muted">Receive push alerts for urgent items</div>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="setting-notif-browser" 
+                                ${settings.notifications_browser !== false ? 'checked' : ''} onchange="updateSetting('notifications_browser', this.checked)">
+                        </div>
+                    </div>
+                    ${this.renderToggle('Notification Sounds', 'notification_sound', settings.notification_sound !== false)}
+                    ${this.renderToggle('Tasks & Reminders', 'notifications_tasks', settings.notifications_tasks !== false)}
+                    ${this.renderToggle('Document Expiry', 'notifications_expiry', settings.notifications_expiry !== false)}
+                    ${this.renderToggle('Vehicle Alerts', 'notifications_vehicles', settings.notifications_vehicles !== false)}
+                    ${this.renderToggle('Loan Repayments', 'notifications_loans', settings.notifications_loans !== false)}
+                    <div class="list-group-item px-0 pt-1 border-top-0">
+                        <div class="d-flex justify-content-end align-items-center">
+                            <label class="small text-muted me-2">Alert days before due:</label>
+                            <input type="number" class="form-control form-control-sm" style="width: 80px;" 
+                                value="${settings.notifications_loans_days !== undefined ? settings.notifications_loans_days : 0}" min="0" max="60"
+                                onchange="updateSetting('notifications_loans_days', parseInt(this.value))">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">System</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-bold">Global Alerts System</div>
+                        <div class="small text-muted">Master switch for all app notifications</div>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="setting-notif" 
+                            ${settings.notifications !== false ? 'checked' : ''} onchange="updateSetting('notifications', this.checked)">
+                    </div>
                 </div>
             </div>
         </div>
@@ -55,6 +95,18 @@ window.loadSettingsSection = async function() {
             <div class="card-body">
                 <p>Once you delete your account, there is no going back. Please be certain.</p>
                 <button class="btn btn-danger" onclick="deleteAccount()">Delete Account</button>
+            </div>
+        </div>
+    `;
+};
+
+window.renderToggle = function(label, key, isChecked) {
+    return `
+        <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+            <span>${label}</span>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" 
+                    ${isChecked ? 'checked' : ''} onchange="updateSetting('${key}', this.checked)">
             </div>
         </div>
     `;
@@ -114,14 +166,16 @@ window.deleteAccount = async function() {
     if (confirm('Are you strictly sure? This will delete ALL your data permanently.')) {
         const user = auth.currentUser;
         try {
+            if(window.dashboard) window.dashboard.showLoading();
             // In a real app, you'd trigger a cloud function to recursively delete subcollections
             // Here we just delete the user doc and auth
             await db.collection('users').doc(user.uid).delete();
             await user.delete();
             window.location.href = 'auth.html';
         } catch (error) {
+            if(window.dashboard) window.dashboard.hideLoading();
             console.error("Error deleting account:", error);
-            alert("Error deleting account. You may need to re-login first.");
+            if(window.dashboard) window.dashboard.showNotification("Error deleting account. You may need to re-login first.", 'danger');
         }
     }
 };
