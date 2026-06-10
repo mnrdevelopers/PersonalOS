@@ -354,116 +354,54 @@ window.loadFinanceSection = async function() {
         <!-- Ledger View -->
         <div id="finance-ledger-view">
             <div class="finance-filter-panel card border-0 shadow-sm rounded-4 mb-4 animate-slide-up" style="animation-delay: 0.38s;">
-                <div class="card-body p-3 p-lg-4">
-                    <div class="finance-filter-toolbar">
-                        <div class="finance-filter-header">
-                            <div class="finance-filter-copy">
-                                <div class="finance-filter-title">Filters</div>
-                                <div class="finance-filter-caption">Narrow the transaction register without disturbing totals, balances, or stored data.</div>
-                            </div>
-                            <button type="button" class="btn btn-sm btn-outline-secondary finance-reset-btn" onclick="resetFinanceFilters()">
-                                <i class="fas fa-rotate-left me-2"></i>Reset All
-                            </button>
+                <div class="card-body p-2 p-lg-3">
+                    <!-- Row 1: Quick presets + Reset -->
+                    <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+                        <span class="text-muted small fw-semibold me-1" style="white-space:nowrap">Quick:</span>
+                        <button type="button" class="btn btn-xs btn-outline-secondary finance-preset-btn py-1 px-2" style="font-size:0.75rem" onclick="applyFinancePreset('today')">Today</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary finance-preset-btn py-1 px-2" style="font-size:0.75rem" onclick="applyFinancePreset('month')">This Month</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary finance-preset-btn py-1 px-2" style="font-size:0.75rem" onclick="applyFinancePreset('current-fy')">Current FY</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary finance-preset-btn py-1 px-2" style="font-size:0.75rem" onclick="applyFinancePreset('last-fy')">Last FY</button>
+                        <button type="button" class="btn btn-xs btn-outline-danger ms-auto py-1 px-2" style="font-size:0.75rem" onclick="resetFinanceFilters()">
+                            <i class="fas fa-rotate-left me-1"></i>Reset
+                        </button>
+                    </div>
+                    <!-- Row 2: All filters inline -->
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <!-- Search -->
+                        <div class="input-group" style="min-width:160px;max-width:220px;flex:1 1 160px">
+                            <span class="input-group-text py-1 px-2"><i class="fas fa-search text-muted" style="font-size:0.75rem"></i></span>
+                            <input type="text" class="form-control form-control-sm" id="finance-search" placeholder="Search..." onkeyup="searchFinance(this.value)" style="font-size:0.8rem">
                         </div>
-                        <div class="finance-filter-presets-wrap">
-                            <div class="finance-filter-mini-label">Quick Range</div>
-                            <div class="finance-filter-presets">
-                                <button type="button" class="btn btn-sm btn-outline-secondary finance-preset-btn" onclick="applyFinancePreset('today')">Today</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary finance-preset-btn" onclick="applyFinancePreset('month')">This Month</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary finance-preset-btn" onclick="applyFinancePreset('current-fy')">Current FY</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary finance-preset-btn" onclick="applyFinancePreset('last-fy')">Last FY</button>
-                            </div>
+                        <!-- Category -->
+                        <select class="form-select form-select-sm" id="finance-category-filter" onchange="filterFinanceCategory(this.value)" style="min-width:130px;max-width:170px;flex:1 1 130px;font-size:0.8rem">
+                            <option value="all">All Categories</option>
+                        </select>
+                        <!-- Financial Year -->
+                        <select class="form-select form-select-sm" id="finance-financial-year" onchange="applyFinanceFinancialYear(this.value)" style="min-width:120px;max-width:150px;flex:1 1 120px;font-size:0.8rem">
+                            <option value="all">All Years</option>
+                        </select>
+                        <!-- Date Range -->
+                        <div class="d-flex align-items-center gap-1" style="flex:1 1 auto">
+                            <input type="date" class="form-control form-control-sm" id="finance-start-date" onchange="filterFinanceDate()" style="font-size:0.78rem;min-width:115px">
+                            <span class="text-muted small">–</span>
+                            <input type="date" class="form-control form-control-sm" id="finance-end-date" onchange="filterFinanceDate()" style="font-size:0.78rem;min-width:115px">
+                            <button class="btn btn-sm btn-outline-secondary py-1 px-2" type="button" onclick="clearFinanceDate()" title="Clear dates" style="font-size:0.75rem"><i class="fas fa-times"></i></button>
+                        </div>
+                        <!-- Type pills -->
+                        <div class="d-flex gap-1" role="group" aria-label="Transaction type filters">
+                            <input type="radio" class="btn-check" name="finance-filter" id="filter-all" autocomplete="off" checked>
+                            <label class="btn btn-sm btn-outline-primary py-1 px-2" for="filter-all" style="font-size:0.78rem">All</label>
+                            <input type="radio" class="btn-check" name="finance-filter" id="filter-income" autocomplete="off">
+                            <label class="btn btn-sm btn-outline-success py-1 px-2" for="filter-income" style="font-size:0.78rem">In</label>
+                            <input type="radio" class="btn-check" name="finance-filter" id="filter-expense" autocomplete="off">
+                            <label class="btn btn-sm btn-outline-danger py-1 px-2" for="filter-expense" style="font-size:0.78rem">Out</label>
+                            <input type="radio" class="btn-check" name="finance-filter" id="filter-transfer" autocomplete="off">
+                            <label class="btn btn-sm btn-outline-secondary py-1 px-2" for="filter-transfer" style="font-size:0.78rem">Txfr</label>
                         </div>
                     </div>
-                    <div class="finance-filter-grid">
-                        <div class="finance-filter-block finance-filter-search">
-                            <div class="finance-filter-block-head">
-                                <span class="finance-filter-icon"><i class="fas fa-search"></i></span>
-                                <div>
-                                    <div class="finance-filter-label">Search</div>
-                                    <div class="finance-filter-subtitle">Find by description, category, account, or payment mode.</div>
-                                </div>
-                            </div>
-                            <div class="input-group finance-search-input-group">
-                                <span class="input-group-text finance-search-icon"><i class="fas fa-search text-muted"></i></span>
-                                <input type="text" class="form-control finance-search-input" id="finance-search" placeholder="Search transactions..." onkeyup="searchFinance(this.value)">
-                            </div>
-                            <div class="finance-filter-hint">Try person, purpose, bank, cash, UPI, or category name.</div>
-                        </div>
-                        <div class="finance-filter-block finance-filter-category">
-                            <div class="finance-filter-block-head">
-                                <span class="finance-filter-icon"><i class="fas fa-tags"></i></span>
-                                <div>
-                                    <div class="finance-filter-label">Category</div>
-                                    <div class="finance-filter-subtitle">See one category or keep the full register.</div>
-                                </div>
-                            </div>
-                            <select class="form-select finance-filter-select" id="finance-category-filter" onchange="filterFinanceCategory(this.value)">
-                                <option value="all">All Categories</option>
-                                <!-- Populated via JS -->
-                            </select>
-                        </div>
-                        <div class="finance-filter-block finance-filter-year">
-                            <div class="finance-filter-block-head">
-                                <span class="finance-filter-icon"><i class="fas fa-calendar-days"></i></span>
-                                <div>
-                                    <div class="finance-filter-label">Financial Year</div>
-                                    <div class="finance-filter-subtitle">April to March filtering for proper yearly review.</div>
-                                </div>
-                            </div>
-                            <select class="form-select finance-filter-select" id="finance-financial-year" onchange="applyFinanceFinancialYear(this.value)">
-                                <option value="all">All Financial Years</option>
-                            </select>
-                        </div>
-                        <div class="finance-filter-block finance-filter-date">
-                            <div class="finance-filter-block-head">
-                                <span class="finance-filter-icon"><i class="fas fa-clock"></i></span>
-                                <div>
-                                    <div class="finance-filter-label">Date Range</div>
-                                    <div class="finance-filter-subtitle">Use a custom period when financial year is not enough.</div>
-                                </div>
-                            </div>
-                            <div class="finance-date-range">
-                                <div class="finance-date-field">
-                                    <label class="finance-date-label" for="finance-start-date">From</label>
-                                    <input type="date" class="form-control finance-date-input" id="finance-start-date" onchange="filterFinanceDate()">
-                                </div>
-                                <div class="finance-date-field">
-                                    <label class="finance-date-label" for="finance-end-date">To</label>
-                                    <input type="date" class="form-control finance-date-input" id="finance-end-date" onchange="filterFinanceDate()">
-                                </div>
-                                <button class="btn btn-outline-secondary finance-date-clear" type="button" onclick="clearFinanceDate()" title="Clear Dates">
-                                    <i class="fas fa-times"></i><span>Clear</span>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="finance-filter-block finance-filter-type">
-                            <div class="finance-filter-block-head">
-                                <span class="finance-filter-icon"><i class="fas fa-sliders"></i></span>
-                                <div>
-                                    <div class="finance-filter-label">View</div>
-                                    <div class="finance-filter-subtitle">Switch between all, income, expense, and transfer entries.</div>
-                                </div>
-                            </div>
-                            <div class="finance-pill-group w-100" role="group" aria-label="Transaction type filters">
-                                <input type="radio" class="btn-check" name="finance-filter" id="filter-all" autocomplete="off" checked>
-                                <label class="btn btn-outline-primary" for="filter-all">All</label>
-
-                                <input type="radio" class="btn-check" name="finance-filter" id="filter-income" autocomplete="off">
-                                <label class="btn btn-outline-success" for="filter-income">Income</label>
-
-                                <input type="radio" class="btn-check" name="finance-filter" id="filter-expense" autocomplete="off">
-                                <label class="btn btn-outline-danger" for="filter-expense">Expense</label>
-
-                                <input type="radio" class="btn-check" name="finance-filter" id="filter-transfer" autocomplete="off">
-                                <label class="btn btn-outline-dark" for="filter-transfer">Transfer</label>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="finance-active-filters-wrap">
-                        <div class="finance-filter-mini-label">Active Filters</div>
-                        <div class="finance-active-filters" id="finance-active-filters"></div>
-                    </div>
+                    <!-- Active filter chips -->
+                    <div class="finance-active-filters mt-2" id="finance-active-filters"></div>
                 </div>
             </div>
             <div class="card table-card finance-table-card animate-slide-up" style="animation-delay: 0.42s;">
