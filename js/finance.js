@@ -424,7 +424,15 @@ window.loadFinanceSection = async function() {
                             <div class="finance-filter-label mb-1">Transaction Register</div>
                             <div class="text-muted small">Transfers change cash and bank positions, but stay out of income and expense totals.</div>
                         </div>
-                        <span class="finance-register-note">Live view of filtered finance entries</span>
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <span class="finance-register-note d-none d-md-inline-flex">Live view of filtered finance entries</span>
+                            <button class="btn btn-sm btn-outline-danger rounded-pill px-3" onclick="exportFinancePDF()" title="Download PDF Report">
+                                <i class="fas fa-file-pdf me-1"></i> Download PDF
+                            </button>
+                            <button class="btn btn-sm btn-outline-success rounded-pill px-3" onclick="exportFinanceCSV()" title="Download CSV Report">
+                                <i class="fas fa-file-csv me-1"></i> Download CSV
+                            </button>
+                        </div>
                     </div>
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0">
