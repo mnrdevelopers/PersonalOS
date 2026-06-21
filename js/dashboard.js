@@ -1016,14 +1016,50 @@ class Dashboard {
         try {
             const snapshot = await db.collection('transactions')
                 .where('userId', '==', this.currentUser.uid)
-                .orderBy('date', 'desc')
-                .orderBy('createdAt', 'desc')
-                .limit(5)
                 .get();
+
+            let docs = snapshot.docs;
+
+            // Sort docs client-side: date (desc), createdAt (desc), id (desc)
+            docs.sort((a, b) => {
+                const dataA = a.data();
+                const dataB = b.data();
+                
+                const dateA = dataA.date || '';
+                const dateB = dataB.date || '';
+                if (dateA !== dateB) {
+                    return dateB.localeCompare(dateA); // desc
+                }
+                
+                const getCreatedMs = (data) => {
+                    if (!data.createdAt) return 0;
+                    if (typeof data.createdAt.toMillis === 'function') {
+                        return data.createdAt.toMillis();
+                    }
+                    if (data.createdAt.seconds) {
+                        return data.createdAt.seconds * 1000 + (data.createdAt.nanoseconds || 0) / 1000000;
+                    }
+                    if (data.createdAt instanceof Date) {
+                        return data.createdAt.getTime();
+                    }
+                    const parsed = Date.parse(data.createdAt);
+                    return isNaN(parsed) ? 0 : parsed;
+                };
+
+                const createdA = getCreatedMs(dataA);
+                const createdB = getCreatedMs(dataB);
+                if (createdA !== createdB) {
+                    return createdB - createdA; // desc
+                }
+                
+                return b.id.localeCompare(a.id); // desc
+            });
+
+            const pageDocs = docs.slice(0, 5);
 
             container.innerHTML = '';
 
-            if (snapshot.empty) {
+            if (pageDocs.length === 0) {
                 container.innerHTML = `
                     <div class="text-center py-4">
                         <i class="fas fa-receipt fa-2x text-muted mb-3"></i>
@@ -1036,7 +1072,7 @@ class Dashboard {
                 return;
             }
 
-            snapshot.forEach(doc => {
+            pageDocs.forEach(doc => {
                 const data = doc.data();
                 const element = this.createTransactionElement(data);
                 container.appendChild(element);
@@ -1702,6 +1738,15 @@ class Dashboard {
         });
     }
 
+    async populateTransactionBankAccountSelect(selectedId = '') {
+        if (window.populateBankAccountSelect) {
+            await window.populateBankAccountSelect('transaction-bank-account', {
+                placeholder: 'Select bank account…',
+                selectedId
+            });
+        }
+    }
+
     showTransactionModal(type = 'income') {
         // Load categories first
         this.loadTransactionCategories().then(() => {
@@ -1721,12 +1766,17 @@ class Dashboard {
             document.getElementById('recurring-options').classList.add('d-none');
             document.getElementById('transaction-frequency').value = 'monthly';
 
+            // Hide bank account selector (reset)
+            const baContainer = document.getElementById('bank-account-select-container');
+            if (baContainer) baContainer.classList.add('d-none');
+
             // Reset the searchable category picker
             if (window.resetCatSearchPicker) window.resetCatSearchPicker();
 
-            // Populate CCs
+            // Populate CCs, Wallets and Bank Accounts
             this.populateTransactionCCSelect();
             this.populateTransactionWalletSelect();
+            this.populateTransactionBankAccountSelect();
             document.getElementById('transaction-mode').dispatchEvent(new Event('change'));
 
             // Reset button state
@@ -1795,6 +1845,7 @@ class Dashboard {
             const frequency = document.getElementById('transaction-frequency').value;
             const creditCardId = document.getElementById('transaction-credit-card').value;
             const walletId = document.getElementById('transaction-wallet').value;
+            const bankAccountId = document.getElementById('transaction-bank-account')?.value || '';
 
             if (!type || !amount || !category || !date) {
                 this.showNotification('Please fill all required fields', 'danger');
@@ -1812,12 +1863,26 @@ class Dashboard {
                 ? window.getTransactionAccountMeta(paymentMode)
                 : { type: paymentMode === 'cash' ? 'cash' : 'bank', label: paymentMode === 'cash' ? 'Cash' : 'Bank' };
 
+            // Resolve bank account label for denormalisation
+            let resolvedAccountLabel = accountMeta.label;
+            let resolvedBankAccountId = null;
+            let resolvedBankAccountName = null;
+            if (accountMeta.type === 'bank' && bankAccountId) {
+                resolvedBankAccountId = bankAccountId;
+                resolvedBankAccountName = window.getBankAccountLabel ? window.getBankAccountLabel(bankAccountId) : null;
+                if (resolvedBankAccountName && resolvedBankAccountName !== 'Bank') {
+                    resolvedAccountLabel = resolvedBankAccountName;
+                }
+            }
+
             const transaction = {
                 type: type,
                 amount: amount,
                 paymentMode: paymentMode,
                 accountType: accountMeta.type,
-                accountLabel: accountMeta.label,
+                accountLabel: resolvedAccountLabel,
+                bankAccountId: resolvedBankAccountId,
+                bankAccountName: resolvedBankAccountName,
                 category: category,
                 description: description,
                 date: date,

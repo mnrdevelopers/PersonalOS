@@ -144,6 +144,8 @@ window.getPaymentModeLabel = function(mode) {
         'credit-card': 'CREDIT CARD',
         'debit-card': 'DEBIT CARD',
         wallet: 'WALLET',
+        card: 'CARD',
+        fastag_wallet: 'FASTAG WALLET',
         other: 'OTHER'
     };
     return labels[mode] || mode.toUpperCase();
@@ -191,7 +193,8 @@ window.getTransactionAccountMeta = function(transactionOrMode) {
         return { type: 'bank', label: 'Bank' };
     }
     if (mode === 'wallet') return { type: 'wallet', label: 'Wallet' };
-    if (mode === 'credit-card') return { type: 'credit-card', label: 'Credit Card' };
+    if (mode === 'fastag_wallet') return { type: 'wallet', label: 'FASTag Wallet' };
+    if (mode === 'credit-card' || mode === 'card') return { type: 'credit-card', label: mode === 'card' ? 'Card' : 'Credit Card' };
     return { type: 'other', label: 'Other' };
 };
 
@@ -334,6 +337,9 @@ window.loadFinanceSection = async function() {
             </div>
         </div>
 
+        <!-- Per-account balance chips (shown when user has bank accounts) -->
+        <div id="finance-account-chips-row" class="mb-4" style="display:none"></div>
+
         <div class="finance-register-shell">
         <div class="finance-register-header">
             <div class="finance-register-copy">
@@ -347,6 +353,9 @@ window.loadFinanceSection = async function() {
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" href="javascript:void(0)" onclick="switchFinanceTab('recurring', this)">Recurring Rules</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="javascript:void(0)" onclick="switchFinanceTab('accounts', this)"><i class="fas fa-building-columns me-1"></i>Bank Accounts</a>
                 </li>
             </ul>
         </div>
@@ -376,6 +385,10 @@ window.loadFinanceSection = async function() {
                         <!-- Category -->
                         <select class="form-select form-select-sm" id="finance-category-filter" onchange="filterFinanceCategory(this.value)" style="min-width:130px;max-width:170px;flex:1 1 130px;font-size:0.8rem">
                             <option value="all">All Categories</option>
+                        </select>
+                        <!-- Bank Account -->
+                        <select class="form-select form-select-sm" id="finance-bank-account-filter" onchange="filterFinanceBankAccount(this.value)" style="min-width:130px;max-width:170px;flex:1 1 130px;font-size:0.8rem">
+                            <option value="all">All Accounts</option>
                         </select>
                         <!-- Financial Year -->
                         <select class="form-select form-select-sm" id="finance-financial-year" onchange="applyFinanceFinancialYear(this.value)" style="min-width:120px;max-width:150px;flex:1 1 120px;font-size:0.8rem">
@@ -417,7 +430,10 @@ window.loadFinanceSection = async function() {
                         <table class="table table-hover align-middle mb-0">
                             <thead>
                                 <tr>
-                                    <th class="ps-4">Date</th>
+                                    <th class="ps-4" style="width: 40px;">
+                                        <input type="checkbox" class="form-check-input" id="finance-select-all" onclick="toggleSelectAllFinance(this)">
+                                    </th>
+                                    <th>Date</th>
                                     <th>Category & Desc</th>
                                     <th>Account</th>
                                     <th>Payment Mode</th>
@@ -426,7 +442,7 @@ window.loadFinanceSection = async function() {
                                 </tr>
                             </thead>
                             <tbody id="finance-table-body">
-                                <tr><td colspan="6" class="text-center">Loading...</td></tr>
+                                <tr><td colspan="7" class="text-center">Loading...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -481,6 +497,11 @@ window.loadFinanceSection = async function() {
                 </div>
             </div>
         </div>
+        </div>
+
+        <!-- Bank Accounts View -->
+        <div id="finance-accounts-view" class="d-none">
+            <!-- Content loaded dynamically by bank-accounts.js -->
         </div>
         </div>
 
@@ -542,6 +563,7 @@ window.loadFinanceSection = async function() {
             </div>
         </div>
 
+        <!-- Transfer Modal -->
         <div class="modal fade" id="transferModal" tabindex="-1">
             <div class="modal-dialog modal-dialog-centered finance-transfer-dialog">
                 <div class="modal-content">
@@ -558,9 +580,24 @@ window.loadFinanceSection = async function() {
                             <input type="hidden" id="transfer-id">
                             <div class="mb-3">
                                 <label class="form-label">Direction</label>
-                                <select class="form-select" id="transfer-direction" required>
-                                    <option value="cash_to_bank">Cash to Bank</option>
-                                    <option value="bank_to_cash">Bank to Cash</option>
+                                <select class="form-select" id="transfer-direction" required onchange="onTransferDirectionChange(this.value)">
+                                    <option value="cash_to_bank">Cash → Bank</option>
+                                    <option value="bank_to_cash">Bank → Cash</option>
+                                    <option value="bank_to_bank">Bank → Bank (between accounts)</option>
+                                </select>
+                            </div>
+                            <!-- Source bank account (shown for bank_to_cash and bank_to_bank) -->
+                            <div class="mb-3 transfer-bank-row" id="transfer-source-bank-row">
+                                <label class="form-label">Source Bank Account</label>
+                                <select class="form-select" id="transfer-source-bank-account">
+                                    <option value="">Select account…</option>
+                                </select>
+                            </div>
+                            <!-- Destination bank account (shown for cash_to_bank and bank_to_bank) -->
+                            <div class="mb-3 transfer-bank-row" id="transfer-dest-bank-row">
+                                <label class="form-label">Destination Bank Account</label>
+                                <select class="form-select" id="transfer-dest-bank-account">
+                                    <option value="">Select account…</option>
                                 </select>
                             </div>
                             <div class="mb-3">
@@ -599,6 +636,9 @@ window.loadFinanceSection = async function() {
         document.getElementById('finance-end-date').value = range.end;
     }
 
+    // Populate bank account filter and chips
+    await window.populateFinanceBankAccountFilter();
+
     const activeFilterInput = document.getElementById(`filter-${currentFinanceFilter}`) || document.getElementById('filter-all');
     if (activeFilterInput) activeFilterInput.checked = true;
     updateFinanceFilterSummary();
@@ -613,17 +653,25 @@ window.loadFinanceSection = async function() {
 };
 
 window.switchFinanceTab = function(tab, element) {
+    if (window.clearBulkSelection) window.clearBulkSelection();
     document.querySelectorAll('#finance-section .finance-tabs .nav-link').forEach(l => l.classList.remove('active'));
     element.classList.add('active');
 
+    const ledger  = document.getElementById('finance-ledger-view');
+    const recur   = document.getElementById('finance-recurring-view');
+    const accounts = document.getElementById('finance-accounts-view');
+
+    [ledger, recur, accounts].forEach(el => el && el.classList.add('d-none'));
+
     if (tab === 'ledger') {
-        document.getElementById('finance-ledger-view').classList.remove('d-none');
-        document.getElementById('finance-recurring-view').classList.add('d-none');
+        if (ledger) ledger.classList.remove('d-none');
         loadFinanceData();
-    } else {
-        document.getElementById('finance-ledger-view').classList.add('d-none');
-        document.getElementById('finance-recurring-view').classList.remove('d-none');
+    } else if (tab === 'recurring') {
+        if (recur) recur.classList.remove('d-none');
         loadRecurringTransactions();
+    } else if (tab === 'accounts') {
+        if (accounts) accounts.classList.remove('d-none');
+        if (window.loadBankAccountsSection) window.loadBankAccountsSection();
     }
 };
 
@@ -688,6 +736,43 @@ window.populateCategoryFilter = async function() {
 
 window.filterFinanceCategory = function(category) {
     financeCategoryFilter = category;
+    financeCurrentPage = 1;
+    financeLastDocs = [];
+    updateFinanceFilterSummary();
+    loadFinanceData();
+};
+
+/* ── Bank Account filter (new) ── */
+let financeAccountFilter = 'all';
+
+window.populateFinanceBankAccountFilter = async function() {
+    const select = document.getElementById('finance-bank-account-filter');
+    if (!select || !window.getUserBankAccounts) return;
+
+    const accounts = await window.getUserBankAccounts();
+    select.innerHTML = '<option value="all">All Accounts</option>';
+
+    // Populate chips row
+    const chipsRow = document.getElementById('finance-account-chips-row');
+    if (chipsRow) { chipsRow.style.display = accounts.length > 0 ? 'block' : 'none'; }
+
+    accounts.forEach(acc => {
+        const opt = document.createElement('option');
+        opt.value = acc.id;
+        opt.textContent = `${acc.icon || '🏦'} ${acc.name}`;
+        if (acc.id === financeAccountFilter) opt.selected = true;
+        select.appendChild(opt);
+    });
+
+    // Add "Unassigned" option
+    const unassigned = document.createElement('option');
+    unassigned.value = '__unassigned__';
+    unassigned.textContent = '⚠️ Unassigned Bank';
+    select.appendChild(unassigned);
+};
+
+window.filterFinanceBankAccount = function(accountId) {
+    financeAccountFilter = accountId || 'all';
     financeCurrentPage = 1;
     financeLastDocs = [];
     updateFinanceFilterSummary();
@@ -871,6 +956,55 @@ window.stopRecurring = async function(id) {
     }
 };
 
+async function getFinanceTransactionsData() {
+    const user = auth.currentUser;
+    if (!user) return [];
+
+    const snapshot = await db.collection('transactions')
+        .where('userId', '==', user.uid)
+        .get();
+
+    let docs = snapshot.docs;
+
+    // Sort docs client-side: date (desc), createdAt (desc), id (desc)
+    docs.sort((a, b) => {
+        const dataA = a.data();
+        const dataB = b.data();
+        
+        const dateA = dataA.date || '';
+        const dateB = dataB.date || '';
+        if (dateA !== dateB) {
+            return dateB.localeCompare(dateA); // desc
+        }
+        
+        // Parse createdAt timestamps to ms
+        const getCreatedMs = (data) => {
+            if (!data.createdAt) return 0;
+            if (typeof data.createdAt.toMillis === 'function') {
+                return data.createdAt.toMillis();
+            }
+            if (data.createdAt.seconds) {
+                return data.createdAt.seconds * 1000 + (data.createdAt.nanoseconds || 0) / 1000000;
+            }
+            if (data.createdAt instanceof Date) {
+                return data.createdAt.getTime();
+            }
+            const parsed = Date.parse(data.createdAt);
+            return isNaN(parsed) ? 0 : parsed;
+        };
+
+        const createdA = getCreatedMs(dataA);
+        const createdB = getCreatedMs(dataB);
+        if (createdA !== createdB) {
+            return createdB - createdA; // desc
+        }
+        
+        return b.id.localeCompare(a.id); // desc
+    });
+
+    return docs;
+}
+
 async function loadFinanceData(filter = null) {
     const user = auth.currentUser;
     if (!user) return;
@@ -881,84 +1015,100 @@ async function loadFinanceData(filter = null) {
         financeLastDocs = [];
     }
 
-    let query = db.collection('transactions')
-        .where('userId', '==', user.uid)
-        .orderBy('date', 'desc')
-        .orderBy('createdAt', 'desc');
-
-    if (currentFinanceFilter !== 'all') {
-        query = query.where('type', '==', currentFinanceFilter);
-    }
-
-    if (financeCategoryFilter !== 'all') {
-        query = query.where('category', '==', financeCategoryFilter);
-    }
+    // Bank account filter applied client-side (bankAccountId may be null on old docs)
+    const bankAccountFilterValue = financeAccountFilter || 'all';
 
     const startDate = document.getElementById('finance-start-date')?.value;
     const endDate = document.getElementById('finance-end-date')?.value;
-    if (startDate) {
-        query = query.where('date', '>=', startDate);
-    }
-    if (endDate) {
-        query = query.where('date', '<=', endDate);
-    }
-
-    // Apply pagination
-    if (financeCurrentPage > 1 && financeLastDocs[financeCurrentPage - 2]) {
-        query = query.startAfter(financeLastDocs[financeCurrentPage - 2]);
-    }
 
     // Update stats (only on first page load or filter change to save reads)
     if (financeCurrentPage === 1) updateFinanceStats();
 
     try {
-        const snapshot = await query.limit(FINANCE_PAGE_SIZE).get();
+        let docs = await getFinanceTransactionsData();
         const tbody = document.getElementById('finance-table-body');
         const prevBtn = document.getElementById('btn-finance-prev');
         const nextBtn = document.getElementById('btn-finance-next');
         const pageInfo = document.getElementById('finance-page-info');
         
-        // Client-side search filtering if query exists (Firestore doesn't support partial text search easily)
-        let docs = snapshot.docs;
-        if (financeSearchQuery) {
-            const lowerQuery = financeSearchQuery.toLowerCase();
-            docs = docs.filter(doc => {
-                const data = doc.data();
+        // Apply client-side filters
+        docs = docs.filter(doc => {
+            const data = doc.data();
+
+            // Filter by type
+            if (currentFinanceFilter !== 'all' && data.type !== currentFinanceFilter) {
+                return false;
+            }
+
+            // Filter by category
+            if (financeCategoryFilter !== 'all' && data.category !== financeCategoryFilter) {
+                return false;
+            }
+
+            // Filter by date range
+            if (startDate && data.date < startDate) {
+                return false;
+            }
+            if (endDate && data.date > endDate) {
+                return false;
+            }
+
+            // Filter by bank account (using resolved metadata dynamically)
+            if (bankAccountFilterValue !== 'all') {
+                const accountMeta = window.getTransactionAccountMeta(data);
+                if (bankAccountFilterValue === '__unassigned__') {
+                    return accountMeta.type === 'bank' && !data.bankAccountId;
+                }
+                return data.bankAccountId === bankAccountFilterValue || data.destinationBankAccountId === bankAccountFilterValue;
+            }
+
+            // Client-side search filtering
+            if (financeSearchQuery) {
+                const lowerQuery = financeSearchQuery.toLowerCase();
                 const accountMeta = window.getTransactionAccountMeta(data);
                 return (data.description && data.description.toLowerCase().includes(lowerQuery)) || 
                        (data.category && data.category.toLowerCase().includes(lowerQuery)) ||
                        (accountMeta.label && accountMeta.label.toLowerCase().includes(lowerQuery)) ||
                        window.getPaymentModeLabel(data.paymentMode).toLowerCase().includes(lowerQuery);
-            });
+            }
+
+            return true;
+        });
+
+        const totalFilteredDocs = docs.length;
+        const totalPages = Math.ceil(totalFilteredDocs / FINANCE_PAGE_SIZE) || 1;
+        
+        if (financeCurrentPage > totalPages) {
+            financeCurrentPage = totalPages;
         }
 
-        if (snapshot.empty || docs.length === 0) {
+        if (totalFilteredDocs === 0) {
             const message = financeSearchQuery
                 ? 'No transactions found for this search'
                 : 'No transactions found';
 
-            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">${message}</td></tr>`;
-            if (financeCurrentPage > 1) {
-                // If we are on a page > 1 and it's empty, it means we went too far or data was deleted.
-                // But usually Next button logic prevents this.
-            } else {
-                if (prevBtn) prevBtn.disabled = true;
-                if (nextBtn) nextBtn.disabled = true;
-                if (pageInfo) pageInfo.textContent = 'Page 1';
-            }
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">${message}</td></tr>`;
+            if (prevBtn) prevBtn.disabled = true;
+            if (nextBtn) nextBtn.disabled = true;
+            if (pageInfo) pageInfo.textContent = 'Page 1 of 1';
             return;
         }
 
-        // Store last doc for next page
-        financeLastDocs[financeCurrentPage - 1] = snapshot.docs[snapshot.docs.length - 1];
+        // Slice for current page
+        const startIdx = (financeCurrentPage - 1) * FINANCE_PAGE_SIZE;
+        const pageDocs = docs.slice(startIdx, startIdx + FINANCE_PAGE_SIZE);
 
         // Update Pagination UI
         if (prevBtn) prevBtn.disabled = financeCurrentPage === 1;
-        if (nextBtn) nextBtn.disabled = snapshot.docs.length < FINANCE_PAGE_SIZE || financeSearchQuery; // Disable next on search as we are filtering current page results
-        if (pageInfo) pageInfo.textContent = `Page ${financeCurrentPage}`;
+        if (nextBtn) nextBtn.disabled = startIdx + FINANCE_PAGE_SIZE >= totalFilteredDocs;
+        if (pageInfo) pageInfo.textContent = `Page ${financeCurrentPage} of ${totalPages}`;
+
+        const selectAll = document.getElementById('finance-select-all');
+        if (selectAll) selectAll.checked = false;
+        if (window.updateBulkActionsBar) window.updateBulkActionsBar();
 
         tbody.innerHTML = '';
-        docs.forEach(doc => {
+        pageDocs.forEach(doc => {
             const data = doc.data();
             data.id = doc.id;
             const isIncome = data.type === 'income';
@@ -972,16 +1122,35 @@ async function loadFinanceData(filter = null) {
             const accountMeta = window.getTransactionAccountMeta(data);
             const icon = window.getCategoryIcon(data.category);
             
+            const isBankType = accountMeta.type === 'bank';
+            
+            let formattedDate = 'N/A';
+            try {
+                if (data.date) {
+                    const parsedDate = new Date(data.date);
+                    if (!isNaN(parsedDate.getTime())) {
+                        formattedDate = parsedDate.toLocaleDateString();
+                    }
+                }
+            } catch (e) {
+                console.error("Error parsing date:", e);
+            }
+
+            const amountNum = Number(data.amount) || 0;
+
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td class="ps-4 text-muted fw-medium">${new Date(data.date).toLocaleDateString()}</td>
+                <td class="ps-4">
+                    <input type="checkbox" class="form-check-input finance-row-checkbox" data-id="${data.id}" onchange="window.onFinanceRowSelect()" ${isBankType ? '' : 'disabled title="Only bank-type transactions can be bulk-reassigned"'}>
+                </td>
+                <td class="text-muted fw-medium">${formattedDate}</td>
                 <td data-label="Category">
                     <div class="fw-bold finance-row-title"><span class="me-2">${icon}</span>${data.category}</div>
                     <div class="small text-muted finance-row-description">${data.description || ''}</div>
                 </td>
                 <td><span class="badge finance-chip-badge ${window.getAccountBadgeClass(accountMeta.type)} rounded-pill px-3">${accountMeta.label}</span></td>
                 <td><span class="badge finance-table-badge ${modeBadge} rounded-pill px-3">${modeText}</span></td>
-                <td class="text-end ${colorClass} fw-bold pe-4 fs-6">${sign}₹${data.amount.toFixed(2)}</td>
+                <td class="text-end ${colorClass} fw-bold pe-4 fs-6">${sign}₹${amountNum.toFixed(2)}</td>
                 <td class="text-end pe-4" data-label="Actions">
                     <button class="btn btn-sm btn-outline-primary me-1 finance-row-action" onclick="editTransaction('${data.id}')">
                         <i class="fas fa-edit"></i>
@@ -991,7 +1160,7 @@ async function loadFinanceData(filter = null) {
                     </button>
                 </td>
             `;
-            const financeLabels = ['Date', 'Category & Desc', 'Account', 'Payment Mode', 'Amount', 'Actions'];
+            const financeLabels = ['Select', 'Date', 'Category & Desc', 'Account', 'Payment Mode', 'Amount', 'Actions'];
             Array.from(tr.children).forEach((cell, index) => {
                 if (financeLabels[index]) cell.setAttribute('data-label', financeLabels[index]);
             });
@@ -1006,28 +1175,11 @@ async function updateFinanceStats() {
     const user = auth.currentUser;
     if (!user) return;
 
-    let query = db.collection('transactions')
-        .where('userId', '==', user.uid);
-
-    if (currentFinanceFilter !== 'all') {
-        query = query.where('type', '==', currentFinanceFilter);
-    }
-
-    if (financeCategoryFilter !== 'all') {
-        query = query.where('category', '==', financeCategoryFilter);
-    }
-
     const startDate = document.getElementById('finance-start-date')?.value;
     const endDate = document.getElementById('finance-end-date')?.value;
-    if (startDate) {
-        query = query.where('date', '>=', startDate);
-    }
-    if (endDate) {
-        query = query.where('date', '<=', endDate);
-    }
 
     try {
-        const snapshot = await query.get();
+        const docs = await getFinanceTransactionsData();
         let income = 0;
         let expense = 0;
         let cashIncome = 0;
@@ -1036,20 +1188,46 @@ async function updateFinanceStats() {
         let bankExpense = 0;
         const lowerQuery = financeSearchQuery ? financeSearchQuery.toLowerCase() : '';
 
-        snapshot.forEach(doc => {
+        // Filter client-side
+        const filteredDocs = docs.filter(doc => {
             const data = doc.data();
-            const amount = Number(data.amount) || 0;
+
+            // Filter by type
+            if (currentFinanceFilter !== 'all' && data.type !== currentFinanceFilter) {
+                return false;
+            }
+
+            // Filter by category
+            if (financeCategoryFilter !== 'all' && data.category !== financeCategoryFilter) {
+                return false;
+            }
+
+            // Filter by date range
+            if (startDate && data.date < startDate) {
+                return false;
+            }
+            if (endDate && data.date > endDate) {
+                return false;
+            }
 
             // Keep summary cards aligned with the same client-side search used by the ledger table.
             if (lowerQuery) {
                 const description = (data.description || '').toLowerCase();
                 const category = (data.category || '').toLowerCase();
-                const accountLabel = window.getTransactionAccountMeta(data).label.toLowerCase();
+                const accountMeta = window.getTransactionAccountMeta(data);
+                const accountLabel = (accountMeta.label || '').toLowerCase();
                 const paymentMode = window.getPaymentModeLabel(data.paymentMode).toLowerCase();
                 if (!description.includes(lowerQuery) && !category.includes(lowerQuery) && !accountLabel.includes(lowerQuery) && !paymentMode.includes(lowerQuery)) {
-                    return;
+                    return false;
                 }
             }
+
+            return true;
+        });
+
+        filteredDocs.forEach(doc => {
+            const data = doc.data();
+            const amount = Number(data.amount) || 0;
 
             if (data.type === 'income') {
                 income += amount;
@@ -1082,6 +1260,33 @@ async function updateFinanceStats() {
         document.getElementById('stats-bank-balance').textContent = `₹${(bankIncome - bankExpense).toFixed(2)}`;
         document.getElementById('stats-cash-detail').textContent = `In ₹${cashIncome.toFixed(2)} | Out ₹${cashExpense.toFixed(2)}`;
         document.getElementById('stats-bank-detail').textContent = `In ₹${bankIncome.toFixed(2)} | Out ₹${bankExpense.toFixed(2)}`;
+
+        // Compute per-account balances and render chips
+        const perAccountBalances = {};
+        filteredDocs.forEach(doc => {
+            const data = doc.data();
+            const amount = Number(data.amount) || 0;
+            if (data.type === 'transfer') {
+                if (data.bankAccountId) {
+                    if (!perAccountBalances[data.bankAccountId]) perAccountBalances[data.bankAccountId] = 0;
+                    if (data.sourceAccountType === 'bank') perAccountBalances[data.bankAccountId] -= amount;
+                }
+                if (data.destinationBankAccountId) {
+                    if (!perAccountBalances[data.destinationBankAccountId]) perAccountBalances[data.destinationBankAccountId] = 0;
+                    perAccountBalances[data.destinationBankAccountId] += amount;
+                }
+                return;
+            }
+            if (data.bankAccountId) {
+                if (!perAccountBalances[data.bankAccountId]) perAccountBalances[data.bankAccountId] = 0;
+                if (data.type === 'income') perAccountBalances[data.bankAccountId] += amount;
+                else if (data.type === 'expense') perAccountBalances[data.bankAccountId] -= amount;
+            }
+        });
+
+        if (window.renderBankAccountBalanceChips && window._bankAccountsCache) {
+            window.renderBankAccountBalanceChips('finance-account-chips-row', perAccountBalances, window._bankAccountsCache);
+        }
     } catch (e) { console.error("Error updating stats", e); }
 }
 
@@ -1108,16 +1313,19 @@ window.filterFinanceDate = function() {
 window.resetFinanceFilters = function() {
     financeSearchQuery = '';
     financeCategoryFilter = 'all';
+    financeAccountFilter = 'all';
     financeCurrentPage = 1;
     financeLastDocs = [];
     currentFinanceFilter = 'all';
 
     const searchInput = document.getElementById('finance-search');
     const categorySelect = document.getElementById('finance-category-filter');
+    const accountSelect = document.getElementById('finance-bank-account-filter');
     const allFilter = document.getElementById('filter-all');
 
     if (searchInput) searchInput.value = '';
     if (categorySelect) categorySelect.value = 'all';
+    if (accountSelect) accountSelect.value = 'all';
     window.applyFinanceDefaultLedgerRange();
     if (allFilter) allFilter.checked = true;
 
@@ -1141,7 +1349,7 @@ window.changeFinancePage = function(delta) {
     loadFinanceData();
 };
 
-window.openTransferModal = function(id = '', data = null) {
+window.openTransferModal = async function(id = '', data = null) {
     const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('transferModal'));
     const directionInput = document.getElementById('transfer-direction');
     const amountInput = document.getElementById('transfer-amount');
@@ -1157,7 +1365,32 @@ window.openTransferModal = function(id = '', data = null) {
     descriptionInput.value = data?.description || '';
     if (saveBtn) window.setBtnLoading(saveBtn, false);
 
+    // Populate bank account selects
+    if (window.populateBankAccountSelect) {
+        await window.populateBankAccountSelect('transfer-source-bank-account', {
+            placeholder: 'Select source account…',
+            selectedId: data?.bankAccountId || ''
+        });
+        await window.populateBankAccountSelect('transfer-dest-bank-account', {
+            placeholder: 'Select destination account…',
+            selectedId: data?.destinationBankAccountId || ''
+        });
+    }
+
+    // Trigger direction change UI
+    window.onTransferDirectionChange(directionInput.value);
+
     modal.show();
+};
+
+window.onTransferDirectionChange = function(direction) {
+    const sourceRow = document.getElementById('transfer-source-bank-row');
+    const destRow   = document.getElementById('transfer-dest-bank-row');
+    if (!sourceRow || !destRow) return;
+
+    // Show/hide bank account pickers based on direction
+    sourceRow.classList.toggle('visible', direction === 'bank_to_cash' || direction === 'bank_to_bank');
+    destRow.classList.toggle('visible', direction === 'cash_to_bank' || direction === 'bank_to_bank');
 };
 
 window.saveTransferTransaction = async function() {
@@ -1170,17 +1403,43 @@ window.saveTransferTransaction = async function() {
     const amount = parseFloat(document.getElementById('transfer-amount').value);
     const date = document.getElementById('transfer-date').value;
     const description = document.getElementById('transfer-description').value.trim();
+    const sourceBankAccountId = document.getElementById('transfer-source-bank-account')?.value || '';
+    const destBankAccountId = document.getElementById('transfer-dest-bank-account')?.value || '';
 
     if (!direction || !amount || amount <= 0 || !date) {
         if (window.dashboard) window.dashboard.showNotification('Enter a valid transfer amount and date', 'warning');
         return;
     }
 
-    const isCashToBank = direction === 'cash_to_bank';
-    const sourceAccountType = isCashToBank ? 'cash' : 'bank';
-    const destinationAccountType = isCashToBank ? 'bank' : 'cash';
-    const sourceAccountLabel = window.getAccountTypeLabel(sourceAccountType);
-    const destinationAccountLabel = window.getAccountTypeLabel(destinationAccountType);
+    // Resolve account types and labels based on direction
+    let sourceAccountType, destinationAccountType, sourceAccountLabel, destinationAccountLabel;
+    let resolvedSourceBankId = null, resolvedDestBankId = null;
+    let resolvedSourceBankName = null, resolvedDestBankName = null;
+
+    if (direction === 'cash_to_bank') {
+        sourceAccountType = 'cash';  destinationAccountType = 'bank';
+        sourceAccountLabel = 'Cash';
+        resolvedDestBankId = destBankAccountId || null;
+        resolvedDestBankName = resolvedDestBankId ? (window.getBankAccountLabel ? window.getBankAccountLabel(resolvedDestBankId) : null) : null;
+        destinationAccountLabel = resolvedDestBankName || window.getAccountTypeLabel('bank');
+    } else if (direction === 'bank_to_cash') {
+        sourceAccountType = 'bank';  destinationAccountType = 'cash';
+        destinationAccountLabel = 'Cash';
+        resolvedSourceBankId = sourceBankAccountId || null;
+        resolvedSourceBankName = resolvedSourceBankId ? (window.getBankAccountLabel ? window.getBankAccountLabel(resolvedSourceBankId) : null) : null;
+        sourceAccountLabel = resolvedSourceBankName || window.getAccountTypeLabel('bank');
+    } else if (direction === 'bank_to_bank') {
+        sourceAccountType = 'bank';  destinationAccountType = 'bank';
+        resolvedSourceBankId = sourceBankAccountId || null;
+        resolvedDestBankId = destBankAccountId || null;
+        resolvedSourceBankName = resolvedSourceBankId ? (window.getBankAccountLabel ? window.getBankAccountLabel(resolvedSourceBankId) : null) : null;
+        resolvedDestBankName = resolvedDestBankId ? (window.getBankAccountLabel ? window.getBankAccountLabel(resolvedDestBankId) : null) : null;
+        sourceAccountLabel = resolvedSourceBankName || 'Bank';
+        destinationAccountLabel = resolvedDestBankName || 'Bank';
+    } else {
+        sourceAccountType = 'cash'; destinationAccountType = 'bank';
+        sourceAccountLabel = 'Cash'; destinationAccountLabel = 'Bank';
+    }
 
     const payload = {
         userId: user.uid,
@@ -1197,6 +1456,10 @@ window.saveTransferTransaction = async function() {
         sourceAccountLabel,
         destinationAccountType,
         destinationAccountLabel,
+        bankAccountId: resolvedSourceBankId,
+        bankAccountName: resolvedSourceBankName,
+        destinationBankAccountId: resolvedDestBankId,
+        destinationBankAccountName: resolvedDestBankName,
         recurring: false,
         frequency: null,
         nextDueDate: null,
@@ -1222,6 +1485,9 @@ window.saveTransferTransaction = async function() {
             window.dashboard.updateFinanceChart();
             window.dashboard.showNotification(id ? 'Transfer updated successfully!' : 'Transfer saved successfully!', 'success');
         }
+
+        // Refresh bank accounts cache so chips update
+        if (window.invalidateBankAccountsCache) window.invalidateBankAccountsCache();
 
         loadFinanceData(currentFinanceFilter);
         if (typeof window.loadTransactionsSection === 'function' && document.getElementById('transactions-section')?.innerHTML.trim()) {
@@ -1250,7 +1516,8 @@ window.editTransaction = async function(id) {
             await window.dashboard.loadTransactionCategories();
             await Promise.all([
                 window.dashboard.populateTransactionCCSelect(),
-                window.dashboard.populateTransactionWalletSelect()
+                window.dashboard.populateTransactionWalletSelect(),
+                window.dashboard.populateTransactionBankAccountSelect(data.bankAccountId || '')
             ]);
         }
         
@@ -1259,12 +1526,19 @@ window.editTransaction = async function(id) {
         document.getElementById('transaction-mode').value = data.paymentMode || 'cash';
         document.getElementById('transaction-description').value = data.description;
         document.getElementById('transaction-date').value = data.date;
-        // Set category on hidden input and update picker display
         document.getElementById('transaction-category').value = data.category;
         if (window.setCatSearchValue) window.setCatSearchValue(data.category);
         document.getElementById('transaction-credit-card').value = data.paymentMode === 'credit-card' ? (data.relatedId || '') : '';
         document.getElementById('transaction-wallet').value = data.paymentMode === 'wallet' ? (data.relatedId || '') : '';
         document.getElementById('transaction-mode').dispatchEvent(new Event('change'));
+
+        // Pre-fill bank account selector
+        const baSelect = document.getElementById('transaction-bank-account');
+        if (baSelect && data.bankAccountId) {
+            baSelect.value = data.bankAccountId;
+            const baContainer = document.getElementById('bank-account-select-container');
+            if (baContainer) baContainer.classList.remove('d-none');
+        }
         
         if (data.type === 'income') document.getElementById('type-income').checked = true;
         else document.getElementById('type-expense').checked = true;
@@ -1278,7 +1552,6 @@ window.editTransaction = async function(id) {
             document.getElementById('recurring-options').classList.add('d-none');
         }
 
-        // Reset button state
         const btn = document.getElementById('save-transaction');
         if(btn) window.setBtnLoading(btn, false);
 
@@ -1329,34 +1602,59 @@ window.exportFinanceCSV = async function() {
     if (window.dashboard) window.dashboard.showLoading();
 
     try {
-        let query = db.collection('transactions')
-            .where('userId', '==', user.uid)
-            .orderBy('date', 'desc')
-            .orderBy('createdAt', 'desc');
-
-        if (currentFinanceFilter !== 'all') {
-            query = query.where('type', '==', currentFinanceFilter);
-        }
-
-        if (financeCategoryFilter !== 'all') {
-            query = query.where('category', '==', financeCategoryFilter);
-        }
-
+        let docs = await getFinanceTransactionsData();
+        const bankAccountFilterValue = financeAccountFilter || 'all';
         const startDate = document.getElementById('finance-start-date')?.value;
         const endDate = document.getElementById('finance-end-date')?.value;
-        if (startDate) {
-            query = query.where('date', '>=', startDate);
-        }
-        if (endDate) {
-            query = query.where('date', '<=', endDate);
-        }
 
-        const snapshot = await query.get();
+        // Apply client-side filters
+        docs = docs.filter(doc => {
+            const data = doc.data();
+
+            // Filter by type
+            if (currentFinanceFilter !== 'all' && data.type !== currentFinanceFilter) {
+                return false;
+            }
+
+            // Filter by category
+            if (financeCategoryFilter !== 'all' && data.category !== financeCategoryFilter) {
+                return false;
+            }
+
+            // Filter by date range
+            if (startDate && data.date < startDate) {
+                return false;
+            }
+            if (endDate && data.date > endDate) {
+                return false;
+            }
+
+            // Filter by bank account (using resolved metadata dynamically)
+            if (bankAccountFilterValue !== 'all') {
+                const accountMeta = window.getTransactionAccountMeta(data);
+                if (bankAccountFilterValue === '__unassigned__') {
+                    return accountMeta.type === 'bank' && !data.bankAccountId;
+                }
+                return data.bankAccountId === bankAccountFilterValue || data.destinationBankAccountId === bankAccountFilterValue;
+            }
+
+            // Client-side search filtering
+            if (financeSearchQuery) {
+                const lowerQuery = financeSearchQuery.toLowerCase();
+                const accountMeta = window.getTransactionAccountMeta(data);
+                return (data.description && data.description.toLowerCase().includes(lowerQuery)) || 
+                       (data.category && data.category.toLowerCase().includes(lowerQuery)) ||
+                       (accountMeta.label && accountMeta.label.toLowerCase().includes(lowerQuery)) ||
+                       window.getPaymentModeLabel(data.paymentMode).toLowerCase().includes(lowerQuery);
+            }
+
+            return true;
+        });
         
         let csvContent = "data:text/csv;charset=utf-8,";
         csvContent += "Date,Type,Category,Description,Account,Payment Mode,Amount\n";
 
-        snapshot.forEach(doc => {
+        docs.forEach(doc => {
             const data = doc.data();
             const accountMeta = window.getTransactionAccountMeta(data);
             const row = [
@@ -1983,31 +2281,56 @@ window.exportFinancePDF = async function() {
     if (window.dashboard) window.dashboard.showLoading();
 
     try {
-        let query = db.collection('transactions')
-            .where('userId', '==', user.uid)
-            .orderBy('date', 'desc')
-            .orderBy('createdAt', 'desc');
-
-        if (currentFinanceFilter !== 'all') {
-            query = query.where('type', '==', currentFinanceFilter);
-        }
-
-        if (financeCategoryFilter !== 'all') {
-            query = query.where('category', '==', financeCategoryFilter);
-        }
-
+        let docs = await getFinanceTransactionsData();
+        const bankAccountFilterValue = financeAccountFilter || 'all';
         const startDate = document.getElementById('finance-start-date')?.value;
         const endDate = document.getElementById('finance-end-date')?.value;
-        if (startDate) {
-            query = query.where('date', '>=', startDate);
-        }
-        if (endDate) {
-            query = query.where('date', '<=', endDate);
-        }
 
-        const snapshot = await query.get();
-        
-        if (snapshot.empty) {
+        // Apply client-side filters
+        docs = docs.filter(doc => {
+            const data = doc.data();
+
+            // Filter by type
+            if (currentFinanceFilter !== 'all' && data.type !== currentFinanceFilter) {
+                return false;
+            }
+
+            // Filter by category
+            if (financeCategoryFilter !== 'all' && data.category !== financeCategoryFilter) {
+                return false;
+            }
+
+            // Filter by date range
+            if (startDate && data.date < startDate) {
+                return false;
+            }
+            if (endDate && data.date > endDate) {
+                return false;
+            }
+
+            // Filter by bank account (using resolved metadata dynamically)
+            if (bankAccountFilterValue !== 'all') {
+                const accountMeta = window.getTransactionAccountMeta(data);
+                if (bankAccountFilterValue === '__unassigned__') {
+                    return accountMeta.type === 'bank' && !data.bankAccountId;
+                }
+                return data.bankAccountId === bankAccountFilterValue || data.destinationBankAccountId === bankAccountFilterValue;
+            }
+
+            // Client-side search filtering
+            if (financeSearchQuery) {
+                const lowerQuery = financeSearchQuery.toLowerCase();
+                const accountMeta = window.getTransactionAccountMeta(data);
+                return (data.description && data.description.toLowerCase().includes(lowerQuery)) || 
+                       (data.category && data.category.toLowerCase().includes(lowerQuery)) ||
+                       (accountMeta.label && accountMeta.label.toLowerCase().includes(lowerQuery)) ||
+                       window.getPaymentModeLabel(data.paymentMode).toLowerCase().includes(lowerQuery);
+            }
+
+            return true;
+        });
+
+        if (docs.length === 0) {
              if (window.dashboard) window.dashboard.showNotification('No data to export', 'warning');
              if (window.dashboard) window.dashboard.hideLoading();
              return;
@@ -2026,7 +2349,7 @@ window.exportFinancePDF = async function() {
         const tableColumn = ["Date", "Type", "Category", "Description", "Account", "Mode", "Amount"];
         const tableRows = [];
 
-        snapshot.forEach(doc => {
+        docs.forEach(doc => {
             const data = doc.data();
             const accountMeta = window.getTransactionAccountMeta(data);
             const row = [
@@ -2085,6 +2408,158 @@ window.deleteCategory = async function(id) {
     } finally {
         if(window.dashboard) window.dashboard.hideLoading();
     }
+};
+
+/* ───────────────────────────────────────────────────────────
+   BULK TRANSACTION REASSIGNMENT & ACTIONS
+   ─────────────────────────────────────────────────────────── */
+
+window.toggleSelectAllFinance = function(master) {
+    const checkboxes = document.querySelectorAll('.finance-row-checkbox:not(:disabled)');
+    checkboxes.forEach(cb => {
+        cb.checked = master.checked;
+    });
+    window.updateBulkActionsBar();
+};
+
+window.onFinanceRowSelect = function() {
+    const checkboxes = document.querySelectorAll('.finance-row-checkbox:not(:disabled)');
+    const checkedBoxes = document.querySelectorAll('.finance-row-checkbox:not(:disabled):checked');
+    const selectAll = document.getElementById('finance-select-all');
+    if (selectAll) {
+        selectAll.checked = checkboxes.length > 0 && checkboxes.length === checkedBoxes.length;
+    }
+    window.updateBulkActionsBar();
+};
+
+window.updateBulkActionsBar = async function() {
+    const bar = document.getElementById('bulk-actions-bar');
+    const countSpan = document.getElementById('bulk-selected-count');
+    const checkedBoxes = document.querySelectorAll('.finance-row-checkbox:checked');
+    
+    if (!bar || !countSpan) return;
+    
+    if (checkedBoxes.length > 0) {
+        countSpan.textContent = `${checkedBoxes.length} selected`;
+        bar.classList.remove('d-none');
+        
+        // Populate the bank account dropdown in the bulk actions bar
+        const select = document.getElementById('bulk-bank-account-select');
+        if (select && select.children.length <= 1) { // populate only if empty or just has placeholder
+            const accounts = await window.getUserBankAccounts();
+            select.innerHTML = '<option value="" selected disabled>Assign to Bank Account...</option>';
+            accounts.forEach(acc => {
+                const opt = document.createElement('option');
+                opt.value = acc.id;
+                opt.textContent = `${acc.icon || '🏦'} ${acc.name}`;
+                select.appendChild(opt);
+            });
+        }
+    } else {
+        bar.classList.add('d-none');
+        const select = document.getElementById('bulk-bank-account-select');
+        if (select) select.value = ""; // Reset select
+    }
+};
+
+window.bulkAssignBankAccount = async function(bankAccountId) {
+    const user = auth.currentUser;
+    if (!user) return;
+    if (!bankAccountId) return;
+    
+    const checkedBoxes = document.querySelectorAll('.finance-row-checkbox:checked');
+    if (checkedBoxes.length === 0) return;
+    
+    const bankAccountName = window.getBankAccountLabel ? window.getBankAccountLabel(bankAccountId) : 'Bank';
+    
+    if (window.dashboard) window.dashboard.showLoading();
+    
+    try {
+        const batch = db.batch();
+        checkedBoxes.forEach(cb => {
+            const id = cb.dataset.id;
+            const docRef = db.collection('transactions').doc(id);
+            batch.update(docRef, {
+                bankAccountId: bankAccountId,
+                bankAccountName: bankAccountName,
+                accountType: 'bank', // Force update to bank type
+                accountLabel: bankAccountName,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        });
+        
+        await batch.commit();
+        
+        // Invalidate bank accounts cache
+        if (window.invalidateBankAccountsCache) window.invalidateBankAccountsCache();
+        
+        // Clear selection
+        window.clearBulkSelection();
+        
+        if (window.dashboard) {
+            window.dashboard.updateStats();
+            window.dashboard.loadRecentTransactions();
+            window.dashboard.updateFinanceChart();
+            window.dashboard.showNotification(`Successfully reassigned ${checkedBoxes.length} transactions to ${bankAccountName}!`, 'success');
+        }
+        
+        // Reload table
+        await loadFinanceData();
+    } catch (e) {
+        console.error('Error in bulk assigning bank account:', e);
+        if (window.dashboard) window.dashboard.showNotification('Failed to bulk assign bank account: ' + e.message, 'danger');
+    } finally {
+        if (window.dashboard) window.dashboard.hideLoading();
+    }
+};
+
+window.bulkDeleteTransactions = async function() {
+    const checkedBoxes = document.querySelectorAll('.finance-row-checkbox:checked');
+    if (checkedBoxes.length === 0) return;
+    
+    if (!confirm(`Are you sure you want to delete all ${checkedBoxes.length} selected transactions? This cannot be undone.`)) {
+        return;
+    }
+    
+    if (window.dashboard) window.dashboard.showLoading();
+    
+    try {
+        const batch = db.batch();
+        checkedBoxes.forEach(cb => {
+            const id = cb.dataset.id;
+            const docRef = db.collection('transactions').doc(id);
+            batch.delete(docRef);
+        });
+        
+        await batch.commit();
+        
+        if (window.invalidateBankAccountsCache) window.invalidateBankAccountsCache();
+        window.clearBulkSelection();
+        
+        if (window.dashboard) {
+            window.dashboard.updateStats();
+            window.dashboard.loadRecentTransactions();
+            window.dashboard.updateFinanceChart();
+            window.dashboard.showNotification(`Successfully deleted ${checkedBoxes.length} transactions!`, 'success');
+        }
+        
+        await loadFinanceData();
+    } catch (e) {
+        console.error('Error in bulk deleting transactions:', e);
+        if (window.dashboard) window.dashboard.showNotification('Failed to bulk delete transactions: ' + e.message, 'danger');
+    } finally {
+        if (window.dashboard) window.dashboard.hideLoading();
+    }
+};
+
+window.clearBulkSelection = function() {
+    const checkboxes = document.querySelectorAll('.finance-row-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = false;
+    });
+    const selectAll = document.getElementById('finance-select-all');
+    if (selectAll) selectAll.checked = false;
+    window.updateBulkActionsBar();
 };
 
 

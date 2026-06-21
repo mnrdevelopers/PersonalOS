@@ -5743,3 +5743,221 @@ body {
     color: #a5b4fc;
     border-color: #3a3a3a;
 }
+
+/* ═══════════════════════════════════════════════════════
+   BANK ACCOUNTS MODULE STYLES
+   ═══════════════════════════════════════════════════════ */
+
+.ba-section { padding: 0 0 2rem; }
+.ba-kicker {
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em;
+    text-transform: uppercase; color: #6366f1; margin-bottom: 2px;
+}
+.ba-title { font-size: 1.4rem; font-weight: 700; color: var(--text-color); }
+.ba-subtitle { font-size: 0.85rem; color: #6b7280; margin-top: 2px; }
+.ba-add-btn { border-radius: 10px !important; font-size: 0.82rem; padding: 8px 18px !important; }
+
+.ba-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1.25rem;
+}
+
+.ba-card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.07);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    position: relative;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.ba-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(0,0,0,0.12); }
+.ba-card-accent {
+    position: absolute; top: 0; left: 0; width: 5px; height: 100%;
+    background: var(--ba-color, #0284c7);
+    border-radius: 16px 0 0 16px;
+}
+.ba-card-body { padding: 1.2rem 1.2rem 1.2rem 1.5rem; }
+
+.ba-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.7rem; }
+.ba-card-icon-wrap {
+    width: 44px; height: 44px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+}
+.ba-card-icon { font-size: 1.4rem; }
+.ba-card-actions { display: flex; gap: 4px; align-items: center; }
+.ba-action-btn {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: transparent; border: 1px solid var(--border-color);
+    color: #6b7280; cursor: pointer; display: flex; align-items: center;
+    justify-content: center; font-size: 0.75rem; transition: all 0.15s;
+}
+.ba-action-btn:hover { background: #f3f4f6; color: #374151; }
+.ba-action-delete:hover { background: #fee2e2 !important; color: #dc2626 !important; border-color: #fecaca !important; }
+
+.ba-card-name { font-size: 1.05rem; font-weight: 700; color: var(--text-color); margin-bottom: 2px; }
+.ba-card-bank { font-size: 0.78rem; color: #6b7280; margin-bottom: 0.5rem; }
+.ba-card-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 0.9rem; flex-wrap: wrap; }
+.ba-type-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 0.72rem; font-weight: 600; padding: 3px 10px; border-radius: 20px;
+}
+.ba-card-last4 { font-size: 0.78rem; color: #9ca3af; font-family: monospace; }
+.ba-default-badge {
+    font-size: 0.68rem; background: #f0fdf4; color: #16a34a;
+    border: 1px solid #bbf7d0; padding: 2px 8px; border-radius: 20px; font-weight: 600;
+}
+
+.ba-card-balance-row {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    padding-top: 0.6rem; border-top: 1px solid var(--border-color);
+}
+.ba-balance-label { font-size: 0.72rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
+.ba-balance-amount { font-size: 1.25rem; font-weight: 800; line-height: 1; }
+.ba-tx-count { font-size: 0.75rem; color: #9ca3af; display: flex; align-items: center; gap: 5px; }
+
+.ba-empty-state {
+    text-align: center; padding: 3.5rem 2rem; grid-column: 1/-1;
+    background: var(--card-bg); border-radius: 16px; border: 2px dashed var(--border-color);
+}
+.ba-empty-icon { font-size: 3rem; margin-bottom: 0.75rem; }
+.ba-empty-title { font-size: 1.1rem; font-weight: 700; color: var(--text-color); margin-bottom: 0.4rem; }
+.ba-empty-sub { font-size: 0.85rem; color: #6b7280; max-width: 360px; margin: 0 auto; }
+
+.ba-unassigned-note {
+    background: #fefce8; border: 1px solid #fef08a; border-radius: 10px;
+    padding: 10px 14px; font-size: 0.82rem; color: #713f12;
+    display: flex; align-items: flex-start; gap: 6px;
+}
+[data-theme="dark"] .ba-unassigned-note { background: #2d2800; border-color: #5b4c00; color: #fde68a; }
+
+.ba-modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    z-index: 2000; align-items: center; justify-content: center;
+    backdrop-filter: blur(4px); padding: 1rem;
+}
+.ba-modal-overlay:not(.d-none) { display: flex !important; }
+
+.ba-modal {
+    background: var(--card-bg); border-radius: 20px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.25);
+    width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto;
+    animation: baModalIn 0.2s ease;
+}
+@keyframes baModalIn { from { transform: scale(0.94); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+.ba-modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.2rem 1.4rem 1rem; border-bottom: 1px solid var(--border-color);
+}
+.ba-modal-title-text { font-size: 1.05rem; font-weight: 700; color: var(--text-color); }
+.ba-modal-close-btn {
+    width: 32px; height: 32px; border-radius: 8px; background: transparent;
+    border: 1px solid var(--border-color); cursor: pointer; color: #6b7280;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem; transition: all 0.15s;
+}
+.ba-modal-close-btn:hover { background: #f3f4f6; color: #374151; }
+.ba-modal-body { padding: 1.2rem 1.4rem; }
+.ba-modal-footer {
+    padding: 1rem 1.4rem; border-top: 1px solid var(--border-color);
+    display: flex; justify-content: flex-end; gap: 10px;
+}
+
+.ba-color-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.ba-color-swatch {
+    width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+    border: 2px solid transparent; transition: transform 0.15s, border-color 0.15s;
+}
+.ba-color-swatch:hover { transform: scale(1.15); }
+.ba-color-swatch.selected { border-color: #fff; box-shadow: 0 0 0 3px rgba(0,0,0,0.3); transform: scale(1.1); }
+
+.ba-icon-btn {
+    width: 48px; height: 48px; border-radius: 12px;
+    background: #f3f4f6; border: 2px solid var(--border-color);
+    font-size: 1.5rem; cursor: pointer; display: flex;
+    align-items: center; justify-content: center; transition: all 0.15s;
+}
+.ba-icon-btn:hover { background: #e5e7eb; border-color: #9ca3af; }
+
+.ba-chips-scroller {
+    display: flex; gap: 10px; overflow-x: auto; padding: 2px 0 6px;
+    scrollbar-width: thin; scrollbar-color: rgba(99,102,241,0.3) transparent;
+}
+.ba-chips-scroller::-webkit-scrollbar { height: 4px; }
+.ba-chips-scroller::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.3); border-radius: 2px; }
+.ba-balance-chip {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--card-bg); border: 1px solid var(--border-color);
+    border-radius: 12px; padding: 8px 14px;
+    border-left: 3px solid var(--ba-chip-color, #0284c7);
+    min-width: 155px; flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05); transition: transform 0.15s;
+}
+.ba-balance-chip:hover { transform: translateY(-2px); }
+.ba-chip-icon { font-size: 1.2rem; }
+.ba-chip-info { display: flex; flex-direction: column; }
+.ba-chip-name { font-size: 0.72rem; color: #6b7280; font-weight: 600; white-space: nowrap; }
+.ba-chip-amount { font-size: 0.95rem; font-weight: 800; white-space: nowrap; }
+
+#finance-bank-account-filter { min-width: 130px; max-width: 170px; flex: 1 1 130px; font-size: 0.8rem; }
+
+.transfer-bank-row { display: none; }
+.transfer-bank-row.visible { display: block; }
+
+[data-theme="dark"] .ba-card { background: #1e1e1e; border-color: #333; }
+[data-theme="dark"] .ba-card:hover { box-shadow: 0 12px 32px rgba(0,0,0,0.4); }
+[data-theme="dark"] .ba-modal { background: #1e1e1e; }
+[data-theme="dark"] .ba-action-btn:hover { background: #2d2d2d; color: #d1d5db; }
+[data-theme="dark"] .ba-action-delete:hover { background: #450a0a !important; color: #f87171 !important; }
+[data-theme="dark"] .ba-empty-state { background: #1e1e1e; border-color: #333; }
+[data-theme="dark"] .ba-icon-btn { background: #2d2d2d; border-color: #444; }
+[data-theme="dark"] .ba-balance-chip { background: #1e1e1e; border-color: #333; }
+
+@media (max-width: 640px) {
+    .ba-grid { grid-template-columns: 1fr; }
+    .ba-header { flex-direction: column; align-items: flex-start !important; gap: 12px; }
+}
+
+/* Bulk Actions Floating Bar */
+.bulk-actions-bar {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(33, 37, 41, 0.95);
+    backdrop-filter: blur(10px);
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    z-index: 1050;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    width: auto;
+    max-width: 90%;
+}
+.bulk-actions-content {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+.bulk-actions-buttons {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.bulk-actions-bar select {
+    background-color: #343a40;
+    border-color: #495057;
+    color: #fff;
+}
+.bulk-actions-bar select:focus {
+    background-color: #343a40;
+    color: #fff;
+}
+[data-theme="dark"] .bulk-actions-bar {
+    background: rgba(20, 20, 20, 0.95);
+    border-color: rgba(255, 255, 255, 0.08);
+}

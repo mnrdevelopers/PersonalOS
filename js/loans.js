@@ -2819,18 +2819,54 @@ window.viewCreditCardHistory = async function(cardId) {
         const snapshot = await db.collection('transactions')
             .where('userId', '==', user.uid)
             .where('relatedId', '==', cardId)
-            .orderBy('date', 'desc')
-            .orderBy('createdAt', 'desc')
-            .limit(50)
             .get();
 
-        if (snapshot.empty) {
+        let docs = snapshot.docs;
+
+        // Sort docs client-side: date (desc), createdAt (desc), id (desc)
+        docs.sort((a, b) => {
+            const dataA = a.data();
+            const dataB = b.data();
+            
+            const dateA = dataA.date || '';
+            const dateB = dataB.date || '';
+            if (dateA !== dateB) {
+                return dateB.localeCompare(dateA); // desc
+            }
+            
+            const getCreatedMs = (data) => {
+                if (!data.createdAt) return 0;
+                if (typeof data.createdAt.toMillis === 'function') {
+                    return data.createdAt.toMillis();
+                }
+                if (data.createdAt.seconds) {
+                    return data.createdAt.seconds * 1000 + (data.createdAt.nanoseconds || 0) / 1000000;
+                }
+                if (data.createdAt instanceof Date) {
+                    return data.createdAt.getTime();
+                }
+                const parsed = Date.parse(data.createdAt);
+                return isNaN(parsed) ? 0 : parsed;
+            };
+
+            const createdA = getCreatedMs(dataA);
+            const createdB = getCreatedMs(dataB);
+            if (createdA !== createdB) {
+                return createdB - createdA; // desc
+            }
+            
+            return b.id.localeCompare(a.id); // desc
+        });
+
+        const pageDocs = docs.slice(0, 50);
+
+        if (pageDocs.length === 0) {
             tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No history found.</td></tr>';
             return;
         }
 
         tbody.innerHTML = '';
-        snapshot.forEach(doc => {
+        pageDocs.forEach(doc => {
             const data = doc.data();
             const isSpend = data.description && data.description.startsWith('CC Spend');
             const colorClass = isSpend ? 'text-danger' : 'text-success';

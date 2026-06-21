@@ -93,6 +93,12 @@ service cloud.firestore {
       allow create: if isOwnerCreate();
     }
 
+    // Bank Accounts (multi-account management)
+    match /bank_accounts/{docId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwnerCreate();
+    }
+
     // Categories
     match /categories/{docId} {
       allow read, update, delete: if isOwner(resource.data.userId);

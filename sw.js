@@ -1,4 +1,4 @@
-const CACHE_NAME = 'personalos-v5';
+const CACHE_NAME = 'personalos-v7';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
