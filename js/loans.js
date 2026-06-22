@@ -34,6 +34,32 @@ const CREDIT_CARD_BANKS = [
 
 const METALPRICE_API_KEY = 'goldapi-1tsml7nm4zv-io'; // Enter your API Key here from goldapi.io
 
+function getEnrichedTransactionPayload(baseTx, paymentMode, bankAccountId) {
+    const accountMeta = window.getTransactionAccountMeta
+        ? window.getTransactionAccountMeta(paymentMode)
+        : { type: paymentMode === 'cash' ? 'cash' : 'bank', label: paymentMode === 'cash' ? 'Cash' : 'Bank' };
+
+    let resolvedAccountLabel = accountMeta.label;
+    let resolvedBankAccountId = null;
+    let resolvedBankAccountName = null;
+
+    if (accountMeta.type === 'bank' && bankAccountId) {
+        resolvedBankAccountId = bankAccountId;
+        resolvedBankAccountName = window.getBankAccountLabel ? window.getBankAccountLabel(bankAccountId) : null;
+        if (resolvedBankAccountName && resolvedBankAccountName !== 'Bank') {
+            resolvedAccountLabel = resolvedBankAccountName;
+        }
+    }
+
+    return {
+        ...baseTx,
+        accountType: accountMeta.type,
+        accountLabel: resolvedAccountLabel,
+        bankAccountId: resolvedBankAccountId,
+        bankAccountName: resolvedBankAccountName
+    };
+}
+
 window.loadLoansSection = async function() {
     const container = document.getElementById('loans-section');
     container.innerHTML = `
@@ -201,7 +227,7 @@ window.loadLoansSection = async function() {
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Payment Mode</label>
-                                <select class="form-select" id="loan-payment-mode">
+                                <select class="form-select" id="loan-payment-mode" onchange="toggleLoanPaymentFields('loan')">
                                     <option value="cash">Cash</option>
                                     <option value="bank">Bank Transfer</option>
                                     <option value="upi">UPI</option>
@@ -209,6 +235,12 @@ window.loadLoansSection = async function() {
                                     <option value="wallet">Wallet</option>
                                     <option value="debit-card">Debit Card</option>
                                     <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="mb-3 d-none" id="div-loan-bank-account">
+                                <label class="form-label">Select Bank Account <span class="text-muted small">(optional)</span></label>
+                                <select class="form-select" id="loan-bank-account">
+                                    <option value="">Select bank account…</option>
                                 </select>
                             </div>
                             <div class="mb-3 d-none" id="div-loan-cc">
@@ -286,7 +318,7 @@ window.loadLoansSection = async function() {
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Payment Mode</label>
-                                <select class="form-select" id="repay-payment-mode">
+                                <select class="form-select" id="repay-payment-mode" onchange="toggleLoanPaymentFields('repay')">
                                     <option value="cash">Cash</option>
                                     <option value="bank">Bank Transfer</option>
                                     <option value="upi">UPI</option>
@@ -294,6 +326,12 @@ window.loadLoansSection = async function() {
                                     <option value="wallet">Wallet</option>
                                     <option value="debit-card">Debit Card</option>
                                     <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="mb-3 d-none" id="div-repay-bank-account">
+                                <label class="form-label">Select Bank Account <span class="text-muted small">(optional)</span></label>
+                                <select class="form-select" id="repay-bank-account">
+                                    <option value="">Select bank account…</option>
                                 </select>
                             </div>
                             <div class="mb-3 d-none" id="div-repay-cc">
@@ -482,12 +520,18 @@ window.loadLoansSection = async function() {
                                     <option value="cash">Cash</option>
                                 </select>
                             </div>
+                            <div class="mb-3 d-none" id="div-action-bank-account">
+                                <label class="form-label">Select Bank Account <span class="text-muted small">(optional)</span></label>
+                                <select class="form-select" id="action-bank-account">
+                                    <option value="">Select bank account…</option>
+                                </select>
+                            </div>
                             <div class="mb-3 d-none" id="div-action-wallet">
                                 <label class="form-label">Select Wallet</label>
                                 <select class="form-select" id="action-wallet">
                                     <option value="">Select Wallet</option>
                                 </select>
-                        </div>
+                            </div>
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="action-ledger" checked>
                             <label class="form-check-label">Record in Transaction Ledger</label>
@@ -604,12 +648,18 @@ window.loadLoansSection = async function() {
                             <div id="inv-ledger-fields">
                                 <div class="mb-3">
                                     <label class="form-label">Payment Mode</label>
-                                    <select class="form-select" id="inv-payment-mode" onchange="toggleLoanCCField('inv')">
+                                    <select class="form-select" id="inv-payment-mode" onchange="toggleLoanPaymentFields('inv')">
                                         <option value="bank">Bank Transfer</option>
                                         <option value="upi">UPI</option>
                                         <option value="credit-card">Credit Card</option>
                                         <option value="cash">Cash</option>
                                         <option value="other">Other</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3 d-none" id="div-inv-bank-account">
+                                    <label class="form-label">Select Bank Account <span class="text-muted small">(optional)</span></label>
+                                    <select class="form-select" id="inv-bank-account">
+                                        <option value="">Select bank account…</option>
                                     </select>
                                 </div>
                                 <div class="mb-3 d-none" id="div-inv-cc">
@@ -831,6 +881,12 @@ window.loadLoansSection = async function() {
                                     <option value="cash">Cash</option>
                                 </select>
                             </div>
+                            <div class="mb-3 d-none" id="div-withdraw-bank-account">
+                                <label class="form-label">Select Bank Account <span class="text-muted small">(optional)</span></label>
+                                <select class="form-select" id="withdraw-bank-account">
+                                    <option value="">Select bank account…</option>
+                                </select>
+                            </div>
                             <div class="mb-3 d-none" id="div-withdraw-wallet">
                                 <label class="form-label">Select Wallet</label>
                                 <select class="form-select" id="withdraw-wallet">
@@ -888,6 +944,12 @@ window.loadLoansSection = async function() {
                                     <option value="credit-card">Credit Card</option>
                                     <option value="cash">Cash</option>
                                     <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="mb-3 d-none" id="div-deposit-bank-account">
+                                <label class="form-label">Select Bank Account <span class="text-muted small">(optional)</span></label>
+                                <select class="form-select" id="deposit-bank-account">
+                                    <option value="">Select bank account…</option>
                                 </select>
                             </div>
                             <div class="mb-3 d-none" id="div-deposit-wallet">
@@ -997,6 +1059,7 @@ window.switchLoanView = function(view, element) {
 
 window.populateLoanPaymentSelects = async function() {
     const user = auth.currentUser;
+    if (!user) return;
     const ccSnapshot = await db.collection('credit_cards').where('userId', '==', user.uid).get();
     const walletSnapshot = await db.collection('wallets').where('userId', '==', user.uid).get();
     
@@ -1006,29 +1069,48 @@ window.populateLoanPaymentSelects = async function() {
     const walletOptions = '<option value="">Select Wallet</option>' + 
         walletSnapshot.docs.map(doc => `<option value="${doc.id}">${doc.data().name} (₹${doc.data().balance})</option>`).join('');
     
+    let bankAccounts = [];
+    if (window.getUserBankAccounts) {
+        bankAccounts = await window.getUserBankAccounts();
+    }
+    const bankOptions = '<option value="">Select bank account…</option>' +
+        bankAccounts.map(acc => {
+            const last4Part = acc.last4 ? ` (..${acc.last4})` : '';
+            return `<option value="${acc.id}">${acc.name}${last4Part}</option>`;
+        }).join('');
+
     ['loan', 'repay', 'inv', 'withdraw', 'deposit', 'action'].forEach(type => {
         const ccEl = document.getElementById(`${type}-credit-card`);
         if(ccEl) ccEl.innerHTML = ccOptions;
         
         const walletEl = document.getElementById(`${type}-wallet`);
         if(walletEl) walletEl.innerHTML = walletOptions;
+
+        const baEl = document.getElementById(`${type}-bank-account`);
+        if(baEl) baEl.innerHTML = bankOptions;
     });
 };
 
 window.toggleLoanPaymentFields = function(type) {
-    const mode = document.getElementById(`${type}-payment-mode`).value;
+    const modeEl = document.getElementById(`${type}-payment-mode`);
+    if (!modeEl) return;
+    const mode = modeEl.value;
     const ccDiv = document.getElementById(`div-${type}-cc`);
     const walletDiv = document.getElementById(`div-${type}-wallet`);
+    const baDiv = document.getElementById(`div-${type}-bank-account`);
     
     if (ccDiv) ccDiv.classList.add('d-none');
     if (walletDiv) walletDiv.classList.add('d-none');
+    if (baDiv) baDiv.classList.add('d-none');
+
+    const BANK_MODES = new Set(['bank', 'upi', 'upi-bhim', 'upi-phonepe', 'upi-gpay', 'upi-navi', 'upi-cred', 'debit-card']);
 
     if (mode === 'credit-card') {
         if (ccDiv) ccDiv.classList.remove('d-none');
-        window.populateLoanPaymentSelects();
     } else if (mode === 'wallet') {
         if (walletDiv) walletDiv.classList.remove('d-none');
-        window.populateLoanPaymentSelects();
+    } else if (BANK_MODES.has(mode)) {
+        if (baDiv) baDiv.classList.remove('d-none');
     }
 };
 
@@ -1089,7 +1171,7 @@ window.calculateEMIAmount = function() {
     }
 };
 
-window.resetLoanForm = function() {
+window.resetLoanForm = async function() {
     document.getElementById('loan-form').reset();
     document.getElementById('loan-id').value = '';
     document.getElementById('loan-start-date').value = new Date().toISOString().split('T')[0];
@@ -1098,6 +1180,8 @@ window.resetLoanForm = function() {
     document.getElementById('loan-upi-id').value = '';
     document.getElementById('loan-message-context').value = '';
     document.getElementById('loan-duration').value = '';
+
+    await window.populateLoanPaymentSelects();
 
     // Reset payment mode and dependent fields
     document.getElementById('loan-payment-mode').value = 'bank';
@@ -1109,9 +1193,9 @@ window.resetLoanForm = function() {
     updateLoanModalUI('borrowed');
 };
 
-window.showAddLoanModal = function() {
+window.showAddLoanModal = async function() {
     const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addLoanModal'));
-    window.resetLoanForm();
+    await window.resetLoanForm();
     
     modal.show();
 };
@@ -1246,6 +1330,7 @@ window.saveLoan = async function() {
     const paymentMode = document.getElementById('loan-payment-mode').value;
     const creditCardId = document.getElementById('loan-credit-card')?.value;
     const walletId = document.getElementById('loan-wallet')?.value;
+    const bankAccountId = document.getElementById('loan-bank-account')?.value || '';
     const countryCode = document.getElementById('loan-country-code').value;
     const mobileInput = document.getElementById('loan-mobile').value;
     const upiId = document.getElementById('loan-upi-id').value.trim();
@@ -1332,14 +1417,17 @@ window.saveLoan = async function() {
 
             if (!txQuery.empty) {
                 const txDoc = txQuery.docs[0];
-                await db.collection('transactions').doc(txDoc.id).update({
+                const baseTx = {
                     amount: amount,
                     date: startDate,
                     type: type === 'borrowed' ? 'income' : 'expense',
                     description: `${type === 'borrowed' ? 'Loan from' : (type === 'lent' ? 'Loan to' : 'EMI Purchase:')} ${name}`,
                     paymentMode: paymentMode,
+                    relatedId: (paymentMode === 'credit-card' ? creditCardId : (paymentMode === 'wallet' ? walletId : null)),
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                };
+                const enrichedTx = getEnrichedTransactionPayload(baseTx, paymentMode, bankAccountId);
+                await db.collection('transactions').doc(txDoc.id).update(enrichedTx);
             }
         } else {
             let loanRef = null;
@@ -1416,7 +1504,7 @@ window.saveLoan = async function() {
             }
 
             if (linkLedger) {
-                const transaction = {
+                const baseTx = {
                     userId: user.uid,
                     loanId: loanRef,
                     date: startDate,
@@ -1428,11 +1516,12 @@ window.saveLoan = async function() {
                     paymentMode: paymentMode,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
-                await db.collection('transactions').add(transaction);
+                const enrichedTx = getEnrichedTransactionPayload(baseTx, paymentMode, bankAccountId);
+                await db.collection('transactions').add(enrichedTx);
 
                 // Add Processing Fee Transaction
                 if (processingFee > 0) {
-                    await db.collection('transactions').add({
+                    const baseFeeTx = {
                         userId: user.uid,
                         loanId: loanRef,
                         date: startDate,
@@ -1442,7 +1531,9 @@ window.saveLoan = async function() {
                         description: `Processing Fee: ${name}`,
                         paymentMode: paymentMode,
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
+                    };
+                    const enrichedFeeTx = getEnrichedTransactionPayload(baseFeeTx, paymentMode, bankAccountId);
+                    await db.collection('transactions').add(enrichedFeeTx);
                 }
             }
         }
@@ -1811,6 +1902,8 @@ window.editLoan = async function(id) {
         if (!doc.exists) return;
         const data = doc.data();
         
+        await window.populateLoanPaymentSelects();
+        
         document.getElementById('loan-id').value = id;
         document.getElementById('loan-name').value = data.name;
         document.getElementById('loan-amount').value = data.totalAmount;
@@ -1864,6 +1957,17 @@ window.editLoan = async function(id) {
             if (txData.paymentMode) {
                 document.getElementById('loan-payment-mode').value = txData.paymentMode;
             }
+            if (txData.bankAccountId) {
+                document.getElementById('loan-bank-account').value = txData.bankAccountId;
+            }
+            if (txData.paymentMode === 'credit-card') {
+                document.getElementById('loan-credit-card').value = txData.relatedId || '';
+            } else if (txData.paymentMode === 'wallet') {
+                document.getElementById('loan-wallet').value = txData.relatedId || '';
+            }
+            window.toggleLoanPaymentFields('loan');
+        } else {
+            window.toggleLoanPaymentFields('loan');
         }
 
         const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addLoanModal'));
@@ -1937,6 +2041,8 @@ window.showRepaymentModal = async function(loanId) {
     document.getElementById('repay-loan-id').value = loanId;
     document.getElementById('repay-date').value = new Date().toISOString().split('T')[0];
     
+    await window.populateLoanPaymentSelects();
+
     // Reset Payment Mode
     document.getElementById('repay-payment-mode').onchange = () => toggleLoanPaymentFields('repay');
     toggleLoanPaymentFields('repay');
@@ -1971,6 +2077,7 @@ window.saveRepayment = async function() {
     const paymentMode = document.getElementById('repay-payment-mode').value;
     const creditCardId = document.getElementById('repay-credit-card')?.value;
     const walletId = document.getElementById('repay-wallet')?.value;
+    const bankAccountId = document.getElementById('repay-bank-account')?.value || '';
     const user = auth.currentUser;
 
     if (!amount || !date) {
@@ -2033,7 +2140,7 @@ window.saveRepayment = async function() {
             
             // 1. Record Principal Repayment
             if (principalAmount > 0) {
-                const transactionRef = await db.collection('transactions').add({
+                const baseTx = {
                     userId: user.uid,
                     loanId: loanId,
                     date: date,
@@ -2044,13 +2151,15 @@ window.saveRepayment = async function() {
                     paymentMode: paymentMode,
                     relatedId: (paymentMode === 'credit-card' ? creditCardId : (paymentMode === 'wallet' ? walletId : null)),
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                };
+                const enrichedTx = getEnrichedTransactionPayload(baseTx, paymentMode, bankAccountId);
+                const transactionRef = await db.collection('transactions').add(enrichedTx);
                 transactionId = transactionRef.id;
             }
 
             // 2. Record Penalty Transaction
             if (penalty > 0) {
-                const penaltyRef = await db.collection('transactions').add({
+                const basePenaltyTx = {
                     userId: user.uid,
                     loanId: loanId,
                     date: date,
@@ -2060,13 +2169,15 @@ window.saveRepayment = async function() {
                     description: `Penalty/Charge: ${loanData.name}`,
                     paymentMode: paymentMode,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                };
+                const enrichedPenaltyTx = getEnrichedTransactionPayload(basePenaltyTx, paymentMode, bankAccountId);
+                const penaltyRef = await db.collection('transactions').add(enrichedPenaltyTx);
                 penaltyTransactionId = penaltyRef.id;
             }
 
             // 3. Record Processing Fee Transaction
             if (processingFee > 0) {
-                const pfRef = await db.collection('transactions').add({
+                const baseFeeTx = {
                     userId: user.uid,
                     loanId: loanId,
                     date: date,
@@ -2076,7 +2187,9 @@ window.saveRepayment = async function() {
                     description: `Processing Fee: ${loanData.name}`,
                     paymentMode: paymentMode,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                };
+                const enrichedFeeTx = getEnrichedTransactionPayload(baseFeeTx, paymentMode, bankAccountId);
+                const pfRef = await db.collection('transactions').add(enrichedFeeTx);
                 procFeeTransactionId = pfRef.id;
             }
         }
@@ -2708,7 +2821,7 @@ window.deleteCreditCard = async function(id) {
     } catch (e) { console.error(e); }
 };
 
-window.showCCActionModal = function(id, type) {
+window.showCCActionModal = async function(id, type) {
     document.getElementById('action-cc-id').value = id;
     document.getElementById('action-type').value = type;
     document.getElementById('action-amount').value = '';
@@ -2728,11 +2841,12 @@ window.showCCActionModal = function(id, type) {
         descInput.value = 'Purchase';
     }
     
+    await window.populateLoanPaymentSelects();
+    
     // Reset wallet field visibility
     window.toggleLoanPaymentFields('action');
     
     const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('ccActionModal'));
-    window.populateLoanPaymentSelects(); // Ensure wallets are loaded
     modal.show();
 };
 
@@ -2745,6 +2859,7 @@ window.processCCAction = async function() {
     const desc = document.getElementById('action-desc').value;
     const paymentMode = document.getElementById('action-payment-mode').value;
     const walletId = document.getElementById('action-wallet').value;
+    const bankAccountId = document.getElementById('action-bank-account')?.value || '';
     const recordLedger = document.getElementById('action-ledger').checked;
     const user = auth.currentUser;
 
@@ -2775,7 +2890,9 @@ window.processCCAction = async function() {
             const cardName = cardDoc.data().name;
             
             const txRef = db.collection('transactions').doc();
-            batch.set(txRef, {
+            const actualMode = type === 'spend' ? 'credit-card' : paymentMode;
+            const bankAccToUse = type === 'spend' ? '' : bankAccountId;
+            const baseTx = {
                 userId: user.uid,
                 date: date,
                 amount: amount,
@@ -2785,11 +2902,13 @@ window.processCCAction = async function() {
                                  // Payment is tricky: It's money leaving bank to pay debt. So also Expense in cash flow terms.
                 category: type === 'spend' ? 'Shopping' : 'Credit Card Bill',
                 description: `${type === 'spend' ? 'CC Spend' : 'Bill Pay'}: ${cardName} - ${desc}`,
-                paymentMode: type === 'spend' ? 'credit-card' : paymentMode, // Spend is via CC. Payment is via selected mode.
+                paymentMode: actualMode, // Spend is via CC. Payment is via selected mode.
                 relatedId: id, // Always link to Card ID for history visibility
                 section: 'credit_cards',
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
+            };
+            const enrichedTx = getEnrichedTransactionPayload(baseTx, actualMode, bankAccToUse);
+            batch.set(txRef, enrichedTx);
         }
 
         await batch.commit();
@@ -3181,10 +3300,13 @@ window.saveWalletTransfer = async function() {
 
 // --- Investment Functions ---
 
-window.showAddInvestmentModal = function() {
+window.showAddInvestmentModal = async function() {
     const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addInvestmentModal'));
     document.getElementById('investment-form').reset();
     document.getElementById('inv-id').value = '';
+    
+    await window.populateLoanPaymentSelects();
+    
     toggleInvestmentFields();
     toggleLoanPaymentFields('inv'); // Reset CC field
     toggleSipFields();
@@ -3424,6 +3546,7 @@ window.saveInvestment = async function() {
     const paymentMode = document.getElementById('inv-payment-mode').value;
     const creditCardId = document.getElementById('inv-credit-card')?.value;
     const walletId = document.getElementById('inv-wallet')?.value;
+    const bankAccountId = document.getElementById('inv-bank-account')?.value || '';
     
     if (!name || isNaN(investedAmount)) {
         if(window.dashboard) window.dashboard.showNotification('Please fill required fields', 'warning');
@@ -3469,7 +3592,7 @@ window.saveInvestment = async function() {
 
             // Add to Ledger
             if (linkLedger) {
-                await db.collection('transactions').add({
+                const baseTx = {
                     userId: user.uid,
                     date: new Date().toISOString().split('T')[0],
                     amount: investedAmount,
@@ -3481,7 +3604,9 @@ window.saveInvestment = async function() {
                     investmentId: invRefId,
                     section: 'investments',
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                };
+                const enrichedTx = getEnrichedTransactionPayload(baseTx, paymentMode, bankAccountId);
+                await db.collection('transactions').add(enrichedTx);
             }
         }
         
@@ -3685,23 +3810,30 @@ window.editInvestment = async function(id) {
     } catch (e) { console.error(e); }
 };
 
-window.showWithdrawInvestmentModal = function(id) {
+window.showWithdrawInvestmentModal = async function(id) {
     const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('withdrawInvestmentModal'));
     document.getElementById('withdraw-form').reset();
     document.getElementById('withdraw-id').value = id;
     document.getElementById('withdraw-date').value = new Date().toISOString().split('T')[0];
+    
+    await window.populateLoanPaymentSelects();
+    
     toggleWithdrawalFields();
-    window.populateLoanPaymentSelects(); // Ensure wallets are loaded
     modal.show();
 };
 
 window.toggleWithdrawalFields = function() {
     const mode = document.getElementById('withdraw-to').value;
     const walletDiv = document.getElementById('div-withdraw-wallet');
+    const baDiv = document.getElementById('div-withdraw-bank-account');
+    
+    if (walletDiv) walletDiv.classList.add('d-none');
+    if (baDiv) baDiv.classList.add('d-none');
+
     if (mode === 'wallet') {
-        walletDiv.classList.remove('d-none');
-    } else {
-        walletDiv.classList.add('d-none');
+        if (walletDiv) walletDiv.classList.remove('d-none');
+    } else if (mode === 'bank') {
+        if (baDiv) baDiv.classList.remove('d-none');
     }
 };
 
@@ -3713,6 +3845,7 @@ window.saveWithdrawal = async function() {
     const date = document.getElementById('withdraw-date').value;
     const mode = document.getElementById('withdraw-to').value;
     const walletId = document.getElementById('withdraw-wallet').value;
+    const bankAccountId = document.getElementById('withdraw-bank-account')?.value || '';
     const closeInv = document.getElementById('withdraw-close').checked;
     const user = auth.currentUser;
 
@@ -3767,7 +3900,7 @@ window.saveWithdrawal = async function() {
 
         // 2. Add Transaction (Income)
         const txRef = db.collection('transactions').doc();
-        batch.set(txRef, {
+        const baseTx = {
             userId: user.uid,
             date: date,
             amount: amount,
@@ -3778,7 +3911,9 @@ window.saveWithdrawal = async function() {
             relatedId: id, // Link to investment ID even if deleted (for history)
             section: 'investments',
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        };
+        const enrichedTx = getEnrichedTransactionPayload(baseTx, mode, bankAccountId);
+        batch.set(txRef, enrichedTx);
 
         // 3. Update Wallet if selected
         if (mode === 'wallet' && walletId) {
@@ -3805,13 +3940,15 @@ window.saveWithdrawal = async function() {
     }
 };
 
-window.showDepositInvestmentModal = function(id) {
+window.showDepositInvestmentModal = async function(id) {
     const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('depositInvestmentModal'));
     document.getElementById('deposit-form').reset();
     document.getElementById('deposit-id').value = id;
     document.getElementById('deposit-date').value = new Date().toISOString().split('T')[0];
+    
+    await window.populateLoanPaymentSelects();
+    
     toggleDepositFields();
-    window.populateLoanPaymentSelects();
     modal.show();
 };
 
@@ -3819,14 +3956,20 @@ window.toggleDepositFields = function() {
     const mode = document.getElementById('deposit-payment-mode').value;
     const walletDiv = document.getElementById('div-deposit-wallet');
     const ccDiv = document.getElementById('div-deposit-credit-card');
+    const baDiv = document.getElementById('div-deposit-bank-account');
     
-    walletDiv.classList.add('d-none');
-    ccDiv.classList.add('d-none');
+    if (walletDiv) walletDiv.classList.add('d-none');
+    if (ccDiv) ccDiv.classList.add('d-none');
+    if (baDiv) baDiv.classList.add('d-none');
+
+    const BANK_MODES = new Set(['bank', 'upi']);
 
     if (mode === 'wallet') {
-        walletDiv.classList.remove('d-none');
+        if (walletDiv) walletDiv.classList.remove('d-none');
     } else if (mode === 'credit-card') {
-        ccDiv.classList.remove('d-none');
+        if (ccDiv) ccDiv.classList.remove('d-none');
+    } else if (BANK_MODES.has(mode)) {
+        if (baDiv) baDiv.classList.remove('d-none');
     }
 };
 
@@ -3839,6 +3982,7 @@ window.saveDeposit = async function() {
     const mode = document.getElementById('deposit-payment-mode').value;
     const walletId = document.getElementById('deposit-wallet').value;
     const creditCardId = document.getElementById('deposit-credit-card').value;
+    const bankAccountId = document.getElementById('deposit-bank-account')?.value || '';
     const user = auth.currentUser;
 
     if (!amount || amount <= 0) {
@@ -3865,7 +4009,7 @@ window.saveDeposit = async function() {
 
         // 2. Add Transaction (Expense)
         const txRef = db.collection('transactions').doc();
-        batch.set(txRef, {
+        const baseTx = {
             userId: user.uid,
             date: date,
             amount: amount,
@@ -3877,7 +4021,9 @@ window.saveDeposit = async function() {
             investmentId: id,
             section: 'investments',
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        };
+        const enrichedTx = getEnrichedTransactionPayload(baseTx, mode, bankAccountId);
+        batch.set(txRef, enrichedTx);
 
         // 3. Deduct from Wallet if selected
         if (mode === 'wallet' && walletId) {
