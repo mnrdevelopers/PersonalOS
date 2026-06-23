@@ -7,6 +7,21 @@ window.loadHabitsSection = async function() {
                 <i class="fas fa-plus me-2"></i>New Habit
             </button>
         </div>
+
+        <!-- Quick Guide -->
+        <details class="section-guide-card mb-4 animate-fade-in">
+            <summary class="section-guide-header">
+                <span class="section-guide-title"><i class="fas fa-compass"></i> Habits Tracker Guide</span>
+            </summary>
+            <div class="section-guide-content">
+                <ul class="section-guide-steps">
+                    <li><strong>Build Mode (Good Habits)</strong>: Track positive activities you want to build. Check them off daily to increase your completion streaks.</li>
+                    <li><strong>Abstinence Mode (Quit Habits)</strong>: Log daily habits you want to drop. The dashboard tracks days clean, relapses, and estimates money saved based on daily cost offsets.</li>
+                    <li><strong>Streaks & Progress</strong>: Streaks auto-calculate based on daily checks. Habits can be set as daily, weekly, or custom frequencies.</li>
+                </ul>
+            </div>
+        </details>
+
         <div class="row" id="habits-grid">
             <div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>
         </div>

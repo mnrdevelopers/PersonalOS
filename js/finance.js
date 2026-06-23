@@ -218,6 +218,20 @@ window.loadFinanceSection = async function() {
     const container = document.getElementById('finance-section');
     container.innerHTML = `
         <div class="finance-shell finance-classic">
+        <!-- Quick Guide -->
+        <details class="section-guide-card mb-4 animate-fade-in">
+            <summary class="section-guide-header">
+                <span class="section-guide-title"><i class="fas fa-compass"></i> Finance Guide</span>
+            </summary>
+            <div class="section-guide-content">
+                <ul class="section-guide-steps">
+                    <li><strong>Workspace Layout</strong>: Manage your income, expenses, bank accounts, and scheduled recurring rules from one dashboard.</li>
+                    <li><strong>Transfers vs. Income/Expenses</strong>: Record transfers to move money between cash and bank accounts. Transfers update account totals without inflating your income or expense logs.</li>
+                    <li><strong>Quick Integrations</strong>: Click "Categories" to create custom emojis and color tags, or select PDF/CSV to export report spreadsheets.</li>
+                </ul>
+            </div>
+        </details>
+
         <div class="finance-hero card border-0 shadow-lg rounded-4 overflow-hidden animate-slide-up mb-4">
             <div class="card-body p-3 p-lg-4 finance-hero-body position-relative">
                 <div class="finance-hero-glow finance-hero-glow-1"></div>

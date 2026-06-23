@@ -16,6 +16,21 @@ window.loadExpirySection = async function() {
             </div>
         </div>
         
+        <!-- Quick Guide -->
+        <details class="section-guide-card mb-4 animate-fade-in">
+            <summary class="section-guide-header">
+                <span class="section-guide-title"><i class="fas fa-compass"></i> Document Tracker Guide</span>
+            </summary>
+            <div class="section-guide-content">
+                <ul class="section-guide-steps">
+                    <li><strong>Document Expiries</strong>: Add expiries for cards, agreements, insurance, and personal identification to receive advance email warnings.</li>
+                    <li><strong>Issue Date Progress</strong>: Adding an optional issue date shows a visual validity usage percentage bar (e.g. active vs expiring vs expired).</li>
+                    <li><strong>Update Limits</strong>: Track lifetime limits on official document edits (e.g. Aadhaar name/birthdate changes, passport modifications).</li>
+                    <li><strong>Renew Logs</strong>: Quickly log document renewals to archive history and set new future validation durations.</li>
+                </ul>
+            </div>
+        </details>
+        
         <div class="row mb-4">
             <div class="col-md-8">
                 <ul class="nav nav-tabs">

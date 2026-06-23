@@ -8,6 +8,20 @@ window.loadRemindersSection = async function() {
             </button>
         </div>
         
+        <!-- Quick Guide -->
+        <details class="section-guide-card mb-4 animate-fade-in">
+            <summary class="section-guide-header">
+                <span class="section-guide-title"><i class="fas fa-compass"></i> Tasks & Reminders Guide</span>
+            </summary>
+            <div class="section-guide-content">
+                <ul class="section-guide-steps">
+                    <li><strong>Task Tracking</strong>: Keep a checklist of your pending and completed personal or professional tasks.</li>
+                    <li><strong>Priority Tags</strong>: Categorize tasks as High (red), Medium (orange), or Low (green) priority. High priority tasks trigger urgent notices in your inbox.</li>
+                    <li><strong>Active Notifications</strong>: Toggle notification alerts to receive dashboard alert messages when task deadlines draw close.</li>
+                </ul>
+            </div>
+        </details>
+
         <ul class="nav nav-tabs mb-4">
             <li class="nav-item">
                 <a class="nav-link active" href="javascript:void(0)" onclick="filterTasks('pending', this)">Pending</a>

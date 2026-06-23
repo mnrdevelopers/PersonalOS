@@ -816,6 +816,106 @@ body {
     }
 }
 
+/* Section Guide Card Component */
+.section-guide-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--border-radius);
+    padding: 14px 18px;
+    box-shadow: var(--glass-shadow);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: all 0.3s ease;
+}
+
+.section-guide-card[open] {
+    box-shadow: var(--shadow-md);
+}
+
+.section-guide-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    font-weight: 700;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.9rem;
+    color: var(--text-color);
+    list-style: none; /* Hide default list style marker */
+    outline: none;
+    user-select: none;
+}
+
+.section-guide-header::-webkit-details-marker {
+    display: none; /* Hide default list style marker in Safari */
+}
+
+.section-guide-header::after {
+    content: '\f078'; /* fa-chevron-down */
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    font-size: 0.8rem;
+    transition: transform 0.3s ease;
+    opacity: 0.7;
+}
+
+.section-guide-card[open] .section-guide-header::after {
+    transform: rotate(180deg);
+}
+
+.section-guide-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.section-guide-title i {
+    color: var(--primary-color);
+    font-size: 1rem;
+}
+
+[data-theme="dark"] .section-guide-title i {
+    color: var(--secondary-color);
+}
+
+.section-guide-content {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
+    font-size: 0.82rem;
+    line-height: 1.45;
+    color: var(--text-color);
+    opacity: 0.9;
+}
+
+.section-guide-steps {
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: 0;
+}
+
+.section-guide-steps li {
+    position: relative;
+    padding-left: 18px;
+    margin-bottom: 6px;
+}
+
+.section-guide-steps li::before {
+    content: '✦';
+    position: absolute;
+    left: 0;
+    color: var(--primary-color);
+    font-size: 0.75rem;
+}
+
+[data-theme="dark"] .section-guide-steps li::before {
+    color: var(--secondary-color);
+}
+
+.section-guide-steps li:last-child {
+    margin-bottom: 0;
+}
+
 /* Dark mode overrides */
 [data-theme="dark"] .card, 
 [data-theme="dark"] .stat-card, 

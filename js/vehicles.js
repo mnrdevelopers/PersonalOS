@@ -160,6 +160,21 @@ window.loadVehiclesSection = async function() {
             </button>
         </div>
 
+        <!-- Quick Guide -->
+        <details class="section-guide-card mb-4 animate-fade-in">
+            <summary class="section-guide-header">
+                <span class="section-guide-title"><i class="fas fa-compass"></i> Vehicle Tracker Guide</span>
+            </summary>
+            <div class="section-guide-content">
+                <ul class="section-guide-steps">
+                    <li><strong>Vehicle Logging</strong>: Track mileage efficiency, fuel refuels, toll charges, or maintenance service logs for each of your vehicles.</li>
+                    <li><strong>FASTag Balance</strong>: Track FASTag digital toll balances, set low balance warnings, and log direct recharges.</li>
+                    <li><strong>Maintenance Alerts</strong>: Configure service alerts based on odometer checkpoints. The app will warn you when your odometer draws close to target limits.</li>
+                    <li><strong>Document Expiries</strong>: Add expiry dates for Registration Certificates (RC), Pollution certificates (PUC), or Insurance to avoid fines.</li>
+                </ul>
+            </div>
+        </details>
+        
         <!-- Global Stats -->
         <div class="row g-4 mb-4" id="vehicle-global-stats">
             <div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>

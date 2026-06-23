@@ -648,6 +648,21 @@ window.loadGroceriesSection = async function() {
             </div>
         </div>
 
+        <!-- Quick Guide -->
+        <details class="section-guide-card mb-4 animate-fade-in">
+            <summary class="section-guide-header">
+                <span class="section-guide-title"><i class="fas fa-compass"></i> Grocery Tracker Guide</span>
+            </summary>
+            <div class="section-guide-content">
+                <ul class="section-guide-steps">
+                    <li><strong>Shopping Lists</strong>: Create and modify lists of items you need to buy. Check items off as you shop.</li>
+                    <li><strong>Inventory Management</strong>: Keep track of item stocks, categories, standard units, and price histories.</li>
+                    <li><strong>Checkout Logs & Basket Planner</strong>: Formulate shopping runs and save logs, automatically calculating your average monthly spends and basket cost.</li>
+                    <li><strong>Smart Auto-Categorization</strong>: Type in common ingredients (like Apples, Milk, Potatoes) and the tracker will auto-fill matching categories and catalog details.</li>
+                </ul>
+            </div>
+        </details>
+
         <!-- Stats Row -->
         <div class="row g-4 mb-4">
             <div class="col-md-3">

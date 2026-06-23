@@ -17,6 +17,22 @@ window.loadProfileSection = async function() {
 
     container.innerHTML = `
         <h2 class="mb-4">My Profile</h2>
+        
+        <!-- Quick Guide -->
+        <details class="section-guide-card mb-4 animate-fade-in">
+            <summary class="section-guide-header">
+                <span class="section-guide-title"><i class="fas fa-compass"></i> Profile Guide</span>
+            </summary>
+            <div class="section-guide-content">
+                <ul class="section-guide-steps">
+                    <li><strong>Custom Avatars</strong>: Choose a custom avatar representing your age group or select an emoji to personalize your account style.</li>
+                    <li><strong>Account Preferences</strong>: Modify your display name and default currency symbol (INR, USD, EUR) to customize data logs.</li>
+                    <li><strong>Theme Configuration</strong>: Select between Light, Dark, or System Auto themes. Changes apply instantly across all workspaces.</li>
+                    <li><strong>Account Synchronization</strong>: Your profile and settings are linked securely to your account, ensuring full cross-device synchronization.</li>
+                </ul>
+            </div>
+        </details>
+
         <div class="row">
             <div class="col-md-4 mb-4">
                 <div class="card text-center p-4">

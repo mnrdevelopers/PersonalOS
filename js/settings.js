@@ -7,6 +7,21 @@ window.loadSettingsSection = async function() {
     container.innerHTML = `
         <h2 class="mb-4">App Settings</h2>
         
+        <!-- Quick Guide -->
+        <details class="section-guide-card mb-4 animate-fade-in">
+            <summary class="section-guide-header">
+                <span class="section-guide-title"><i class="fas fa-compass"></i> Settings Guide</span>
+            </summary>
+            <div class="section-guide-content">
+                <ul class="section-guide-steps">
+                    <li><strong>Appearance Customization</strong>: Change system themes (Light, Dark, Auto) and default currency displays globally.</li>
+                    <li><strong>Granular Notifications</strong>: Enable or disable browser push alerts and audio sounds for tasks, expiries, vehicles, and loan payouts.</li>
+                    <li><strong>Data Export & Backups</strong>: Download all logged records of transactions, habits, and tasks into a portable JSON backup file.</li>
+                    <li><strong>Account Security</strong>: Permanently delete your user profile and Firestore database records from the Danger Zone.</li>
+                </ul>
+            </div>
+        </details>
+
         <div class="card mb-4">
             <div class="card-header">
                 <h5 class="mb-0">Appearance & Preferences</h5>

@@ -8,6 +8,20 @@ window.loadEntertainmentSection = async function() {
             </button>
         </div>
         
+        <!-- Quick Guide -->
+        <details class="section-guide-card mb-4 animate-fade-in">
+            <summary class="section-guide-header">
+                <span class="section-guide-title"><i class="fas fa-compass"></i> Entertainment Tracker Guide</span>
+            </summary>
+            <div class="section-guide-content">
+                <ul class="section-guide-steps">
+                    <li><strong>Activity Logging</strong>: Keep logs of movies watched, theaters visited, or personal vacations and tours.</li>
+                    <li><strong>OMDb Magic Fetch</strong>: For movies, enter the title and tap the magic wand icon to auto-fetch the poster and IMDb star ratings.</li>
+                    <li><strong>Ledger Link</strong>: Toggle "Add to Transaction Ledger" to automatically insert ticket or travel costs directly into your financial registers.</li>
+                </ul>
+            </div>
+        </details>
+
         <ul class="nav nav-tabs mb-4">
             <li class="nav-item">
                 <a class="nav-link active" href="javascript:void(0)" onclick="filterEntertainment('all', this)">All</a>

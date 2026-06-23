@@ -64,6 +64,20 @@ window.loadLoansSection = async function() {
     const container = document.getElementById('loans-section');
     container.innerHTML = `
         <div class="loans-shell">
+            <!-- Quick Guide -->
+            <details class="section-guide-card mb-4 animate-fade-in">
+                <summary class="section-guide-header">
+                    <span class="section-guide-title"><i class="fas fa-compass"></i> Loans & Assets Guide</span>
+                </summary>
+                <div class="section-guide-content">
+                    <ul class="section-guide-steps">
+                        <li><strong>Workspace Tabs</strong>: Toggle between Loans/Debts (liabilities/assets), Investments (stocks/gold/SIPs), digital Wallets, and Credit Cards.</li>
+                        <li><strong>Track Repayments</strong>: Open repayments details on any active loan to log repayments, calculate interest splits, or record processing fees.</li>
+                        <li><strong>Integrated Calculators</strong>: Use the toolbar buttons to open the Loan Amortization Calculator to estimate schedules and interest payments.</li>
+                    </ul>
+                </div>
+            </details>
+
             <div class="loans-hero card border-0 shadow-lg rounded-4 overflow-hidden animate-slide-up mb-4">
                 <div class="card-body p-3 p-lg-4">
                     <div class="loans-hero-grid">

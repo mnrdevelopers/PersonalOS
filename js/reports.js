@@ -3,6 +3,20 @@ window.loadReportsSection = async function() {
     container.innerHTML = `
         <h2 class="mb-4">Analytics & Reports</h2>
         
+        <!-- Quick Guide -->
+        <details class="section-guide-card mb-4 animate-fade-in">
+            <summary class="section-guide-header">
+                <span class="section-guide-title"><i class="fas fa-compass"></i> Reports Guide</span>
+            </summary>
+            <div class="section-guide-content">
+                <ul class="section-guide-steps">
+                    <li><strong>Financial Trends</strong>: View interactive charts showcasing month-on-month credit vs debit comparisons, as well as a doughnut breakdown of expense categories.</li>
+                    <li><strong>Productivity Insights</strong>: Track streaks for your top positive habits and inspect the current priority breakdown of pending tasks.</li>
+                    <li><strong>Interactivity</strong>: Hover over any chart segment to see the exact numerical values and labels.</li>
+                </ul>
+            </div>
+        </details>
+        
         <!-- Finance Section -->
         <h4 class="mb-3 text-primary"><i class="fas fa-wallet me-2"></i>Finance</h4>
         <div class="row g-4 mb-5">

@@ -74,6 +74,20 @@ window.loadTransactionsSection = async function() {
             </div>
         </div>
 
+        <!-- Quick Guide -->
+        <details class="section-guide-card mb-4 animate-fade-in">
+            <summary class="section-guide-header">
+                <span class="section-guide-title"><i class="fas fa-compass"></i> Transaction Ledger Guide</span>
+            </summary>
+            <div class="section-guide-content">
+                <ul class="section-guide-steps">
+                    <li><strong>Ledger History</strong>: View a unified, sequential credit-debit statement of all account balances and transaction entries.</li>
+                    <li><strong>Filtering & Searching</strong>: Search transaction descriptions, filter by financial years, custom date ranges, or view specific accounts (Cash/Bank).</li>
+                    <li><strong>Reports Export</strong>: Download your ledger records at any time using the "Export PDF" or "Export CSV" buttons.</li>
+                </ul>
+            </div>
+        </details>
+
         <div class="row g-3 mb-4">
             <div class="col-md-4">
                 <div class="card border-success h-100 shadow-sm">

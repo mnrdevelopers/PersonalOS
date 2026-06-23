@@ -16,6 +16,20 @@ window.loadNotificationsSection = async function() {
             </div>
         </div>
 
+        <!-- Quick Guide -->
+        <details class="section-guide-card mb-4 animate-fade-in">
+            <summary class="section-guide-header">
+                <span class="section-guide-title"><i class="fas fa-compass"></i> Notifications Guide</span>
+            </summary>
+            <div class="section-guide-content">
+                <ul class="section-guide-steps">
+                    <li><strong>Inbox Hub</strong>: View important system updates, upcoming task deadlines, vehicle service schedules, and item expiries here.</li>
+                    <li><strong>Snooze Alerts</strong>: Tap the Snooze button on any notification card to temporarily snooze the alert for 1 day, 3 days, or 1 week.</li>
+                    <li><strong>Management Actions</strong>: Use the header buttons to quickly clear your read system notifications or mark all system alerts as read at once.</li>
+                </ul>
+            </div>
+        </details>
+
         <ul class="nav nav-pills mb-4 gap-2">
             <li class="nav-item">
                 <a class="nav-link active" href="javascript:void(0)" onclick="filterNotificationView('all', this)">All</a>
