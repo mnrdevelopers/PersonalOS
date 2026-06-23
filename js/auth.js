@@ -97,7 +97,13 @@ class AuthManager {
         const messageDiv = document.getElementById('auth-message');
         if (!messageDiv) return;
 
-        messageDiv.textContent = message;
+        // Clear active timeout
+        if (this.messageTimeout) {
+            clearTimeout(this.messageTimeout);
+            this.messageTimeout = null;
+        }
+
+        messageDiv.innerHTML = message;
         messageDiv.className = `alert alert-${type} alert-dismissible fade show mt-3`;
         messageDiv.classList.remove('d-none');
         
@@ -110,11 +116,15 @@ class AuthManager {
             messageDiv.appendChild(closeBtn);
         }
         
-        setTimeout(() => {
-            if (messageDiv && !messageDiv.classList.contains('d-none')) {
-                messageDiv.classList.add('d-none');
-            }
-        }, 5000);
+        // Auto-dismiss success messages after 5 seconds.
+        // Let danger/warning messages persist so the user can read and click links.
+        if (type === 'success') {
+            this.messageTimeout = setTimeout(() => {
+                if (messageDiv && !messageDiv.classList.contains('d-none')) {
+                    messageDiv.classList.add('d-none');
+                }
+            }, 5000);
+        }
     }
 
     clearMessages() {
@@ -170,6 +180,8 @@ class AuthManager {
         } catch (error) {
             this.setButtonLoading(btn, false, originalContent);
             let errorMessage = 'Login failed. ';
+            let bindListeners = false;
+            
             switch (error.code) {
                 case 'auth/invalid-email':
                     errorMessage += 'Invalid email address.';
@@ -178,15 +190,44 @@ class AuthManager {
                     errorMessage += 'This account has been disabled.';
                     break;
                 case 'auth/user-not-found':
-                    errorMessage += 'No account found with this email.';
+                    errorMessage += 'No account found with this email. If you don\'t have an account, please <a href="#" id="auth-warn-register-link" class="alert-link fw-bold text-decoration-underline">Sign Up / Register</a> first.';
+                    bindListeners = true;
                     break;
                 case 'auth/wrong-password':
-                    errorMessage += 'Incorrect password.';
+                    errorMessage += 'Incorrect password. If you forgot your password, you can <a href="#" id="auth-warn-reset-link" class="alert-link fw-bold text-decoration-underline">Reset Password</a>. If you do not have an account, please <a href="#" id="auth-warn-register-link" class="alert-link fw-bold text-decoration-underline">Sign Up / Register</a>.';
+                    bindListeners = true;
+                    break;
+                case 'auth/invalid-credential':
+                    errorMessage += 'Invalid credentials. If you do not have an account, please <a href="#" id="auth-warn-register-link" class="alert-link fw-bold text-decoration-underline">Sign Up / Register</a>. If you forgot your password, please <a href="#" id="auth-warn-reset-link" class="alert-link fw-bold text-decoration-underline">Reset Password</a>.';
+                    bindListeners = true;
                     break;
                 default:
                     errorMessage += error.message;
             }
+            
             this.showMessage(errorMessage, 'danger');
+            
+            if (bindListeners) {
+                // Add event listener to transition to Register Form
+                document.getElementById('auth-warn-register-link')?.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.showForm('register');
+                    const registerEmailInput = document.getElementById('register-email');
+                    if (registerEmailInput && email) {
+                        registerEmailInput.value = email;
+                    }
+                });
+                
+                // Add event listener to transition to Forgot Password Form
+                document.getElementById('auth-warn-reset-link')?.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.showForm('forgot');
+                    const resetEmailInput = document.getElementById('reset-email');
+                    if (resetEmailInput && email) {
+                        resetEmailInput.value = email;
+                    }
+                });
+            }
         }
     }
 
