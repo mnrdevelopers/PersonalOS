@@ -631,17 +631,12 @@ window.loadGroceriesSection = async function() {
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2 class="fw-bold gradient-text mb-0">Grocery Tracker</h2>
             <div>
-                <div class="btn-group me-2">
-                    <button class="btn btn-outline-primary" onclick="showAddGroceryItemModal()">
-                        <i class="fas fa-plus me-2"></i>Add Item
-                    </button>
-                    <button type="button" class="btn btn-outline-primary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
-                        <span class="visually-hidden">Toggle Dropdown</span>
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" href="javascript:void(0)" onclick="importCatalog()"><i class="fas fa-file-import me-2"></i>Import Catalog to Inventory</a></li>
-                    </ul>
-                </div>
+                <button class="btn btn-outline-primary me-2" onclick="showAddGroceryItemModal()">
+                    <i class="fas fa-plus me-2"></i>Add Item
+                </button>
+                <button class="btn btn-outline-secondary me-2" onclick="importCatalog()">
+                    <i class="fas fa-file-import me-2"></i>Import Catalog
+                </button>
                 <button class="btn btn-success" id="btn-checkout-fab" onclick="initiateCheckout()" style="display: none;">
                     <i class="fas fa-shopping-cart me-2"></i>Checkout (<span id="cart-count">0</span>)
                 </button>
@@ -719,12 +714,23 @@ window.loadGroceriesSection = async function() {
 
         <div class="card border-0 shadow-sm mb-4">
             <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                    <h6 class="mb-0 fw-bold text-uppercase small text-muted">Monthly Product Spend</h6>
-                    <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <select class="form-select form-select-sm w-auto" id="grocery-spend-month" onchange="updateGrocerySpendAnalytics()" style="width: 170px;"></select>
-                        <input type="text" class="form-control form-control-sm w-auto" id="grocery-spend-product-search" placeholder="Search product..." oninput="searchGrocerySpendProduct(this.value)" style="width: 180px;">
-                        <select class="form-select form-select-sm w-auto" id="grocery-spend-product" onchange="updateGrocerySpendAnalytics()" style="width: 190px;"></select>
+                <div class="row align-items-center g-3 mb-4">
+                    <div class="col-lg-4">
+                        <h6 class="mb-1 fw-bold text-uppercase small text-muted"><i class="fas fa-chart-pie me-2 text-primary"></i>Monthly Product Spend</h6>
+                        <div class="small text-muted">Track spend history for specific items</div>
+                    </div>
+                    <div class="col-lg-8">
+                        <div class="row g-2 justify-content-lg-end">
+                            <div class="col-sm-4 col-12">
+                                <select class="form-select form-select-sm" id="grocery-spend-month" onchange="updateGrocerySpendAnalytics()"></select>
+                            </div>
+                            <div class="col-sm-4 col-12">
+                                <input type="text" class="form-control form-control-sm" id="grocery-spend-product-search" placeholder="Search product..." oninput="searchGrocerySpendProduct(this.value)">
+                            </div>
+                            <div class="col-sm-4 col-12">
+                                <select class="form-select form-select-sm" id="grocery-spend-product" onchange="updateGrocerySpendAnalytics()"></select>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="row g-3">
