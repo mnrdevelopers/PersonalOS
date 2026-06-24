@@ -1014,11 +1014,7 @@ class Dashboard {
         if (!container) return;
 
         try {
-            const snapshot = await db.collection('transactions')
-                .where('userId', '==', this.currentUser.uid)
-                .get();
-
-            let docs = snapshot.docs;
+            const docs = await window.getTransactions(this.currentUser.uid);
 
             // Sort docs client-side: date (desc), createdAt (desc), id (desc)
             docs.sort((a, b) => {

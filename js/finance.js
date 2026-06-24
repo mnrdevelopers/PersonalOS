@@ -982,11 +982,7 @@ async function getFinanceTransactionsData() {
     const user = auth.currentUser;
     if (!user) return [];
 
-    const snapshot = await db.collection('transactions')
-        .where('userId', '==', user.uid)
-        .get();
-
-    let docs = snapshot.docs;
+    const docs = await window.getTransactions(user.uid);
 
     // Sort docs client-side: date (desc), createdAt (desc), id (desc)
     docs.sort((a, b) => {

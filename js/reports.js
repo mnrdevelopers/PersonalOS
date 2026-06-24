@@ -79,7 +79,7 @@ async function loadReportCharts() {
 
     // Fetch Data from all collections
     const [transactionsSnap, habitsSnap, tasksSnap, entertainmentSnap] = await Promise.all([
-        db.collection('transactions').where('userId', '==', user.uid).get(),
+        window.getTransactions(user.uid),
         db.collection('habits').where('userId', '==', user.uid).where('active', '==', true).get(),
         db.collection('reminders').where('userId', '==', user.uid).get(),
         db.collection('entertainment').where('userId', '==', user.uid).get()

@@ -205,10 +205,10 @@ async function loadLedgerData() {
     if (window.dashboard) window.dashboard.showLoading();
 
     try {
-        const transactionsSnap = await db.collection('transactions').where('userId', '==', user.uid).get();
+        const docs = await window.getTransactions(user.uid);
         ledgerAllEntries = [];
 
-        transactionsSnap.forEach(doc => {
+        docs.forEach(doc => {
             const data = doc.data();
             createLedgerEntriesFromTransaction(data).forEach(entry => ledgerAllEntries.push(entry));
         });
