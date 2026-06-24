@@ -759,6 +759,61 @@ body {
         height: auto !important;
         min-height: 100vh;
     }
+
+    /* Mobile Header Layout Enhancements */
+    .navbar > .container-fluid {
+        flex-wrap: nowrap !important;
+    }
+    
+    .navbar {
+        padding: calc(0.35rem + env(safe-area-inset-top)) 0.75rem 0.35rem !important;
+    }
+    
+    .navbar-brand {
+        font-size: 1.15rem !important;
+        margin-right: 6px !important;
+        white-space: nowrap;
+        display: flex;
+        align-items: center;
+    }
+    
+    .navbar-brand i {
+        margin-right: 4px !important;
+    }
+
+    .navbar .btn-link {
+        padding: 6px 8px !important;
+        margin-right: 4px !important;
+    }
+    
+    #nav-back-btn {
+        padding-left: 0 !important;
+        padding-right: 4px !important;
+        margin-right: 4px !important;
+    }
+    
+    #hamburger-menu {
+        margin-right: 0 !important;
+        padding: 4px !important;
+    }
+    
+    .hamburger-lines {
+        width: 24px;
+        height: 18px;
+    }
+    
+    .hamburger-lines span {
+        height: 2.5px;
+    }
+    
+    @media (max-width: 380px) {
+        .navbar-brand span {
+            display: none !important;
+        }
+        .navbar-brand {
+            margin-right: 4px !important;
+        }
+    }
 }
 
 @media (max-width: 768px) {
