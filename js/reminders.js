@@ -56,49 +56,49 @@ async function loadTasks(status) {
             .orderBy('dueDate', isCompleted ? 'desc' : 'asc')
             .get();
 
-    const container = document.getElementById('tasks-list');
-    if (snapshot.empty) {
-        container.innerHTML = `<div class="text-center text-muted py-5">No ${status} tasks found.</div>`;
-        return;
-    }
+        const container = document.getElementById('tasks-list');
+        if (snapshot.empty) {
+            container.innerHTML = `<div class="text-center text-muted py-5">No ${status} tasks found.</div>`;
+            return;
+        }
 
-    container.innerHTML = '';
-    snapshot.forEach(doc => {
-        const task = doc.data();
-        const priorityColors = { low: 'success', medium: 'warning', high: 'danger' };
-        const priorityColor = priorityColors[task.priority] || 'secondary';
-        const notifIcon = task.sendNotification ? '<i class="fas fa-bell text-warning ms-2" title="Notification Enabled"></i>' : '';
-        
-        const item = document.createElement('div');
-        item.className = `list-group-item list-group-item-action d-flex justify-content-between align-items-center p-3 ${task.completed ? 'bg-light' : ''}`;
-        item.innerHTML = `
-            <div class="d-flex align-items-center">
-                <input class="form-check-input me-3" type="checkbox" 
-                    ${task.completed ? 'checked' : ''} 
-                    onchange="window.toggleTaskCompletion('${doc.id}', this.checked); setTimeout(() => loadTasks('${status}'), 500);">
-                <div>
-                    <h6 class="mb-1 ${task.completed ? 'text-decoration-line-through text-muted' : ''}">${task.title} ${notifIcon}</h6>
-                    <small class="text-muted">
-                        <i class="far fa-calendar me-1"></i> ${new Date(task.dueDate).toLocaleDateString()}
-                        ${task.time ? `<i class="far fa-clock ms-2 me-1"></i> ${task.time}` : ''}
-                    </small>
+        container.innerHTML = '';
+        snapshot.forEach(doc => {
+            const task = doc.data();
+            const priorityColors = { low: 'success', medium: 'warning', high: 'danger' };
+            const priorityColor = priorityColors[task.priority] || 'secondary';
+            const notifIcon = task.sendNotification ? '<i class="fas fa-bell text-warning ms-2" title="Notification Enabled"></i>' : '';
+            
+            const item = document.createElement('div');
+            item.className = `list-group-item list-group-item-action d-flex justify-content-between align-items-center p-3 ${task.completed ? 'bg-light' : ''}`;
+            item.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <input class="form-check-input me-3" type="checkbox" 
+                        ${task.completed ? 'checked' : ''} 
+                        onchange="window.toggleTaskCompletion('${doc.id}', this.checked); setTimeout(() => loadTasks('${status}'), 500);">
+                    <div>
+                        <h6 class="mb-1 ${task.completed ? 'text-decoration-line-through text-muted' : ''}">${task.title} ${notifIcon}</h6>
+                        <small class="text-muted">
+                            <i class="far fa-calendar me-1"></i> ${new Date(task.dueDate).toLocaleDateString()}
+                            ${task.time ? `<i class="far fa-clock ms-2 me-1"></i> ${task.time}` : ''}
+                        </small>
+                    </div>
                 </div>
-            </div>
-            <div class="d-flex align-items-center">
-                <span class="badge bg-${priorityColor} me-3">${task.priority}</span>
-                <button class="btn btn-sm btn-outline-info me-1" onclick="viewTask('${doc.id}')" title="View Details">
-                    <i class="fas fa-eye"></i>
-                </button>
-                <button class="btn btn-sm btn-outline-primary me-1" onclick="editReminder('${doc.id}')">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteTask('${doc.id}')">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </div>
-        `;
-        container.appendChild(item);
-    });
+                <div class="d-flex align-items-center">
+                    <span class="badge bg-${priorityColor} me-3">${task.priority}</span>
+                    <button class="btn btn-sm btn-outline-info me-1" onclick="viewTask('${doc.id}')" title="View Details">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editReminder('${doc.id}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteTask('${doc.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+            container.appendChild(item);
+        });
     } catch (error) {
         console.error("Error loading tasks:", error);
         document.getElementById('tasks-list').innerHTML = '<div class="text-center text-danger py-5">Error loading tasks.</div>';

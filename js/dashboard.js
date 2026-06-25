@@ -25,17 +25,21 @@ class Dashboard {
             this.switchSection('dashboard');
         }
         this.startGlobalAlertSystem();
-        this.processRecurringTransactions();
+        // Await recurring transactions so hideLoading() only fires after processing completes
+        await this.processRecurringTransactions();
         this.hideLoading();
     }
 
     async checkAuth() {
         return new Promise((resolve) => {
-            auth.onAuthStateChanged(async (user) => {
+            // Unsubscribe immediately after first call to prevent ghost re-initializations
+            const unsubscribe = auth.onAuthStateChanged(async (user) => {
                 if (user) {
                     this.currentUser = user;
+                    unsubscribe();
                     resolve();
                 } else {
+                    unsubscribe();
                     window.location.href = 'auth.html';
                 }
             });
@@ -433,16 +437,22 @@ class Dashboard {
     }
 
     hideLoading() {
+        // Reference counter: only hide when all concurrent callers have finished
+        this._loadingCount = Math.max(0, (this._loadingCount || 0) - 1);
+        if (this._loadingCount > 0) return;
         const loading = document.getElementById('loading');
         if (loading) {
             loading.style.opacity = '0';
             setTimeout(() => {
-                loading.style.display = 'none';
+                if (this._loadingCount === 0) {
+                    loading.style.display = 'none';
+                }
             }, 300);
         }
     }
 
     showLoading() {
+        this._loadingCount = (this._loadingCount || 0) + 1;
         const loading = document.getElementById('loading');
         if (loading) {
             loading.style.display = 'flex';
@@ -793,11 +803,18 @@ class Dashboard {
     }
 
     calculateNextDate(dateStr, frequency) {
-        const date = new Date(dateStr);
+        // Parse date parts explicitly to avoid UTC vs local timezone off-by-one errors
+        // (e.g. '2026-06-25' parsed as UTC midnight appears as June 24 in IST UTC+5:30)
+        const [year, month, day] = dateStr.split('-').map(Number);
+        const date = new Date(year, month - 1, day); // Local midnight
         if (frequency === 'weekly') date.setDate(date.getDate() + 7);
         else if (frequency === 'monthly') date.setMonth(date.getMonth() + 1);
         else if (frequency === 'yearly') date.setFullYear(date.getFullYear() + 1);
-        return date.toISOString().split('T')[0];
+        // Format back as YYYY-MM-DD in local timezone
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
     }
 
     async processRecurringTransactions() {

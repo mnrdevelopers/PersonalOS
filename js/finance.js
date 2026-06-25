@@ -1044,15 +1044,6 @@ async function loadFinanceData(filter = null) {
 
     try {
         let docs = await getFinanceTransactionsData();
-        console.log("ALL_TRANSACTIONS_DUMP:", JSON.stringify(docs.map(doc => {
-            const data = doc.data();
-            data.id = doc.id;
-            return data;
-        })));
-        if (window.getUserBankAccounts) {
-            const accounts = await window.getUserBankAccounts();
-            console.log("ALL_ACCOUNTS_DUMP:", JSON.stringify(accounts));
-        }
         const tbody = document.getElementById('finance-table-body');
         const prevBtn = document.getElementById('btn-finance-prev');
         const nextBtn = document.getElementById('btn-finance-next');

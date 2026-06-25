@@ -19,10 +19,11 @@ if ('serviceWorker' in navigator) {
             })
             .catch((err) => console.log('Service Worker registration failed', err));
             
-        // Handle controller change
-        let refreshing;
+        // Handle controller change — guard with refreshing flag so notification fires only once
+        let refreshing = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
             if (refreshing) return;
+            refreshing = true;
             if (navigator.serviceWorker.controller) {
                 showUpdateNotification();
             }
