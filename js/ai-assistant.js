@@ -25,6 +25,32 @@ function injectAIAssistantStyles() {
             animation: fadeIn 0.4s ease;
             width: 100%;
         }
+        .ai-context-selector {
+            background: rgba(255, 255, 255, 0.6);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+            flex-shrink: 0;
+        }
+        [data-bs-theme="dark"] .ai-context-selector {
+            background: rgba(30, 41, 59, 0.4);
+            border-color: rgba(255, 255, 255, 0.06) !important;
+        }
+        .btn-context-pill {
+            font-size: 0.75rem !important;
+            padding: 0.25rem 0.65rem !important;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            background: var(--bs-body-bg);
+            color: var(--bs-body-color);
+            border-radius: 50px;
+            transition: all 0.2s ease;
+        }
+        .btn-context-pill.active {
+            background: #6366f1 !important;
+            color: #ffffff !important;
+            border-color: #6366f1 !important;
+        }
+        [data-bs-theme="dark"] .btn-context-pill {
+            border-color: rgba(255, 255, 255, 0.08);
+        }
         .ai-prompts-bar {
             background: rgba(255, 255, 255, 0.45);
             border-top: 1px solid rgba(0, 0, 0, 0.06);
@@ -609,17 +635,35 @@ Here is the user's current live data summary from their PersonalOS database:
 `;
 
     try {
-        // Fetch all database snapshots in parallel to reduce network latency
-        const [accountsSnap, ccSnap, walletSnap, txSnap, tasksSnap, grocerySnap] = await Promise.all([
-            db.collection('bank_accounts').where('userId', '==', user.uid).get(),
-            db.collection('credit_cards').where('userId', '==', user.uid).get(),
-            db.collection('wallets').where('userId', '==', user.uid).get(),
-            db.collection('transactions').where('userId', '==', user.uid).orderBy('date', 'desc').limit(10).get(),
-            db.collection('reminders').where('userId', '==', user.uid).where('completed', '==', false).limit(10).get(),
-            db.collection('grocery_items').where('userId', '==', user.uid).where('status', '==', 'to_buy').get()
-        ]);
+        const scope = window.activeAIContextScope || 'all';
+        const promises = [];
+        
+        // Push conditional queries based on chosen scope
+        if (scope === 'all' || scope === 'finance') {
+            promises.push(db.collection('bank_accounts').where('userId', '==', user.uid).get());
+            promises.push(db.collection('credit_cards').where('userId', '==', user.uid).get());
+            promises.push(db.collection('wallets').where('userId', '==', user.uid).get());
+            promises.push(db.collection('transactions').where('userId', '==', user.uid).orderBy('date', 'desc').limit(10).get());
+        } else {
+            promises.push(Promise.resolve(null), Promise.resolve(null), Promise.resolve(null), Promise.resolve(null));
+        }
 
-        if (!accountsSnap.empty) {
+        if (scope === 'all' || scope === 'tasks') {
+            promises.push(db.collection('reminders').where('userId', '==', user.uid).where('completed', '==', false).limit(10).get());
+        } else {
+            promises.push(Promise.resolve(null));
+        }
+
+        if (scope === 'all' || scope === 'groceries') {
+            promises.push(db.collection('grocery_items').where('userId', '==', user.uid).where('status', '==', 'to_buy').get());
+        } else {
+            promises.push(Promise.resolve(null));
+        }
+
+        // Fetch snapshots in parallel to minimize latency
+        const [accountsSnap, ccSnap, walletSnap, txSnap, tasksSnap, grocerySnap] = await Promise.all(promises);
+
+        if (accountsSnap && !accountsSnap.empty) {
             context += `- Bank Accounts:\n`;
             accountsSnap.forEach(doc => {
                 const d = doc.data();
@@ -627,7 +671,7 @@ Here is the user's current live data summary from their PersonalOS database:
             });
         }
         
-        if (!ccSnap.empty) {
+        if (ccSnap && !ccSnap.empty) {
             context += `- Credit Cards:\n`;
             ccSnap.forEach(doc => {
                 const d = doc.data();
@@ -635,7 +679,7 @@ Here is the user's current live data summary from their PersonalOS database:
             });
         }
 
-        if (!walletSnap.empty) {
+        if (walletSnap && !walletSnap.empty) {
             context += `- Digital Wallets:\n`;
             walletSnap.forEach(doc => {
                 const d = doc.data();
@@ -643,7 +687,7 @@ Here is the user's current live data summary from their PersonalOS database:
             });
         }
 
-        if (!txSnap.empty) {
+        if (txSnap && !txSnap.empty) {
             context += `- Last 10 Ledger Transactions:\n`;
             txSnap.forEach(doc => {
                 const d = doc.data();
@@ -651,7 +695,7 @@ Here is the user's current live data summary from their PersonalOS database:
             });
         }
 
-        if (!tasksSnap.empty) {
+        if (tasksSnap && !tasksSnap.empty) {
             context += `- Uncompleted Tasks / Reminders:\n`;
             tasksSnap.forEach(doc => {
                 const d = doc.data();
@@ -659,7 +703,7 @@ Here is the user's current live data summary from their PersonalOS database:
             });
         }
 
-        if (!grocerySnap.empty) {
+        if (grocerySnap && !grocerySnap.empty) {
             context += `- Items to buy in Grocery List: ${grocerySnap.docs.map(d => d.data().name).join(', ')}\n`;
         }
 
@@ -765,6 +809,19 @@ window.loadAIAssistantSection = async function() {
                     </button>
                 </div>
 
+                <!-- Scope / Context focus selector -->
+                ${hasKey ? `
+                <div class="ai-context-selector d-flex align-items-center gap-2 px-3 py-2 border-bottom">
+                    <span class="text-muted small fw-semibold me-1"><i class="fas fa-filter me-1"></i> Focus:</span>
+                    <div class="d-flex gap-1 overflow-x-auto pb-1 w-100" style="white-space: nowrap;">
+                        <button class="btn btn-context-pill active" data-scope="all" onclick="window.setAIContextScope('all', this)">🌐 All Info</button>
+                        <button class="btn btn-context-pill" data-scope="finance" onclick="window.setAIContextScope('finance', this)">💳 Finances</button>
+                        <button class="btn btn-context-pill" data-scope="tasks" onclick="window.setAIContextScope('tasks', this)">📋 Tasks</button>
+                        <button class="btn btn-context-pill" data-scope="groceries" onclick="window.setAIContextScope('groceries', this)">🛒 Groceries</button>
+                    </div>
+                </div>
+                ` : ''}
+
                 <!-- Message stream / API Setup Fallback -->
                 <div class="ai-chat-messages" id="ai-chat-stream">
                     ${!hasKey ? `
@@ -852,6 +909,33 @@ window.saveTempGeminiKey = function() {
 window.clearAIChatHistory = function() {
     _aiChatHistory = [];
     renderAIChatMessages();
+};
+
+// Set AI context focusing scope
+window.setAIContextScope = function(scope, btnElement) {
+    window.activeAIContextScope = scope;
+    
+    // Deactivate all sibling pills
+    const container = btnElement.closest('.ai-context-selector');
+    if (container) {
+        container.querySelectorAll('.btn-context-pill').forEach(btn => {
+            btn.classList.remove('active');
+        });
+    }
+    
+    // Activate clicked pill
+    btnElement.classList.add('active');
+    
+    // Notify focus shift
+    if (window.dashboard) {
+        const scopeLabels = {
+            all: 'Entire Ledger & Checklists',
+            finance: 'Finances & Transactions Only',
+            tasks: 'Tasks & Week Planner Only',
+            groceries: 'Grocery Checklist Only'
+        };
+        window.dashboard.showNotification(`Focused AI context to: ${scopeLabels[scope] || scope}`, 'info');
+    }
 };
 
 // Auto render history
