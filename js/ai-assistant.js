@@ -20,17 +20,19 @@ function injectAIAssistantStyles() {
     style.textContent = `
         .ai-shell {
             display: flex;
-            gap: 1.5rem;
             height: calc(100vh - 180px);
             min-height: 520px;
             animation: fadeIn 0.4s ease;
+            width: 100%;
         }
-        .ai-sidebar {
-            width: 280px;
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            flex-shrink: 0;
+        .ai-prompts-bar {
+            background: rgba(255, 255, 255, 0.45);
+            border-top: 1px solid rgba(0, 0, 0, 0.06);
+            padding: 0.75rem 1.25rem !important;
+        }
+        [data-bs-theme="dark"] .ai-prompts-bar {
+            background: rgba(15, 23, 42, 0.3);
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
         }
         .ai-chat-card {
             flex: 1;
@@ -349,27 +351,20 @@ function injectAIAssistantStyles() {
         .ai-typing-dot:nth-child(3) { animation-delay: 0.4s; }
         @media (max-width: 768px) {
             .ai-shell {
-                flex-direction: column;
-                height: auto;
-                min-height: unset;
-                gap: 1rem;
+                height: 550px;
             }
-            .ai-sidebar {
-                width: 100%;
-            }
-            .ai-sidebar .d-flex.flex-column {
-                flex-direction: row !important;
-                flex-wrap: wrap;
-                gap: 0.5rem !important;
+            .ai-prompts-bar {
+                padding: 0.5rem 0.75rem !important;
             }
             .ai-prompt-card {
-                flex: 1 1 calc(50% - 0.5rem);
-                margin-bottom: 0;
-                padding: 0.75rem;
+                padding: 0.5rem 0.75rem !important;
+                font-size: 0.8rem;
+            }
+            .ai-prompt-card .text-muted {
+                display: none !important;
             }
             .ai-chat-card {
-                height: 500px;
-                flex: none;
+                height: 100%;
             }
             .ai-chat-messages {
                 padding: 1rem;
@@ -575,47 +570,8 @@ window.loadAIAssistantSection = async function() {
         </div>
 
         <div class="ai-shell">
-            <!-- Sidebar Panel: Prompts and Keys -->
-            <div class="ai-sidebar">
-                <div class="card border-0 shadow-sm">
-                    <div class="card-body p-3">
-                        <h6 class="fw-bold mb-3"><i class="fas fa-magic text-primary me-2"></i>Smart Prompts</h6>
-                        <div class="d-flex flex-column gap-2">
-                            <button class="ai-prompt-card" onclick="triggerAISmartPrompt('Analyze my financial ledger transactions and suggest a budget.')">
-                                <div class="fw-bold small mb-1">📊 Analyze Finance</div>
-                                <div class="text-muted" style="font-size: 0.8rem;">Evaluate income vs spending.</div>
-                            </button>
-                            <button class="ai-prompt-card" onclick="triggerAISmartPrompt('Create a structured task list to plan my week.')">
-                                <div class="fw-bold small mb-1">📝 Weekly Task Planner</div>
-                                <div class="text-muted" style="font-size: 0.8rem;">Draft checklists & goals.</div>
-                            </button>
-                            <button class="ai-prompt-card" onclick="triggerAISmartPrompt('Generate a grocery shopping list for a healthy dinner recipe.')">
-                                <div class="fw-bold small mb-1">🛒 Recipe to Groceries</div>
-                                <div class="text-muted" style="font-size: 0.8rem;">Convert meals to grocery list.</div>
-                            </button>
-                            <button class="ai-prompt-card" onclick="triggerAISmartPrompt('What are the recommended maintenance checklist items for my vehicle?')">
-                                <div class="fw-bold small mb-1">🚗 Maintenance Alert</div>
-                                <div class="text-muted" style="font-size: 0.8rem;">Calculate service intervals.</div>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- API Key fallback field -->
-                ${!hasKey ? `
-                <div class="card border-warning shadow-sm">
-                    <div class="card-body p-3">
-                        <h6 class="fw-bold mb-2 text-warning"><i class="fas fa-key me-2"></i>Setup Gemini Key</h6>
-                        <p class="small text-muted mb-2">Paste key below for this session, or configure it permanently in Settings.</p>
-                        <input type="password" class="form-control form-control-sm mb-2" id="ai-temp-key" placeholder="AI Studio Key...">
-                        <button class="btn btn-warning btn-sm w-100 fw-bold" onclick="saveTempGeminiKey()">Connect Assistant</button>
-                    </div>
-                </div>
-                ` : ''}
-            </div>
-
-            <!-- Main Chat Area -->
-            <div class="ai-chat-card">
+            <!-- Full Width Chat Card -->
+            <div class="ai-chat-card w-100 h-100">
                 <div class="ai-chat-header bg-light">
                     <div class="d-flex align-items-center gap-2">
                         <span class="fs-4">🤖</span>
@@ -629,10 +585,57 @@ window.loadAIAssistantSection = async function() {
                     </button>
                 </div>
 
-                <!-- Message stream -->
+                <!-- Message stream / API Setup Fallback -->
                 <div class="ai-chat-messages" id="ai-chat-stream">
-                    <!-- Loaded dynamically -->
+                    ${!hasKey ? `
+                    <div class="d-flex flex-column align-items-center justify-content-center h-100 text-center py-5">
+                        <div class="fs-1 mb-3">🔑</div>
+                        <h4 class="fw-bold">Connect your Gemini API Key</h4>
+                        <p class="text-muted mb-4 small px-3" style="max-width: 450px;">
+                            PersonalOS utilizes the free, developer-tier Gemini API. Get a key in 30 seconds from Google AI Studio and connect below to begin using your assistant.
+                        </p>
+                        <div class="card p-3 border-0 bg-light shadow-sm w-100" style="max-width: 400px;">
+                            <input type="password" class="form-control mb-2" id="ai-temp-key" placeholder="Paste your API key here...">
+                            <button class="btn btn-primary w-100 fw-bold" onclick="saveTempGeminiKey()">Connect Assistant</button>
+                            <div class="form-text mt-2" style="font-size: 0.75rem;">
+                                Get your free key at <a href="https://aistudio.google.com/" target="_blank">Google AI Studio <i class="fas fa-external-link-alt"></i></a>
+                            </div>
+                        </div>
+                    </div>
+                    ` : ''}
                 </div>
+
+                <!-- Prompts bar directly above the text box -->
+                ${hasKey ? `
+                <div class="ai-prompts-bar">
+                    <div class="row g-2">
+                        <div class="col-6 col-md-3">
+                            <button class="ai-prompt-card h-100 w-100" onclick="triggerAISmartPrompt('Analyze my financial ledger transactions and suggest a budget.')">
+                                <div class="fw-bold small mb-1">📊 Analyze Finance</div>
+                                <div class="text-muted text-truncate" style="font-size: 0.75rem;">Evaluate spending.</div>
+                            </button>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <button class="ai-prompt-card h-100 w-100" onclick="triggerAISmartPrompt('Create a structured task list to plan my week.')">
+                                <div class="fw-bold small mb-1">📝 Weekly Planner</div>
+                                <div class="text-muted text-truncate" style="font-size: 0.75rem;">Checklists & goals.</div>
+                            </button>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <button class="ai-prompt-card h-100 w-100" onclick="triggerAISmartPrompt('Generate a grocery shopping list for a healthy dinner recipe.')">
+                                <div class="fw-bold small mb-1">🛒 Meal Groceries</div>
+                                <div class="text-muted text-truncate" style="font-size: 0.75rem;">Recipes to buy list.</div>
+                            </button>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <button class="ai-prompt-card h-100 w-100" onclick="triggerAISmartPrompt('What are the recommended maintenance checklist items for my vehicle?')">
+                                <div class="fw-bold small mb-1">🚗 Car Maintenance</div>
+                                <div class="text-muted text-truncate" style="font-size: 0.75rem;">Service checklists.</div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
 
                 <!-- Chat inputs -->
                 <div class="ai-chat-input-area bg-light">
@@ -640,8 +643,8 @@ window.loadAIAssistantSection = async function() {
                         <button class="ai-action-btn ai-mic-btn" id="ai-mic-trigger" onclick="toggleAISpeechInput()" title="Voice Dictation">
                             <i class="fas fa-microphone"></i>
                         </button>
-                        <textarea class="ai-input-box" id="ai-message-input" rows="1" placeholder="Ask anything about your tasks, finances, or menus..." onkeydown="handleAIChatKeydown(event)"></textarea>
-                        <button class="ai-action-btn ai-send-btn" onclick="sendAIChatMessage()" title="Send message">
+                        <textarea class="ai-input-box" id="ai-message-input" rows="1" placeholder="Ask anything about your tasks, finances, or menus..." onkeydown="handleAIChatKeydown(event)" ${!hasKey ? 'disabled' : ''}></textarea>
+                        <button class="ai-action-btn ai-send-btn" onclick="sendAIChatMessage()" title="Send message" ${!hasKey ? 'disabled' : ''}>
                             <i class="fas fa-paper-plane"></i>
                         </button>
                     </div>
