@@ -51,6 +51,21 @@ function injectAIAssistantStyles() {
         [data-bs-theme="dark"] .btn-context-pill {
             border-color: rgba(255, 255, 255, 0.08);
         }
+        .ai-prompts-toggle-bar {
+            background: rgba(0, 0, 0, 0.015);
+            border-top: 1px solid rgba(0, 0, 0, 0.06);
+            transition: background 0.2s ease;
+        }
+        .ai-prompts-toggle-bar:hover {
+            background: rgba(0, 0, 0, 0.035) !important;
+        }
+        [data-bs-theme="dark"] .ai-prompts-toggle-bar {
+            background: rgba(255, 255, 255, 0.015);
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        [data-bs-theme="dark"] .ai-prompts-toggle-bar:hover {
+            background: rgba(255, 255, 255, 0.035) !important;
+        }
         .ai-prompts-bar {
             background: rgba(255, 255, 255, 0.45);
             border-top: 1px solid rgba(0, 0, 0, 0.06);
@@ -842,9 +857,13 @@ window.loadAIAssistantSection = async function() {
                     ` : ''}
                 </div>
 
-                <!-- Prompts bar directly above the text box -->
+                <!-- Prompts bar directly above the text box (hidden by default on mobile, expandable via chevron header) -->
                 ${hasKey ? `
-                <div class="ai-prompts-bar">
+                <div class="ai-prompts-toggle-bar d-flex justify-content-between align-items-center px-3 py-2 border-top" onclick="window.toggleAIPromptsCollapse()" style="cursor: pointer; user-select: none;">
+                    <span class="text-muted small fw-semibold uppercase" style="font-size: 0.72rem; letter-spacing: 0.03em;"><i class="fa-solid fa-lightbulb text-warning me-1.5"></i> Suggested Prompts</span>
+                    <i class="fas fa-chevron-up text-muted" id="ai-prompts-toggle-icon" style="font-size: 0.75rem;"></i>
+                </div>
+                <div class="ai-prompts-bar d-none d-md-block" id="ai-prompts-wrapper">
                     <div class="row g-2">
                         <div class="col-6 col-md-3">
                             <button class="ai-prompt-card h-100 w-100" onclick="triggerAISmartPrompt('Analyze my financial ledger transactions and suggest a budget.')">
@@ -935,6 +954,28 @@ window.setAIContextScope = function(scope, btnElement) {
             groceries: 'Grocery Checklist Only'
         };
         window.dashboard.showNotification(`Focused AI context to: ${scopeLabels[scope] || scope}`, 'info');
+    }
+};
+
+// Toggle collapse/expand of Suggested Prompts bar
+window.toggleAIPromptsCollapse = function() {
+    const wrapper = document.getElementById('ai-prompts-wrapper');
+    const icon = document.getElementById('ai-prompts-toggle-icon');
+    if (!wrapper || !icon) return;
+    
+    // Check if it is currently hidden
+    const isHidden = wrapper.classList.contains('d-none') || (window.innerWidth < 768 && !wrapper.classList.contains('d-block') && !wrapper.classList.contains('d-flex'));
+    
+    if (isHidden) {
+        // Expand
+        wrapper.classList.remove('d-none');
+        wrapper.classList.add('d-block');
+        icon.className = 'fas fa-chevron-down text-muted';
+    } else {
+        // Collapse
+        wrapper.classList.remove('d-block');
+        wrapper.classList.add('d-none');
+        icon.className = 'fas fa-chevron-up text-muted';
     }
 };
 
