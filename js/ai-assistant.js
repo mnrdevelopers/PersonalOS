@@ -90,6 +90,8 @@ function injectAIAssistantStyles() {
             gap: 0.75rem;
             max-width: 85%;
             align-self: flex-start;
+            animation: messageSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0;
         }
         .ai-msg.user {
             align-self: flex-end;
@@ -337,6 +339,16 @@ function injectAIAssistantStyles() {
             70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
             100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
         }
+        @keyframes messageSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(12px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
         .ai-typing-loader {
             display: flex;
             align-items: center;
@@ -476,8 +488,16 @@ Here is the user's current live data summary from their PersonalOS database:
 `;
 
     try {
-        // Fetch bank account balances
-        const accountsSnap = await db.collection('bank_accounts').where('userId', '==', user.uid).get();
+        // Fetch all database snapshots in parallel to reduce network latency
+        const [accountsSnap, ccSnap, walletSnap, txSnap, tasksSnap, grocerySnap] = await Promise.all([
+            db.collection('bank_accounts').where('userId', '==', user.uid).get(),
+            db.collection('credit_cards').where('userId', '==', user.uid).get(),
+            db.collection('wallets').where('userId', '==', user.uid).get(),
+            db.collection('transactions').where('userId', '==', user.uid).orderBy('date', 'desc').limit(10).get(),
+            db.collection('reminders').where('userId', '==', user.uid).where('completed', '==', false).limit(10).get(),
+            db.collection('grocery_items').where('userId', '==', user.uid).where('status', '==', 'to_buy').get()
+        ]);
+
         if (!accountsSnap.empty) {
             context += `- Bank Accounts:\n`;
             accountsSnap.forEach(doc => {
@@ -486,8 +506,6 @@ Here is the user's current live data summary from their PersonalOS database:
             });
         }
         
-        // Fetch credit cards
-        const ccSnap = await db.collection('credit_cards').where('userId', '==', user.uid).get();
         if (!ccSnap.empty) {
             context += `- Credit Cards:\n`;
             ccSnap.forEach(doc => {
@@ -496,8 +514,6 @@ Here is the user's current live data summary from their PersonalOS database:
             });
         }
 
-        // Fetch digital wallets
-        const walletSnap = await db.collection('wallets').where('userId', '==', user.uid).get();
         if (!walletSnap.empty) {
             context += `- Digital Wallets:\n`;
             walletSnap.forEach(doc => {
@@ -506,12 +522,6 @@ Here is the user's current live data summary from their PersonalOS database:
             });
         }
 
-        // Fetch recent ledger transactions
-        const txSnap = await db.collection('transactions')
-            .where('userId', '==', user.uid)
-            .orderBy('date', 'desc')
-            .limit(10)
-            .get();
         if (!txSnap.empty) {
             context += `- Last 10 Ledger Transactions:\n`;
             txSnap.forEach(doc => {
@@ -520,12 +530,6 @@ Here is the user's current live data summary from their PersonalOS database:
             });
         }
 
-        // Fetch tasks
-        const tasksSnap = await db.collection('reminders')
-            .where('userId', '==', user.uid)
-            .where('completed', '==', false)
-            .limit(10)
-            .get();
         if (!tasksSnap.empty) {
             context += `- Uncompleted Tasks / Reminders:\n`;
             tasksSnap.forEach(doc => {
@@ -534,11 +538,6 @@ Here is the user's current live data summary from their PersonalOS database:
             });
         }
 
-        // Fetch active shopping list items
-        const grocerySnap = await db.collection('grocery_items')
-            .where('userId', '==', user.uid)
-            .where('status', '==', 'to_buy')
-            .get();
         if (!grocerySnap.empty) {
             context += `- Items to buy in Grocery List: ${grocerySnap.docs.map(d => d.data().name).join(', ')}\n`;
         }
