@@ -463,6 +463,60 @@ function injectAIAssistantStyles() {
             .ai-msg {
                 max-width: 90%;
             }
+            /* Stack tables into cards on mobile */
+            .ai-msg-bubble table, 
+            .ai-msg-bubble thead, 
+            .ai-msg-bubble tbody, 
+            .ai-msg-bubble th, 
+            .ai-msg-bubble td, 
+            .ai-msg-bubble tr {
+                display: block !important;
+            }
+            .ai-msg-bubble thead {
+                display: none !important;
+            }
+            .ai-msg-bubble tr {
+                margin-bottom: 0.75rem;
+                padding: 0.5rem;
+                border-radius: 8px;
+                border: 1px solid rgba(0, 0, 0, 0.05);
+                background: rgba(255, 255, 255, 0.3) !important;
+            }
+            [data-bs-theme="dark"] .ai-msg-bubble tr {
+                border: 1px solid rgba(255, 255, 255, 0.05);
+                background: rgba(15, 23, 42, 0.2) !important;
+            }
+            .ai-msg-bubble td {
+                text-align: right !important;
+                padding: 0.4rem 0.5rem !important;
+                position: relative;
+                border-bottom: 1px solid rgba(0, 0, 0, 0.04) !important;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            [data-bs-theme="dark"] .ai-msg-bubble td {
+                border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+            }
+            .ai-msg-bubble td:last-child {
+                border-bottom: none !important;
+            }
+            .ai-msg-bubble td::before {
+                content: attr(data-label);
+                font-weight: 600;
+                font-size: 0.78rem;
+                text-transform: uppercase;
+                color: #64748b;
+                float: left;
+                margin-right: 1rem;
+            }
+            [data-bs-theme="dark"] .ai-msg-bubble td::before {
+                color: #94a3b8;
+            }
+            .table-responsive {
+                border: none !important;
+                margin: 0.5rem 0 !important;
+            }
         }
     `;
     document.head.appendChild(style);
@@ -481,9 +535,33 @@ function formatMarkdown(text) {
                 headerIds: false
             });
             let html = window.marked.parse(text);
+            
             // Wrap tables in responsive wrapper
             html = html.replace(/<table>/g, '<div class="table-responsive"><table>')
                        .replace(/<\/table>/g, '</table></div>');
+
+            // Parse tables and inject data-label properties to tds for mobile card translation
+            try {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const tables = doc.querySelectorAll('table');
+                tables.forEach(table => {
+                    const headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent.trim());
+                    const trs = table.querySelectorAll('tr');
+                    trs.forEach(tr => {
+                        const tds = tr.querySelectorAll('td');
+                        tds.forEach((td, index) => {
+                            if (headers[index]) {
+                                td.setAttribute('data-label', headers[index]);
+                            }
+                        });
+                    });
+                });
+                html = doc.body.innerHTML;
+            } catch (err) {
+                console.error('Failed to inject responsive data labels:', err);
+            }
+
             // Replace markdown task checklists with FontAwesome icons
             html = html.replace(/\[ \]/g, '<i class="far fa-square me-2 text-muted"></i>')
                        .replace(/\[x\]/gi, '<i class="far fa-check-square me-2 text-success"></i>');
