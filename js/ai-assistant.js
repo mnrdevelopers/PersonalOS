@@ -71,6 +71,9 @@ function injectAIAssistantStyles() {
             border-top: 1px solid rgba(0, 0, 0, 0.06);
             padding: 0.75rem 1.25rem !important;
         }
+        .ai-prompts-bar.collapsed {
+            display: none !important;
+        }
         [data-bs-theme="dark"] .ai-prompts-bar {
             background: rgba(15, 23, 42, 0.3);
             border-top: 1px solid rgba(255, 255, 255, 0.06);
@@ -796,6 +799,7 @@ window.loadAIAssistantSection = async function() {
 
     const apiKey = await getGeminiApiKey();
     const hasKey = !!apiKey;
+    const isMobile = window.innerWidth < 768;
 
     container.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -861,9 +865,9 @@ window.loadAIAssistantSection = async function() {
                 ${hasKey ? `
                 <div class="ai-prompts-toggle-bar d-flex justify-content-between align-items-center px-3 py-2 border-top" onclick="window.toggleAIPromptsCollapse()" style="cursor: pointer; user-select: none;">
                     <span class="text-muted small fw-semibold uppercase" style="font-size: 0.72rem; letter-spacing: 0.03em;"><i class="fa-solid fa-lightbulb text-warning me-1.5"></i> Suggested Prompts</span>
-                    <i class="fas fa-chevron-up text-muted" id="ai-prompts-toggle-icon" style="font-size: 0.75rem;"></i>
+                    <i class="fas ${isMobile ? 'fa-chevron-up' : 'fa-chevron-down'} text-muted" id="ai-prompts-toggle-icon" style="font-size: 0.75rem;"></i>
                 </div>
-                <div class="ai-prompts-bar d-none d-md-block" id="ai-prompts-wrapper">
+                <div class="ai-prompts-bar ${isMobile ? 'collapsed' : ''}" id="ai-prompts-wrapper">
                     <div class="row g-2">
                         <div class="col-6 col-md-3">
                             <button class="ai-prompt-card h-100 w-100" onclick="triggerAISmartPrompt('Analyze my financial ledger transactions and suggest a budget.')">
@@ -963,19 +967,12 @@ window.toggleAIPromptsCollapse = function() {
     const icon = document.getElementById('ai-prompts-toggle-icon');
     if (!wrapper || !icon) return;
     
-    // Check if it is currently hidden
-    const isHidden = wrapper.classList.contains('d-none') || (window.innerWidth < 768 && !wrapper.classList.contains('d-block') && !wrapper.classList.contains('d-flex'));
+    const isCollapsed = wrapper.classList.toggle('collapsed');
     
-    if (isHidden) {
-        // Expand
-        wrapper.classList.remove('d-none');
-        wrapper.classList.add('d-block');
-        icon.className = 'fas fa-chevron-down text-muted';
-    } else {
-        // Collapse
-        wrapper.classList.remove('d-block');
-        wrapper.classList.add('d-none');
+    if (isCollapsed) {
         icon.className = 'fas fa-chevron-up text-muted';
+    } else {
+        icon.className = 'fas fa-chevron-down text-muted';
     }
 };
 
