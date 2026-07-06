@@ -191,41 +191,59 @@ function injectAIAssistantStyles() {
             color: inherit !important;
             font-size: 0.88rem;
         }
-        .ai-msg-bubble table {
+        .table-responsive {
             width: 100%;
-            margin-bottom: 1rem;
-            border-collapse: collapse;
-            background: rgba(255, 255, 255, 0.5);
-            border-radius: 8px;
-            overflow: hidden;
-            display: block;
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+        [data-bs-theme="dark"] .table-responsive {
+            border-color: rgba(255, 255, 255, 0.06);
+        }
+        .ai-msg-bubble table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            font-size: 0.88rem;
+            background: rgba(255, 255, 255, 0.4);
         }
         [data-bs-theme="dark"] .ai-msg-bubble table {
-            background: rgba(15, 23, 42, 0.4);
-        }
-        .ai-msg-bubble th, .ai-msg-bubble td {
-            padding: 0.6rem 0.9rem;
-            border: 1px solid rgba(0, 0, 0, 0.08);
-            text-align: left;
-            font-size: 0.9rem;
-        }
-        [data-bs-theme="dark"] .ai-msg-bubble th, [data-bs-theme="dark"] .ai-msg-bubble td {
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(15, 23, 42, 0.2);
         }
         .ai-msg-bubble th {
-            background: rgba(0, 0, 0, 0.04);
+            padding: 0.75rem 1rem;
             font-weight: 600;
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            color: #475569;
+            background: rgba(0, 0, 0, 0.03);
+            border-bottom: 2px solid rgba(0, 0, 0, 0.08);
+            text-align: left;
         }
         [data-bs-theme="dark"] .ai-msg-bubble th {
-            background: rgba(255, 255, 255, 0.04);
+            color: #94a3b8;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
         }
-        .ai-msg-bubble tr:nth-child(even) {
-            background: rgba(0, 0, 0, 0.01);
+        .ai-msg-bubble td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            font-size: 0.88rem;
+            color: inherit;
+            text-align: left;
         }
-        [data-bs-theme="dark"] .ai-msg-bubble tr:nth-child(even) {
-            background: rgba(255, 255, 255, 0.01);
+        [data-bs-theme="dark"] .ai-msg-bubble td {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .ai-msg-bubble tr:hover {
+            background-color: rgba(0, 0, 0, 0.015);
+        }
+        [data-bs-theme="dark"] .ai-msg-bubble tr:hover {
+            background-color: rgba(255, 255, 255, 0.015);
         }
         .ai-msg-bubble blockquote {
             border-left: 4px solid #4f46e5;
@@ -463,6 +481,9 @@ function formatMarkdown(text) {
                 headerIds: false
             });
             let html = window.marked.parse(text);
+            // Wrap tables in responsive wrapper
+            html = html.replace(/<table>/g, '<div class="table-responsive"><table>')
+                       .replace(/<\/table>/g, '</table></div>');
             // Replace markdown task checklists with FontAwesome icons
             html = html.replace(/\[ \]/g, '<i class="far fa-square me-2 text-muted"></i>')
                        .replace(/\[x\]/gi, '<i class="far fa-check-square me-2 text-success"></i>');
