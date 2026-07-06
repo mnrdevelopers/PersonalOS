@@ -353,7 +353,18 @@ function injectAIAssistantStyles() {
         .ai-typing-dot:nth-child(2) { animation-delay: 0.2s; }
         .ai-typing-dot:nth-child(3) { animation-delay: 0.4s; }
         @media (max-width: 768px) {
+            body.is-ai-assistant {
+                position: fixed !important;
+                width: 100% !important;
+                height: 100% !important;
+                overflow: hidden !important;
+            }
             body.is-ai-assistant .main-content {
+                position: fixed !important;
+                top: 56px !important;
+                left: 0 !important;
+                right: 0 !important;
+                bottom: 0 !important;
                 padding: 0 !important;
                 margin: 0 !important;
                 height: calc(100vh - 56px) !important;
@@ -361,6 +372,7 @@ function injectAIAssistantStyles() {
             }
             body.is-ai-assistant #ai-assistant-section {
                 height: 100% !important;
+                width: 100% !important;
                 margin: 0 !important;
                 padding: 0 !important;
             }
