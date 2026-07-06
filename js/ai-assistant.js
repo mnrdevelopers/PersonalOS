@@ -747,6 +747,7 @@ window.loadAIAssistantSection = async function() {
             <!-- Full Width Chat Card -->
             <div class="ai-chat-card w-100 h-100">
                 <div class="ai-chat-header bg-light">
+                    <div class="d-flex align-items-center gap-2">
                         <div class="ai-header-badge">
                             <i class="fa-solid fa-wand-magic-sparkles text-white"></i>
                         </div>
