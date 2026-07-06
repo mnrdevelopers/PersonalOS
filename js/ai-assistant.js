@@ -196,6 +196,9 @@ function injectAIAssistantStyles() {
             background: rgba(255, 255, 255, 0.5);
             border-radius: 8px;
             overflow: hidden;
+            display: block;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
         }
         [data-bs-theme="dark"] .ai-msg-bubble table {
             background: rgba(15, 23, 42, 0.4);
@@ -350,30 +353,73 @@ function injectAIAssistantStyles() {
         .ai-typing-dot:nth-child(2) { animation-delay: 0.2s; }
         .ai-typing-dot:nth-child(3) { animation-delay: 0.4s; }
         @media (max-width: 768px) {
-            .ai-shell {
-                height: 550px;
+            body.is-ai-assistant .main-content {
+                padding: 0 !important;
+                margin: 0 !important;
+                height: calc(100vh - 56px) !important;
+                overflow: hidden !important;
             }
+            body.is-ai-assistant #ai-assistant-section {
+                height: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            body.is-ai-assistant #ai-assistant-section > div.d-flex.justify-content-between {
+                display: none !important;
+            }
+            .ai-shell {
+                height: 100% !important;
+                min-height: unset !important;
+            }
+            .ai-chat-card {
+                height: 100% !important;
+                border-radius: 0 !important;
+                border: none !important;
+            }
+            /* Make prompts bar a horizontal scroll list */
             .ai-prompts-bar {
-                padding: 0.5rem 0.75rem !important;
+                overflow-x: auto !important;
+                white-space: nowrap !important;
+                display: flex !important;
+                gap: 0.5rem !important;
+                padding: 0.5rem 1rem !important;
+                background: rgba(255, 255, 255, 0.95);
+            }
+            [data-bs-theme="dark"] .ai-prompts-bar {
+                background: rgba(30, 41, 59, 0.95);
+            }
+            .ai-prompts-bar .row {
+                display: flex !important;
+                flex-direction: row !important;
+                flex-wrap: nowrap !important;
+                margin: 0 !important;
+                width: auto !important;
+                gap: 0.5rem;
+            }
+            .ai-prompts-bar .col-6 {
+                flex: 0 0 auto !important;
+                width: 170px !important;
+                padding: 0 !important;
             }
             .ai-prompt-card {
                 padding: 0.5rem 0.75rem !important;
                 font-size: 0.8rem;
+                white-space: normal;
+                line-height: 1.3;
             }
             .ai-prompt-card .text-muted {
                 display: none !important;
             }
-            .ai-chat-card {
-                height: 100%;
-            }
             .ai-chat-messages {
-                padding: 1rem;
+                padding: 1rem 1rem 0.5rem 1rem !important;
             }
             .ai-chat-input-area {
-                padding: 1rem;
+                padding: 0.5rem 1rem 0.75rem 1rem !important;
+                position: sticky;
+                bottom: 0;
             }
             .ai-msg {
-                max-width: 92%;
+                max-width: 90%;
             }
         }
     `;

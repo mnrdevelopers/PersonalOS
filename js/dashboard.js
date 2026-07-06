@@ -1635,11 +1635,13 @@ class Dashboard {
         const body = document.body;
         const backBtn = document.getElementById('nav-back-btn');
 
+        // Remove previous section classes on body
+        body.className = body.className.split(' ').filter(c => !c.startsWith('is-')).join(' ');
+        body.classList.add(`is-${section}`);
+
         if (section === 'dashboard') {
-            body.classList.add('is-dashboard');
             if (backBtn) backBtn.classList.add('d-none');
         } else {
-            body.classList.remove('is-dashboard');
             if (backBtn) {
                 backBtn.classList.remove('d-none');
                 backBtn.onclick = () => this.switchSection('dashboard');
