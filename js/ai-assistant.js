@@ -600,33 +600,71 @@ window.sendAIChatMessage = async function() {
             ..._aiChatHistory
         ];
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents })
-        });
+        const MODELS_TO_TRY = [
+            'gemini-3.5-flash',
+            'gemini-2.5-flash',
+            'gemini-2.0-flash',
+            'gemini-1.5-flash-latest',
+            'gemini-1.5-pro-latest',
+            'gemini-1.0-pro'
+        ];
 
-        if (!response.ok) {
-            let errMsg = `HTTP Error ${response.status} (${response.statusText || 'Not Found'})`;
+        let response = null;
+        let resData = null;
+        let lastError = null;
+
+        for (const model of MODELS_TO_TRY) {
             try {
-                const errData = await response.json();
-                if (errData.error?.message) {
-                    errMsg += ` - ${errData.error.message}`;
-                }
-            } catch (err) {}
-            
-            if (response.status === 404 || response.status === 400 || response.status === 403) {
-                const hasValidPrefix = apiKey.startsWith('AIza') || apiKey.startsWith('AQ.');
-                if (!hasValidPrefix) {
-                    errMsg += `\n\n**Tip:** The API key you configured (\`${apiKey.substring(0, 5)}...\`) does not start with a recognized Gemini prefix (\`AIzaSy\` or \`AQ.\`). Google Gemini API keys from Google AI Studio always start with one of these. Please check that you copied the correct key.`;
+                response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents })
+                });
+
+                if (response.ok) {
+                    resData = await response.json();
+                    break;
                 } else {
-                    errMsg += `\n\n**Tip:** Your API key has the correct prefix (\`${apiKey.startsWith('AIza') ? 'AIza' : 'AQ.'}\`), but Google's server returned a ${response.status} error. This indicates that the key is inactive, has been deleted, has restricted permissions, or was copied incorrectly (truncated). Please verify it in your [Google AI Studio Console](https://aistudio.google.com/).`;
+                    let errMsg = `HTTP Error ${response.status} (${response.statusText || 'Error'})`;
+                    try {
+                        const errData = await response.json();
+                        if (errData.error?.message) {
+                            errMsg += ` - ${errData.error.message}`;
+                        }
+                    } catch (err) {}
+
+                    // If it is a model not found / not supported error, we try fallback models
+                    if (response.status === 404 && (errMsg.includes('not found') || errMsg.includes('not supported') || errMsg.includes('Model') || errMsg.includes('is not found'))) {
+                        console.warn(`Model ${model} not available, trying fallback...`);
+                        lastError = errMsg;
+                        continue;
+                    }
+                    
+                    // Otherwise (invalid key, bad request, quota, etc.), fail immediately
+                    if (response.status === 404 || response.status === 400 || response.status === 403) {
+                        const hasValidPrefix = apiKey.startsWith('AIza') || apiKey.startsWith('AQ.');
+                        if (!hasValidPrefix) {
+                            errMsg += `\n\n**Tip:** The API key you configured (\`${apiKey.substring(0, 5)}...\`) does not start with a recognized Gemini prefix (\`AIzaSy\` or \`AQ.\`). Google Gemini API keys from Google AI Studio always start with one of these. Please check that you copied the correct key.`;
+                        } else {
+                            errMsg += `\n\n**Tip:** Your API key has the correct prefix (\`${apiKey.startsWith('AIza') ? 'AIza' : 'AQ.'}\`), but Google's server returned a ${response.status} error. This indicates that the key is inactive, has been deleted, has restricted permissions, or was copied incorrectly (truncated). Please verify it in your [Google AI Studio Console](https://aistudio.google.com/).`;
+                        }
+                    }
+                    throw new Error(errMsg);
                 }
+            } catch (err) {
+                lastError = err.message || err;
+                // If it is a model not found / version mismatch, continue loop
+                if (lastError.includes('not found') || lastError.includes('not supported') || lastError.includes('Model') || lastError.includes('is not found')) {
+                    continue;
+                }
+                throw err;
             }
-            throw new Error(errMsg);
         }
 
-        const resData = await response.json();
+        if (!resData) {
+            throw new Error(`Failed to contact any Gemini models. Last error: ${lastError}`);
+        }
+
         loadingDiv.remove();
 
         if (resData.candidates && resData.candidates[0]?.content?.parts[0]?.text) {
