@@ -406,16 +406,20 @@ function injectAIAssistantStyles() {
                 width: 100% !important;
                 height: 100% !important;
                 overflow: hidden !important;
+                padding-bottom: 0 !important;
+            }
+            body.is-ai-assistant .fab-container {
+                display: none !important;
             }
             body.is-ai-assistant .main-content {
                 position: fixed !important;
-                top: 56px !important;
+                top: calc(76px + env(safe-area-inset-top)) !important;
                 left: 0 !important;
                 right: 0 !important;
                 bottom: 0 !important;
                 padding: 0 !important;
                 margin: 0 !important;
-                height: calc(100vh - 56px) !important;
+                height: auto !important;
                 overflow: hidden !important;
             }
             body.is-ai-assistant #ai-assistant-section {
@@ -860,7 +864,7 @@ function renderAIChatMessages() {
             <div class="text-center py-5 text-muted">
                 <div class="fs-1 mb-2">👋</div>
                 <h5 class="fw-bold">Hello! I am your PersonalOS AI Assistant.</h5>
-                <p class="small px-4">I can query your active tasks, verify your grocery checklist, analyze your ledger balance transactions, or plan your next schedule! Click any smart prompt in the left sidebar to start.</p>
+                <p class="small px-4">I can query your active tasks, verify your grocery checklist, analyze your ledger balance transactions, or plan your next schedule! Click any smart prompt below to start.</p>
             </div>
         `;
         return;
