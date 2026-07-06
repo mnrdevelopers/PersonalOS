@@ -10,6 +10,7 @@ let _aiChatHistory = [];
 let _aiContext = "";
 let _isSpeechListening = false;
 let _speechRecognition = null;
+window.activeAIModel = '';
 
 // Dynamically inject styles once
 function injectAIAssistantStyles() {
@@ -455,7 +456,7 @@ window.loadAIAssistantSection = async function() {
                         <span class="fs-4">🤖</span>
                         <div>
                             <div class="fw-bold" style="font-size: 0.95rem;">PersonalOS Companion</div>
-                            <div class="text-muted" style="font-size: 0.75rem;">Powered by Gemini AI</div>
+                            <div class="text-muted" id="ai-model-subtext" style="font-size: 0.75rem;">Powered by Gemini AI ${window.activeAIModel ? `(${window.activeAIModel})` : ''}</div>
                         </div>
                     </div>
                     <button class="btn btn-outline-secondary btn-sm" onclick="clearAIChatHistory()">
@@ -623,6 +624,11 @@ window.sendAIChatMessage = async function() {
 
                 if (response.ok) {
                     resData = await response.json();
+                    window.activeAIModel = model;
+                    const subtext = document.getElementById('ai-model-subtext');
+                    if (subtext) {
+                        subtext.textContent = `Powered by Gemini AI (${model})`;
+                    }
                     break;
                 } else {
                     let errMsg = `HTTP Error ${response.status} (${response.statusText || 'Error'})`;
