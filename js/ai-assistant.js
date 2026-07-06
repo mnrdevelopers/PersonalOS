@@ -374,7 +374,13 @@ Here is the user's current live data summary from their PersonalOS database:
     }
     
     context += `
-Answer queries contextually using this data. Be helpful, draft clean checklists, and explain finances. Format responses using clean, readable markdown. Always use the Indian Rupee symbol (₹) for values. Keep answers concise.
+Instructions:
+1. Provide extremely professional, clear, and actionable advice to the user.
+2. Structure your replies using clean markdown tables, neat sections, and professional language suitable for a personal CFO.
+3. Avoid overly casual language, emojis in titles, or raw informal notes. Use a clean, crisp, business-like tone.
+4. When drafting checklists, present them clearly.
+5. If they ask about their finances, tasks, or groceries, refer to the data provided above.
+6. Always use the Indian Rupee symbol (₹) for monetary values.
 `;
     return context;
 }
@@ -522,21 +528,44 @@ function renderAIChatMessages() {
         return;
     }
 
-    stream.innerHTML = _aiChatHistory.map(msg => {
+    stream.innerHTML = _aiChatHistory.map((msg, index) => {
         const isUser = msg.role === 'user';
         const avatar = isUser ? '👤' : '🤖';
         const cssClass = isUser ? 'user' : 'assistant';
         const content = formatMarkdown(msg.parts[0].text);
+        
+        const copyButton = !isUser ? `
+            <div class="text-end mt-2 pt-1 border-top" style="border-color: rgba(0,0,0,0.05) !important;">
+                <button class="btn btn-sm btn-link text-decoration-none text-muted p-0" style="font-size: 0.8rem;" onclick="copyAIChatMessage(${index})">
+                    <i class="far fa-copy me-1"></i>Copy
+                </button>
+            </div>
+        ` : '';
+
         return `
             <div class="ai-msg ${cssClass}">
                 <div class="ai-msg-avatar">${avatar}</div>
-                <div class="ai-msg-bubble">${content}</div>
+                <div class="ai-msg-bubble">
+                    ${content}
+                    ${copyButton}
+                </div>
             </div>
         `;
     }).join('');
 
     stream.scrollTop = stream.scrollHeight;
 }
+
+window.copyAIChatMessage = function(index) {
+    const msg = _aiChatHistory[index];
+    if (!msg) return;
+    const text = msg.parts[0].text;
+    navigator.clipboard.writeText(text).then(() => {
+        if (window.dashboard) window.dashboard.showNotification('Summary copied to clipboard!', 'success');
+    }).catch(err => {
+        console.error('Failed to copy text: ', err);
+    });
+};
 
 // Run smart templates
 window.triggerAISmartPrompt = function(promptText) {
