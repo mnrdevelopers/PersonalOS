@@ -887,14 +887,22 @@ window.sendAIChatMessage = async function() {
                         }
                     } catch (err) {}
 
-                    // If it is a model not found / not supported error, we try fallback models
-                    if (response.status === 404 && (errMsg.includes('not found') || errMsg.includes('not supported') || errMsg.includes('Model') || errMsg.includes('is not found'))) {
-                        console.warn(`Model ${model} not available, trying fallback...`);
+                    // If it is a 503 (Overloaded) or 429 (Rate Limit/Quota), try fallback models
+                    if (response.status === 503 || response.status === 429) {
+                        console.warn(`Model ${model} returned temporary status ${response.status}. Trying fallback model...`);
+                        lastError = errMsg;
+                        continue;
+                    }
+
+                    // If it is a model not found / not supported error, try fallback models
+                    const isModel404 = response.status === 404 && (errMsg.includes('not found') || errMsg.includes('not supported') || errMsg.includes('Model') || errMsg.includes('is not found'));
+                    if (isModel404) {
+                        console.warn(`Model ${model} not available (404), trying fallback...`);
                         lastError = errMsg;
                         continue;
                     }
                     
-                    // Otherwise (invalid key, bad request, quota, etc.), fail immediately
+                    // Otherwise (invalid key, bad request, etc.), fail immediately
                     if (response.status === 404 || response.status === 400 || response.status === 403) {
                         const hasValidPrefix = apiKey.startsWith('AIza') || apiKey.startsWith('AQ.');
                         if (!hasValidPrefix) {
@@ -907,8 +915,15 @@ window.sendAIChatMessage = async function() {
                 }
             } catch (err) {
                 lastError = err.message || err;
-                // If it is a model not found / version mismatch, continue loop
-                if (lastError.includes('not found') || lastError.includes('not supported') || lastError.includes('Model') || lastError.includes('is not found')) {
+                const isTransientOrModelErr = lastError.includes('not found') || 
+                                              lastError.includes('not supported') || 
+                                              lastError.includes('Model') || 
+                                              lastError.includes('is not found') || 
+                                              lastError.includes('503') || 
+                                              lastError.includes('429') || 
+                                              lastError.includes('fetch') || 
+                                              lastError.includes('NetworkError');
+                if (isTransientOrModelErr) {
                     continue;
                 }
                 throw err;
