@@ -347,9 +347,39 @@ function injectAIAssistantStyles() {
         }
         .ai-typing-dot:nth-child(2) { animation-delay: 0.2s; }
         .ai-typing-dot:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes ai-typing {
-            from { transform: translateY(0); }
-            to { transform: translateY(-6px); }
+        @media (max-width: 768px) {
+            .ai-shell {
+                flex-direction: column;
+                height: auto;
+                min-height: unset;
+                gap: 1rem;
+            }
+            .ai-sidebar {
+                width: 100%;
+            }
+            .ai-sidebar .d-flex.flex-column {
+                flex-direction: row !important;
+                flex-wrap: wrap;
+                gap: 0.5rem !important;
+            }
+            .ai-prompt-card {
+                flex: 1 1 calc(50% - 0.5rem);
+                margin-bottom: 0;
+                padding: 0.75rem;
+            }
+            .ai-chat-card {
+                height: 500px;
+                flex: none;
+            }
+            .ai-chat-messages {
+                padding: 1rem;
+            }
+            .ai-chat-input-area {
+                padding: 1rem;
+            }
+            .ai-msg {
+                max-width: 92%;
+            }
         }
     `;
     document.head.appendChild(style);
