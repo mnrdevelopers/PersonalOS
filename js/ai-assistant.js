@@ -690,7 +690,7 @@ Here is the user's current live data summary from their PersonalOS database:
             promises.push(db.collection('bank_accounts').where('userId', '==', user.uid).get());
             promises.push(db.collection('credit_cards').where('userId', '==', user.uid).get());
             promises.push(db.collection('wallets').where('userId', '==', user.uid).get());
-            promises.push(db.collection('transactions').where('userId', '==', user.uid).orderBy('date', 'desc').limit(10).get());
+            promises.push(db.collection('transactions').where('userId', '==', user.uid).get());
         } else {
             promises.push(Promise.resolve(null), Promise.resolve(null), Promise.resolve(null), Promise.resolve(null));
         }
@@ -710,11 +710,47 @@ Here is the user's current live data summary from their PersonalOS database:
         // Fetch snapshots in parallel to minimize latency
         const [accountsSnap, ccSnap, walletSnap, txSnap, tasksSnap, grocerySnap] = await Promise.all(promises);
 
+        const bankBalances = {};
+        let recentTxList = [];
+
+        if (txSnap && !txSnap.empty) {
+            const allTxs = txSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            // Calculate real-time balances for bank accounts dynamically by summing transactions
+            allTxs.forEach(d => {
+                if (d.type === 'transfer') {
+                    if (d.sourceAccountType === 'bank' && d.bankAccountId) {
+                        const srcKey = d.bankAccountId;
+                        bankBalances[srcKey] = (bankBalances[srcKey] || 0) - (Number(d.amount) || 0);
+                    }
+                    if (d.destinationAccountType === 'bank' && d.destinationBankAccountId) {
+                        const dstKey = d.destinationBankAccountId;
+                        bankBalances[dstKey] = (bankBalances[dstKey] || 0) + (Number(d.amount) || 0);
+                    }
+                } else {
+                    const isBank = d.accountType === 'bank' || d.paymentMode === 'bank' || d.paymentMode === 'upi' || d.paymentMode === 'debit-card';
+                    if (isBank) {
+                        const key = d.bankAccountId || '__unassigned__';
+                        if (d.type === 'income') {
+                            bankBalances[key] = (bankBalances[key] || 0) + (Number(d.amount) || 0);
+                        } else if (d.type === 'expense') {
+                            bankBalances[key] = (bankBalances[key] || 0) - (Number(d.amount) || 0);
+                        }
+                    }
+                }
+            });
+
+            // Sort desc by date and take the last 10
+            allTxs.sort((a, b) => new Date(b.date) - new Date(a.date));
+            recentTxList = allTxs.slice(0, 10);
+        }
+
         if (accountsSnap && !accountsSnap.empty) {
             context += `- Bank Accounts:\n`;
             accountsSnap.forEach(doc => {
                 const d = doc.data();
-                context += `  * ID: "${doc.id}", Name: "${d.name}", Balance: ₹${d.balance || 0}\n`;
+                const bal = bankBalances[doc.id] || 0;
+                context += `  * ID: "${doc.id}", Name: "${d.name}", Balance: ₹${bal.toFixed(2)}\n`;
             });
         }
         
@@ -734,10 +770,9 @@ Here is the user's current live data summary from their PersonalOS database:
             });
         }
 
-        if (txSnap && !txSnap.empty) {
+        if (recentTxList.length > 0) {
             context += `- Last 10 Ledger Transactions:\n`;
-            txSnap.forEach(doc => {
-                const d = doc.data();
+            recentTxList.forEach(d => {
                 context += `  * [${d.date}] ${d.type.toUpperCase()}: ₹${d.amount} for ${d.category} - "${d.description || ''}" (Mode: ${d.paymentMode})\n`;
             });
         }
