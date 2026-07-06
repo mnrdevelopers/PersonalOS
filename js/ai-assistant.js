@@ -358,16 +358,37 @@ function injectAIAssistantStyles() {
             box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
         }
         .ai-action-btn {
-            width: 44px;
-            height: 44px;
+            width: 42px;
+            height: 42px;
             border-radius: 50%;
-            border: none;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.1rem;
+            border: none;
             cursor: pointer;
             transition: all 0.2s ease;
+        }
+        .ai-attachment-btn {
+            background: rgba(0, 0, 0, 0.05);
+            color: #475569;
+        }
+        [data-bs-theme="dark"] .ai-attachment-btn {
+            background: rgba(255, 255, 255, 0.05);
+            color: #94a3b8;
+        }
+        .ai-attachment-btn:hover {
+            background: rgba(99, 102, 241, 0.1);
+            color: #6366f1;
+        }
+        .ai-image-preview-container {
+            border-top: 1px solid rgba(0, 0, 0, 0.06);
+            background: rgba(0, 0, 0, 0.015) !important;
+            padding: 0.5rem 1.25rem !important;
+            flex-shrink: 0;
+        }
+        [data-bs-theme="dark"] .ai-image-preview-container {
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            background: rgba(255, 255, 255, 0.015) !important;
         }
         .ai-send-btn {
             background: #4f46e5;
@@ -905,13 +926,28 @@ window.loadAIAssistantSection = async function() {
                 </div>
                 ` : ''}
 
+                <!-- Image attachment preview bar (hidden by default) -->
+                <div class="ai-image-preview-container d-none" id="ai-image-preview-bar">
+                    <div class="position-relative d-inline-block mt-1">
+                        <img src="" id="ai-image-preview-img" class="rounded border shadow-sm" style="height: 55px; width: 55px; object-fit: cover;">
+                        <button type="button" class="btn btn-danger btn-xs position-absolute top-0 start-100 translate-middle rounded-circle border-0 d-flex align-items-center justify-content-center" onclick="window.clearAIAttachment()" style="padding: 0; width: 16px; height: 16px; font-size: 0.6rem;" title="Remove image">&times;</button>
+                    </div>
+                </div>
+
                 <!-- Chat inputs -->
                 <div class="ai-chat-input-area bg-light">
                     <div class="ai-input-wrap">
                         <button class="ai-action-btn ai-mic-btn" id="ai-mic-trigger" onclick="toggleAISpeechInput()" title="Voice Dictation">
                             <i class="fas fa-microphone"></i>
                         </button>
-                        <textarea class="ai-input-box" id="ai-message-input" rows="1" placeholder="Ask anything about your tasks, finances, or menus..." onkeydown="handleAIChatKeydown(event)" ${!hasKey ? 'disabled' : ''}></textarea>
+                        
+                        <!-- Hidden Camera/Upload Input -->
+                        <input type="file" id="ai-file-input" accept="image/*" style="display: none;" onchange="window.handleAIAttachmentSelect(event)">
+                        <button class="ai-action-btn ai-attachment-btn" id="ai-attach-trigger" onclick="window.triggerAIAttachment()" title="Upload Image / Capture Camera" ${!hasKey ? 'disabled' : ''}>
+                            <i class="fa-solid fa-camera"></i>
+                        </button>
+
+                        <textarea class="ai-input-box" id="ai-message-input" rows="1" placeholder="Ask details or upload image here..." onkeydown="handleAIChatKeydown(event)" ${!hasKey ? 'disabled' : ''}></textarea>
                         <button class="ai-action-btn ai-send-btn" onclick="sendAIChatMessage()" title="Send message" ${!hasKey ? 'disabled' : ''}>
                             <i class="fas fa-paper-plane"></i>
                         </button>
@@ -984,6 +1020,65 @@ window.toggleAIPromptsCollapse = function() {
     }
 };
 
+// Global variables for attachment uploads
+window._selectedAIImageFile = null;
+window._selectedAIImageDataUrl = null;
+
+// Trigger upload / Camera capturing click
+window.triggerAIAttachment = function() {
+    const input = document.getElementById('ai-file-input');
+    if (input) input.click();
+};
+
+// Handle file list choice
+window.handleAIAttachmentSelect = function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+        if (window.dashboard) window.dashboard.showNotification('Only image uploads are supported.', 'warning');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        window._selectedAIImageFile = file;
+        window._selectedAIImageDataUrl = e.target.result;
+
+        const previewBar = document.getElementById('ai-image-preview-bar');
+        const previewImg = document.getElementById('ai-image-preview-img');
+        if (previewBar && previewImg) {
+            previewImg.src = e.target.result;
+            previewBar.classList.remove('d-none');
+        }
+    };
+    reader.readAsDataURL(file);
+};
+
+// Remove image attachment
+window.clearAIAttachment = function() {
+    window._selectedAIImageFile = null;
+    window._selectedAIImageDataUrl = null;
+
+    const previewBar = document.getElementById('ai-image-preview-bar');
+    const input = document.getElementById('ai-file-input');
+    if (previewBar) previewBar.classList.add('d-none');
+    if (input) input.value = '';
+};
+
+// Convert image files to Base64 format
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            const base64 = reader.result.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = error => reject(error);
+    });
+}
+
 // Auto render history
 function renderAIChatMessages() {
     const stream = document.getElementById('ai-chat-stream');
@@ -1004,6 +1099,13 @@ function renderAIChatMessages() {
         const isUser = msg.role === 'user';
         const avatar = isUser ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-wand-magic-sparkles"></i>';
         const cssClass = isUser ? 'user' : 'assistant';
+        
+        const imageHtml = msg.imageUrl ? `
+            <div class="mb-2">
+                <img src="${msg.imageUrl}" class="rounded border shadow" style="max-width: min(240px, 100%); max-height: 200px; object-fit: contain;">
+            </div>
+        ` : '';
+
         const content = formatMarkdown(msg.parts[0].text);
         
         const copyButton = !isUser ? `
@@ -1018,6 +1120,7 @@ function renderAIChatMessages() {
             <div class="ai-msg ${cssClass}">
                 <div class="ai-msg-avatar">${avatar}</div>
                 <div class="ai-msg-bubble">
+                    ${imageHtml}
                     ${content}
                     ${copyButton}
                 </div>
@@ -1061,8 +1164,11 @@ window.sendAIChatMessage = async function() {
     const input = document.getElementById('ai-message-input');
     if (!input) return;
 
-    const query = input.value.trim();
-    if (!query) return;
+    let query = input.value.trim();
+    if (!query && window._selectedAIImageFile) {
+        query = "Analyze this image and register any contents or actions accordingly.";
+    }
+    if (!query && !window._selectedAIImageFile) return;
 
     const apiKey = await getGeminiApiKey();
     if (!apiKey) {
@@ -1070,8 +1176,16 @@ window.sendAIChatMessage = async function() {
         return;
     }
 
+    const activeImageFile = window._selectedAIImageFile;
+    const activeImageDataUrl = window._selectedAIImageDataUrl;
+    window.clearAIAttachment();
+
     // Append user query to UI and history
-    _aiChatHistory.push({ role: 'user', parts: [{ text: query }] });
+    const historyItem = { role: 'user', parts: [{ text: query }] };
+    if (activeImageDataUrl) {
+        historyItem.imageUrl = activeImageDataUrl;
+    }
+    _aiChatHistory.push(historyItem);
     renderAIChatMessages();
     input.value = '';
 
@@ -1092,14 +1206,46 @@ window.sendAIChatMessage = async function() {
     stream.appendChild(loadingDiv);
     stream.scrollTop = stream.scrollHeight;
 
+    // Convert image to base64 if selected
+    let activeImageBase64 = null;
+    if (activeImageFile) {
+        try {
+            activeImageBase64 = await fileToBase64(activeImageFile);
+        } catch (e) {
+            console.error("Failed to convert image to base64", e);
+        }
+    }
+
     try {
         const systemContext = await getAppOverviewContext();
         
         // Assemble conversation history for multi-turn chat
+        const historyPartsForGemini = _aiChatHistory.map((h, i) => {
+            const isLast = (i === _aiChatHistory.length - 1);
+            if (isLast && activeImageFile && activeImageBase64) {
+                return {
+                    role: h.role,
+                    parts: [
+                        { text: h.parts[0].text },
+                        {
+                            inlineData: {
+                                mimeType: activeImageFile.type,
+                                data: activeImageBase64
+                            }
+                        }
+                    ]
+                };
+            }
+            return {
+                role: h.role,
+                parts: [{ text: h.parts[0].text }]
+            };
+        });
+
         const contents = [
             { role: 'user', parts: [{ text: systemContext + "\n\nInitial prompt: Hello! I am ready to answer queries." }] },
             { role: 'model', parts: [{ text: "Hello! I am your PersonalOS AI Companion. I can see your configurations and transactions data. Let's work together!" }] },
-            ..._aiChatHistory
+            ...historyPartsForGemini
         ];
 
         const MODELS_TO_TRY = [
