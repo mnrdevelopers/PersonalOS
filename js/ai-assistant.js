@@ -154,6 +154,14 @@ function injectAIAssistantStyles() {
             background: linear-gradient(135deg, #6366f1, #a855f7);
             color: #ffffff;
         }
+        .ai-msg-avatar i {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            line-height: 1 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
         .ai-msg.user .ai-msg-avatar {
             background: #64748b;
             color: #ffffff;
@@ -994,7 +1002,7 @@ function renderAIChatMessages() {
 
     stream.innerHTML = _aiChatHistory.map((msg, index) => {
         const isUser = msg.role === 'user';
-        const avatar = isUser ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-sparkles"></i>';
+        const avatar = isUser ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-wand-magic-sparkles"></i>';
         const cssClass = isUser ? 'user' : 'assistant';
         const content = formatMarkdown(msg.parts[0].text);
         
@@ -1072,7 +1080,7 @@ window.sendAIChatMessage = async function() {
     const loadingDiv = document.createElement('div');
     loadingDiv.className = 'ai-msg assistant';
     loadingDiv.innerHTML = `
-        <div class="ai-msg-avatar"><i class="fa-solid fa-sparkles"></i></div>
+        <div class="ai-msg-avatar"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
         <div class="ai-msg-bubble">
             <div class="ai-typing-loader">
                 <div class="ai-typing-dot"></div>
