@@ -696,7 +696,7 @@ Here is the user's current live data summary from their PersonalOS database:
         }
 
         if (scope === 'all' || scope === 'tasks') {
-            promises.push(db.collection('reminders').where('userId', '==', user.uid).where('completed', '==', false).limit(10).get());
+            promises.push(db.collection('reminders').where('userId', '==', user.uid).where('completed', '==', false).get());
         } else {
             promises.push(Promise.resolve(null));
         }
@@ -711,7 +711,7 @@ Here is the user's current live data summary from their PersonalOS database:
         const [accountsSnap, ccSnap, walletSnap, txSnap, tasksSnap, grocerySnap] = await Promise.all(promises);
 
         const bankBalances = {};
-        let recentTxList = [];
+        let allTxList = [];
 
         if (txSnap && !txSnap.empty) {
             const allTxs = txSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -740,9 +740,9 @@ Here is the user's current live data summary from their PersonalOS database:
                 }
             });
 
-            // Sort desc by date and take the last 10
+            // Sort desc by date
             allTxs.sort((a, b) => new Date(b.date) - new Date(a.date));
-            recentTxList = allTxs.slice(0, 10);
+            allTxList = allTxs;
         }
 
         if (accountsSnap && !accountsSnap.empty) {
@@ -770,9 +770,9 @@ Here is the user's current live data summary from their PersonalOS database:
             });
         }
 
-        if (recentTxList.length > 0) {
-            context += `- Last 10 Ledger Transactions:\n`;
-            recentTxList.forEach(d => {
+        if (allTxList.length > 0) {
+            context += `- Full Ledger Transactions (Total: ${allTxList.length}):\n`;
+            allTxList.forEach(d => {
                 context += `  * [${d.date}] ${d.type.toUpperCase()}: ₹${d.amount} for ${d.category} - "${d.description || ''}" (Mode: ${d.paymentMode})\n`;
             });
         }
