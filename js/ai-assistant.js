@@ -133,18 +133,103 @@ function injectAIAssistantStyles() {
             color: #f1f5f9;
             border: 1px solid rgba(255, 255, 255, 0.05);
         }
+        .ai-msg-bubble h1, .ai-msg-bubble h2, .ai-msg-bubble h3, .ai-msg-bubble h4 {
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: inherit;
+        }
+        .ai-msg-bubble h1 { font-size: 1.35rem; }
+        .ai-msg-bubble h2 { font-size: 1.2rem; }
+        .ai-msg-bubble h3 { font-size: 1.05rem; }
+        .ai-msg-bubble h4 { font-size: 0.95rem; }
+        .ai-msg-bubble p {
+            margin-bottom: 0.75rem;
+            line-height: 1.6;
+        }
+        .ai-msg-bubble p:last-child {
+            margin-bottom: 0;
+        }
+        .ai-msg-bubble ul, .ai-msg-bubble ol {
+            margin-bottom: 0.75rem;
+            padding-left: 1.5rem;
+        }
+        .ai-msg-bubble li {
+            margin-bottom: 0.25rem;
+            line-height: 1.5;
+        }
+        .ai-msg-bubble code {
+            font-family: var(--bs-font-monospace);
+            font-size: 0.85em;
+            background: rgba(0, 0, 0, 0.05);
+            padding: 0.15rem 0.35rem;
+            border-radius: 4px;
+            color: #d63384;
+        }
+        [data-bs-theme="dark"] .ai-msg-bubble code {
+            background: rgba(255, 255, 255, 0.1);
+            color: #f472b6;
+        }
         .ai-msg-bubble pre {
-            background: #f8fafc;
-            padding: 0.75rem;
+            background: #1e1e2e;
+            color: #cdd6f4;
+            padding: 1rem;
             border-radius: 8px;
             overflow-x: auto;
-            margin-top: 0.5rem;
-            margin-bottom: 0.5rem;
-            border: 1px solid rgba(0,0,0,0.05);
-        }
-        [data-bs-theme="dark"] .ai-msg-bubble pre {
-            background: #0f172a;
+            margin-top: 0.75rem;
+            margin-bottom: 0.75rem;
             border: 1px solid rgba(255,255,255,0.05);
+        }
+        .ai-msg-bubble pre code {
+            background: transparent !important;
+            padding: 0 !important;
+            border-radius: 0 !important;
+            color: inherit !important;
+            font-size: 0.88rem;
+        }
+        .ai-msg-bubble table {
+            width: 100%;
+            margin-bottom: 1rem;
+            border-collapse: collapse;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        [data-bs-theme="dark"] .ai-msg-bubble table {
+            background: rgba(15, 23, 42, 0.4);
+        }
+        .ai-msg-bubble th, .ai-msg-bubble td {
+            padding: 0.6rem 0.9rem;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            text-align: left;
+            font-size: 0.9rem;
+        }
+        [data-bs-theme="dark"] .ai-msg-bubble th, [data-bs-theme="dark"] .ai-msg-bubble td {
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .ai-msg-bubble th {
+            background: rgba(0, 0, 0, 0.04);
+            font-weight: 600;
+        }
+        [data-bs-theme="dark"] .ai-msg-bubble th {
+            background: rgba(255, 255, 255, 0.04);
+        }
+        .ai-msg-bubble tr:nth-child(even) {
+            background: rgba(0, 0, 0, 0.01);
+        }
+        [data-bs-theme="dark"] .ai-msg-bubble tr:nth-child(even) {
+            background: rgba(255, 255, 255, 0.01);
+        }
+        .ai-msg-bubble blockquote {
+            border-left: 4px solid #4f46e5;
+            padding-left: 1rem;
+            color: #6b7280;
+            margin-left: 0;
+            margin-right: 0;
+            font-style: italic;
+        }
+        [data-bs-theme="dark"] .ai-msg-bubble blockquote {
+            color: #9ca3af;
         }
         .ai-chat-input-area {
             padding: 1.25rem 1.5rem;
@@ -271,41 +356,31 @@ function injectAIAssistantStyles() {
 }
 
 // Format markdown subset for code & bold text in messages
+// Format markdown using marked.js, rendering tables, lists, and checklists beautifully
 function formatMarkdown(text) {
     if (!text) return "";
-    let formatted = text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-    
-    // Code blocks
-    formatted = formatted.replace(/```([\s\S]*?)```/g, function(match, p1) {
-        return `<pre><code>${p1.trim()}</code></pre>`;
-    });
-    
-    // Inline code
-    formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
-    
-    // Bold
-    formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-    
-    // Bullet points
-    formatted = formatted.split('\n').map(line => {
-        if (line.trim().startsWith('* ')) {
-            return `<li>${line.trim().substring(2)}</li>`;
+    try {
+        if (window.marked && typeof window.marked.parse === 'function') {
+            window.marked.setOptions({
+                gfm: true,
+                breaks: true,
+                mangle: false,
+                headerIds: false
+            });
+            let html = window.marked.parse(text);
+            // Replace markdown task checklists with FontAwesome icons
+            html = html.replace(/\[ \]/g, '<i class="far fa-square me-2 text-muted"></i>')
+                       .replace(/\[x\]/gi, '<i class="far fa-check-square me-2 text-success"></i>');
+            return html;
         }
-        if (line.trim().startsWith('- ')) {
-            return `<li>${line.trim().substring(2)}</li>`;
-        }
-        return line;
-    }).join('\n');
-
-    // Wrap grouped list items
-    formatted = formatted.replace(/(<li>.*<\/li>)/gs, '<ul>$1<\/ul>');
+    } catch (e) {
+        console.error('Error parsing markdown with marked:', e);
+    }
     
-    // Paragraph double spacing
-    formatted = formatted.replace(/\n\n/g, '<br><br>');
-    return formatted;
+    // Fallback simple parsing
+    return text.replace(/\n/g, '<br>')
+               .replace(/\[ \]/g, '<i class="far fa-square me-2 text-muted"></i>')
+               .replace(/\[x\]/gi, '<i class="far fa-check-square me-2 text-success"></i>');
 }
 
 // Compile real-time OS database summary context for Gemini
