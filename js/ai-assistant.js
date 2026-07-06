@@ -104,13 +104,27 @@ function injectAIAssistantStyles() {
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.2rem;
+            font-size: 0.95rem;
             flex-shrink: 0;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-            background: #f1f5f9;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+            background: linear-gradient(135deg, #6366f1, #a855f7);
+            color: #ffffff;
         }
-        [data-bs-theme="dark"] .ai-msg-avatar {
-            background: #334155;
+        .ai-msg.user .ai-msg-avatar {
+            background: #64748b;
+            color: #ffffff;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+        .ai-header-badge {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #6366f1, #a855f7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.88rem;
+            box-shadow: 0 3px 8px rgba(99, 102, 241, 0.2);
         }
         .ai-msg-bubble {
             padding: 0.75rem 1.15rem;
@@ -733,8 +747,9 @@ window.loadAIAssistantSection = async function() {
             <!-- Full Width Chat Card -->
             <div class="ai-chat-card w-100 h-100">
                 <div class="ai-chat-header bg-light">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="fs-4">🤖</span>
+                        <div class="ai-header-badge">
+                            <i class="fa-solid fa-wand-magic-sparkles text-white"></i>
+                        </div>
                         <div>
                             <div class="fw-bold" style="font-size: 0.95rem;">PersonalOS Companion</div>
                             <div class="text-muted" id="ai-model-subtext" style="font-size: 0.75rem;">Powered by Gemini AI ${window.activeAIModel ? `(${window.activeAIModel})` : ''}</div>
@@ -852,7 +867,7 @@ function renderAIChatMessages() {
 
     stream.innerHTML = _aiChatHistory.map((msg, index) => {
         const isUser = msg.role === 'user';
-        const avatar = isUser ? '👤' : '🤖';
+        const avatar = isUser ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-sparkles"></i>';
         const cssClass = isUser ? 'user' : 'assistant';
         const content = formatMarkdown(msg.parts[0].text);
         
@@ -930,7 +945,7 @@ window.sendAIChatMessage = async function() {
     const loadingDiv = document.createElement('div');
     loadingDiv.className = 'ai-msg assistant';
     loadingDiv.innerHTML = `
-        <div class="ai-msg-avatar">🤖</div>
+        <div class="ai-msg-avatar"><i class="fa-solid fa-sparkles"></i></div>
         <div class="ai-msg-bubble">
             <div class="ai-typing-loader">
                 <div class="ai-typing-dot"></div>
