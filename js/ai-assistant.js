@@ -395,15 +395,31 @@ Here is the user's current live data summary from their PersonalOS database:
     try {
         // Fetch bank account balances
         const accountsSnap = await db.collection('bank_accounts').where('userId', '==', user.uid).get();
-        context += `- Bank Accounts Configured: ${accountsSnap.size}. Account Names: ${accountsSnap.docs.map(d => d.data().name).join(', ') || 'None'}\n`;
+        if (!accountsSnap.empty) {
+            context += `- Bank Accounts:\n`;
+            accountsSnap.forEach(doc => {
+                const d = doc.data();
+                context += `  * ID: "${doc.id}", Name: "${d.name}", Balance: ₹${d.balance || 0}\n`;
+            });
+        }
         
         // Fetch credit cards
         const ccSnap = await db.collection('credit_cards').where('userId', '==', user.uid).get();
         if (!ccSnap.empty) {
-            context += `- Credit Cards outstanding balance:\n`;
+            context += `- Credit Cards:\n`;
             ccSnap.forEach(doc => {
                 const d = doc.data();
-                context += `  * ${d.name} (Limit: ₹${d.creditLimit}, Outstanding: ₹${d.currentOutstanding || 0})\n`;
+                context += `  * ID: "${doc.id}", Name: "${d.name}", Limit: ₹${d.creditLimit}, Outstanding: ₹${d.currentOutstanding || 0}\n`;
+            });
+        }
+
+        // Fetch digital wallets
+        const walletSnap = await db.collection('wallets').where('userId', '==', user.uid).get();
+        if (!walletSnap.empty) {
+            context += `- Digital Wallets:\n`;
+            walletSnap.forEach(doc => {
+                const d = doc.data();
+                context += `  * ID: "${doc.id}", Name: "${d.name}", Balance: ₹${d.balance || 0}\n`;
             });
         }
 
@@ -452,10 +468,48 @@ Here is the user's current live data summary from their PersonalOS database:
 Instructions:
 1. Provide extremely professional, clear, and actionable advice to the user.
 2. Structure your replies using clean markdown tables, neat sections, and professional language suitable for a personal CFO.
-3. Avoid overly casual language, emojis in titles, or raw informal notes. Use a clean, crisp, business-like tone.
-4. When drafting checklists, present them clearly.
-5. If they ask about their finances, tasks, or groceries, refer to the data provided above.
-6. Always use the Indian Rupee symbol (₹) for monetary values.
+3. If the user asks you to write, add, record, create, complete, or save any database items (e.g. transaction, income, expense, task, grocery list item), you MUST output a JSON block matching one of the following schemas. Wrap the JSON block in a markdown code block with language "json". Make sure the JSON is valid and complete.
+
+Action Schemas:
+
+A. Adding a Transaction (Income or Expense):
+{
+  "action": "add_transaction",
+  "data": {
+    "type": "income" | "expense",
+    "amount": number,
+    "category": string (e.g. "Salary", "Food", "Entertainment", "Credit Card Bill", "Rent", "Others"),
+    "date": "YYYY-MM-DD",
+    "paymentMode": "upi" | "cash" | "bank" | "credit-card" | "wallet",
+    "description": string,
+    "bankAccountId": "matching_bank_id_from_above" | null,
+    "creditCardId": "matching_card_id_from_above" | null,
+    "walletId": "matching_wallet_id_from_above" | null
+  }
+}
+
+B. Adding a Task / Reminder:
+{
+  "action": "add_task",
+  "data": {
+    "title": string,
+    "dueDate": "YYYY-MM-DD" | "",
+    "priority": "low" | "medium" | "high",
+    "category": string (e.g. "General", "Bills", "Work", "Personal")
+  }
+}
+
+C. Adding a Grocery Item:
+{
+  "action": "add_grocery",
+  "data": {
+    "name": string,
+    "quantity": number,
+    "category": string (e.g. "Vegetables", "Dairy", "Fruits", "Snacks")
+  }
+}
+
+4. Keep descriptions concise. Always use the Indian Rupee symbol (₹) for monetary values. Explain the action you are performing in the text reply.
 `;
     return context;
 }
@@ -779,6 +833,20 @@ window.sendAIChatMessage = async function() {
 
         if (resData.candidates && resData.candidates[0]?.content?.parts[0]?.text) {
             const replyText = resData.candidates[0].content.parts[0].text;
+            
+            // Extract and run JSON Action payload
+            const jsonMatch = replyText.match(/```json\s*([\s\S]*?)\s*```/);
+            if (jsonMatch) {
+                try {
+                    const actionData = JSON.parse(jsonMatch[1].trim());
+                    if (actionData.action && actionData.data) {
+                        await executeAIAction(actionData.action, actionData.data);
+                    }
+                } catch (jsonErr) {
+                    console.error('Failed to parse tool action:', jsonErr);
+                }
+            }
+
             _aiChatHistory.push({ role: 'model', parts: [{ text: replyText }] });
         } else {
             console.error('Gemini error response:', resData);
@@ -841,3 +909,80 @@ window.toggleAISpeechInput = function() {
 
     _speechRecognition.start();
 };
+
+// Tool actions processor
+async function executeAIAction(action, data) {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    try {
+        if (action === 'add_transaction') {
+            const tx = {
+                userId: user.uid,
+                type: data.type || 'expense',
+                amount: parseFloat(data.amount) || 0,
+                category: data.category || 'Others',
+                date: data.date || new Date().toISOString().split('T')[0],
+                paymentMode: data.paymentMode || 'cash',
+                description: data.description || 'Added via AI Assistant',
+                bankAccountId: data.bankAccountId || null,
+                creditCardId: data.creditCardId || null,
+                walletId: data.walletId || null,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            
+            tx.relatedId = (tx.paymentMode === 'credit-card' && tx.creditCardId) ? tx.creditCardId : 
+                           (tx.category === 'Credit Card Bill' && tx.creditCardId ? tx.creditCardId : 
+                           ((tx.paymentMode === 'wallet' && tx.walletId) ? tx.walletId : null));
+
+            await db.collection('transactions').add(tx);
+            
+            if (window.adjustBalancesForTxChange) {
+                await window.adjustBalancesForTxChange(null, tx);
+            }
+            
+            if (window.dashboard) {
+                window.dashboard.showNotification('Transaction added via AI! ✓', 'success');
+                window.dashboard.updateStats();
+            }
+        } 
+        else if (action === 'add_task') {
+            const task = {
+                userId: user.uid,
+                title: data.title,
+                dueDate: data.dueDate || '',
+                priority: data.priority || 'medium',
+                category: data.category || 'General',
+                completed: false,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            
+            await db.collection('reminders').add(task);
+            
+            if (window.dashboard) {
+                window.dashboard.showNotification('Task created via AI! ✓', 'success');
+            }
+        }
+        else if (action === 'add_grocery') {
+            const item = {
+                userId: user.uid,
+                name: data.name,
+                quantity: parseFloat(data.quantity) || 1,
+                category: data.category || 'Others',
+                status: 'to_buy',
+                addedAt: new Date().toISOString()
+            };
+            
+            await db.collection('grocery_items').add(item);
+            
+            if (window.dashboard) {
+                window.dashboard.showNotification('Grocery item added via AI! ✓', 'success');
+            }
+        }
+    } catch (e) {
+        console.error('Failed to execute AI tool action:', e);
+        if (window.dashboard) {
+            window.dashboard.showNotification('AI failed to execute action.', 'danger');
+        }
+    }
+}
