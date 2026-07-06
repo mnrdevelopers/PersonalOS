@@ -1682,6 +1682,9 @@ class Dashboard {
             case 'settings':
                 if (window.loadSettingsSection) await window.loadSettingsSection();
                 break;
+            case 'ai-assistant':
+                if (window.loadAIAssistantSection) await window.loadAIAssistantSection();
+                break;
             case 'expiry':
                 if (window.loadExpirySection) await window.loadExpirySection();
                 break;

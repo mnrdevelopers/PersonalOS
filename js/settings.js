@@ -103,6 +103,27 @@ window.loadSettingsSection = async function() {
             </div>
         </div>
 
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">AI Assistant Preferences</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Gemini API Key</label>
+                    <div class="input-group">
+                        <input type="password" class="form-control" id="setting-ai-key" placeholder="Enter your Gemini API key..." 
+                               value="${settings.gemini_api_key || ''}" onchange="updateSetting('gemini_api_key', this.value)">
+                        <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('setting-ai-key')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="form-text">
+                        Don't have a key? You can get a free, developer-tier Gemini API key from the <a href="https://aistudio.google.com/" target="_blank">Google AI Studio</a>.
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="card border-danger">
             <div class="card-header bg-danger text-white">
                 <h5 class="mb-0">Danger Zone</h5>
@@ -192,5 +213,15 @@ window.deleteAccount = async function() {
             console.error("Error deleting account:", error);
             if(window.dashboard) window.dashboard.showNotification("Error deleting account. You may need to re-login first.", 'danger');
         }
+    }
+};
+
+window.togglePasswordVisibility = function(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.type === 'password') {
+        el.type = 'text';
+    } else {
+        el.type = 'password';
     }
 };
