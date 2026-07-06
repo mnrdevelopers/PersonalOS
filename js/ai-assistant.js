@@ -616,8 +616,11 @@ window.sendAIChatMessage = async function() {
             } catch (err) {}
             
             if (response.status === 404 || response.status === 400 || response.status === 403) {
-                if (!apiKey.startsWith('AIza')) {
-                    errMsg += `\n\n**Tip:** The API key you configured (\`${apiKey.substring(0, 5)}...\`) does not start with \`AIza\`. Google Gemini API keys from Google AI Studio always start with the prefix \`AIzaSy\`. Please check Google AI Studio to get a correct developer API key.`;
+                const hasValidPrefix = apiKey.startsWith('AIza') || apiKey.startsWith('AQ.');
+                if (!hasValidPrefix) {
+                    errMsg += `\n\n**Tip:** The API key you configured (\`${apiKey.substring(0, 5)}...\`) does not start with a recognized Gemini prefix (\`AIzaSy\` or \`AQ.\`). Google Gemini API keys from Google AI Studio always start with one of these. Please check that you copied the correct key.`;
+                } else {
+                    errMsg += `\n\n**Tip:** Your API key has the correct prefix (\`${apiKey.startsWith('AIza') ? 'AIza' : 'AQ.'}\`), but Google's server returned a ${response.status} error. This indicates that the key is inactive, has been deleted, has restricted permissions, or was copied incorrectly (truncated). Please verify it in your [Google AI Studio Console](https://aistudio.google.com/).`;
                 }
             }
             throw new Error(errMsg);
