@@ -376,12 +376,16 @@ function injectAIAssistantStyles() {
         .ai-typing-dot {
             width: 6px;
             height: 6px;
-            background: #94a3b8;
+            background: #6366f1;
             border-radius: 50%;
-            animation: ai-typing 1s infinite alternate;
+            animation: ai-typing 0.6s infinite alternate;
         }
-        .ai-typing-dot:nth-child(2) { animation-delay: 0.2s; }
-        .ai-typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        .ai-typing-dot:nth-child(2) { animation-delay: 0.15s; }
+        .ai-typing-dot:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes ai-typing {
+            from { transform: translateY(0); opacity: 0.3; }
+            to { transform: translateY(-6px); opacity: 1; }
+        }
         @media (max-width: 768px) {
             body.is-ai-assistant {
                 position: fixed !important;
