@@ -1331,6 +1331,7 @@
         // UI Logic for Transaction Modal - Credit Card Selection
         document.addEventListener('DOMContentLoaded', function () {
             const transactionMode = document.getElementById('transaction-mode');
+            const transactionCategory = document.getElementById('transaction-category');
             const creditCardContainer = document.getElementById('credit-card-select-container');
             const walletContainer = document.getElementById('wallet-select-container');
             const bankAccountContainer = document.getElementById('bank-account-select-container');
@@ -1338,24 +1339,40 @@
             // Payment modes that belong to bank (show bank account picker)
             const BANK_MODES = new Set(['bank', 'upi', 'upi-bhim', 'upi-phonepe', 'upi-gpay', 'upi-navi', 'upi-cred', 'debit-card']);
 
-            if (transactionMode) {
-                transactionMode.addEventListener('change', function () {
-                    if (creditCardContainer) creditCardContainer.classList.add('d-none');
-                    if (walletContainer) walletContainer.classList.add('d-none');
-                    if (bankAccountContainer) bankAccountContainer.classList.add('d-none');
-                    document.getElementById('transaction-credit-card').required = false;
-                    document.getElementById('transaction-wallet').required = false;
+            function toggleTransactionFields() {
+                if (!transactionMode) return;
+                const mode = transactionMode.value;
+                const category = transactionCategory ? transactionCategory.value : '';
 
-                    if (this.value === 'credit-card') {
-                        if (creditCardContainer) creditCardContainer.classList.remove('d-none');
-                        document.getElementById('transaction-credit-card').required = true;
-                    } else if (this.value === 'wallet') {
-                        if (walletContainer) walletContainer.classList.remove('d-none');
-                        document.getElementById('transaction-wallet').required = true;
-                    } else if (BANK_MODES.has(this.value)) {
-                        if (bankAccountContainer) bankAccountContainer.classList.remove('d-none');
-                    }
-                });
+                if (creditCardContainer) creditCardContainer.classList.add('d-none');
+                if (walletContainer) walletContainer.classList.add('d-none');
+                if (bankAccountContainer) bankAccountContainer.classList.add('d-none');
+
+                const ccSelect = document.getElementById('transaction-credit-card');
+                const walletSelect = document.getElementById('transaction-wallet');
+                if (ccSelect) ccSelect.required = false;
+                if (walletSelect) walletSelect.required = false;
+
+                if (mode === 'credit-card' || category === 'Credit Card Bill') {
+                    if (creditCardContainer) creditCardContainer.classList.remove('d-none');
+                    if (ccSelect) ccSelect.required = true;
+                }
+                
+                if (mode === 'wallet') {
+                    if (walletContainer) walletContainer.classList.remove('d-none');
+                    if (walletSelect) walletSelect.required = true;
+                }
+                
+                if (BANK_MODES.has(mode)) {
+                    if (bankAccountContainer) bankAccountContainer.classList.remove('d-none');
+                }
+            }
+
+            if (transactionMode) {
+                transactionMode.addEventListener('change', toggleTransactionFields);
+            }
+            if (transactionCategory) {
+                transactionCategory.addEventListener('change', toggleTransactionFields);
             }
 
             // UI Logic for Loan Modal - Transaction Toggle

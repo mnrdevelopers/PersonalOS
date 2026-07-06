@@ -1519,6 +1519,121 @@ window.saveTransferTransaction = async function() {
     }
 };
 
+function getTxOutstandingEffect(tx) {
+    if (!tx) return { cardId: null, effect: 0 };
+    const amount = Number(tx.amount) || 0;
+    
+    // Check if a credit card was selected, checking either creditCardId or relatedId field
+    const cardId = (tx.paymentMode === 'credit-card' || tx.category === 'Credit Card Bill')
+        ? (tx.creditCardId || tx.relatedId)
+        : null;
+        
+    if (!cardId) return { cardId: null, effect: 0 };
+    
+    if (tx.paymentMode === 'credit-card') {
+        const effect = tx.type === 'expense' ? amount : (tx.type === 'income' ? -amount : 0);
+        return { cardId, effect };
+    }
+    
+    const isBillPay = tx.category === 'Credit Card Bill' || 
+                       (tx.description && (tx.description.includes('Bill Pay') || tx.description.includes('Credit Card Bill')));
+    if (isBillPay) {
+        const effect = tx.type === 'expense' ? -amount : (tx.type === 'income' ? amount : 0);
+        return { cardId, effect };
+    }
+    
+    return { cardId: null, effect: 0 };
+}
+
+function getTxWalletEffect(tx) {
+    if (!tx || tx.paymentMode !== 'wallet') return { walletId: null, effect: 0 };
+    const walletId = tx.walletId || tx.relatedId;
+    if (!walletId) return { walletId: null, effect: 0 };
+    
+    const amount = Number(tx.amount) || 0;
+    const effect = tx.type === 'expense' ? -amount : (tx.type === 'income' ? amount : 0);
+    return { walletId, effect };
+}
+
+window.adjustBalancesForTxChange = async function(oldTx, newTx) {
+    try {
+        const batch = db.batch();
+        let hasChanges = false;
+        
+        // 1. Handle Credit Cards
+        const oldCc = getTxOutstandingEffect(oldTx);
+        const newCc = getTxOutstandingEffect(newTx);
+        
+        if (oldCc.cardId && newCc.cardId && oldCc.cardId === newCc.cardId) {
+            const diff = newCc.effect - oldCc.effect;
+            if (diff !== 0) {
+                batch.update(db.collection('credit_cards').doc(newCc.cardId), {
+                    currentOutstanding: firebase.firestore.FieldValue.increment(diff),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                hasChanges = true;
+            }
+        } else {
+            if (oldCc.cardId && oldCc.effect !== 0) {
+                batch.update(db.collection('credit_cards').doc(oldCc.cardId), {
+                    currentOutstanding: firebase.firestore.FieldValue.increment(-oldCc.effect),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                hasChanges = true;
+            }
+            if (newCc.cardId && newCc.effect !== 0) {
+                batch.update(db.collection('credit_cards').doc(newCc.cardId), {
+                    currentOutstanding: firebase.firestore.FieldValue.increment(newCc.effect),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                hasChanges = true;
+            }
+        }
+
+        // 2. Handle Wallets
+        const oldW = getTxWalletEffect(oldTx);
+        const newW = getTxWalletEffect(newTx);
+        
+        if (oldW.walletId && newW.walletId && oldW.walletId === newW.walletId) {
+            const diff = newW.effect - oldW.effect;
+            if (diff !== 0) {
+                batch.update(db.collection('wallets').doc(newW.walletId), {
+                    balance: firebase.firestore.FieldValue.increment(diff),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                hasChanges = true;
+            }
+        } else {
+            if (oldW.walletId && oldW.effect !== 0) {
+                batch.update(db.collection('wallets').doc(oldW.walletId), {
+                    balance: firebase.firestore.FieldValue.increment(-oldW.effect),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                hasChanges = true;
+            }
+            if (newW.walletId && newW.effect !== 0) {
+                batch.update(db.collection('wallets').doc(newW.walletId), {
+                    balance: firebase.firestore.FieldValue.increment(newW.effect),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                hasChanges = true;
+            }
+        }
+        
+        if (hasChanges) {
+            await batch.commit();
+            if (typeof loadCreditCardsGrid === 'function') {
+                loadCreditCardsGrid();
+            }
+            if (typeof loadWalletsGrid === 'function') {
+                loadWalletsGrid();
+            }
+        }
+    } catch (e) {
+        console.error('Error adjusting balances for transaction change:', e);
+    }
+};
+
 window.editTransaction = async function(id) {
     try {
         const doc = await db.collection('transactions').doc(id).get();
@@ -1546,8 +1661,8 @@ window.editTransaction = async function(id) {
         document.getElementById('transaction-date').value = data.date;
         document.getElementById('transaction-category').value = data.category;
         if (window.setCatSearchValue) window.setCatSearchValue(data.category);
-        document.getElementById('transaction-credit-card').value = data.paymentMode === 'credit-card' ? (data.relatedId || '') : '';
-        document.getElementById('transaction-wallet').value = data.paymentMode === 'wallet' ? (data.relatedId || '') : '';
+        document.getElementById('transaction-credit-card').value = (data.paymentMode === 'credit-card' || data.category === 'Credit Card Bill') ? (data.creditCardId || data.relatedId || '') : '';
+        document.getElementById('transaction-wallet').value = data.paymentMode === 'wallet' ? (data.walletId || data.relatedId || '') : '';
         document.getElementById('transaction-mode').dispatchEvent(new Event('change'));
 
         // Pre-fill bank account selector
@@ -1582,7 +1697,18 @@ window.deleteTransaction = async function(id) {
     if(confirm('Are you sure you want to delete this transaction?')) {
         if(window.dashboard) window.dashboard.showLoading();
         try {
+            const doc = await db.collection('transactions').doc(id).get();
+            let oldTx = null;
+            if (doc.exists) {
+                oldTx = doc.data();
+            }
+
             await db.collection('transactions').doc(id).delete();
+            
+            if (oldTx && window.adjustBalancesForTxChange) {
+                await window.adjustBalancesForTxChange(oldTx, null);
+            }
+
             const activeInput = document.querySelector('input[name="finance-filter"]:checked');
             const activeFilter = activeInput ? activeInput.id.replace('filter-', '') : 'all';
             loadFinanceData(activeFilter); 

@@ -975,9 +975,36 @@ window.loadGroceriesSection = async function() {
                         <div class="mb-3" id="checkout-payment-div">
                             <label class="form-label">Payment Mode</label>
                             <select class="form-select" id="checkout-payment-mode">
-                                <option value="upi">UPI</option>
-                                <option value="card">Card</option>
                                 <option value="cash">Cash</option>
+                                <option value="bank">Bank Transfer</option>
+                                <option value="upi" selected>UPI</option>
+                                <option value="upi-bhim">UPI - BHIM</option>
+                                <option value="upi-phonepe">UPI - PhonePe</option>
+                                <option value="upi-gpay">UPI - Google Pay</option>
+                                <option value="upi-navi">UPI - Navi Pay</option>
+                                <option value="upi-cred">UPI - CRED Pay</option>
+                                <option value="credit-card">Credit Card</option>
+                                <option value="wallet">Wallet</option>
+                                <option value="debit-card">Debit Card</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="mb-3 d-none" id="checkout-cc-select-container">
+                            <label class="form-label">Select Credit Card</label>
+                            <select class="form-select" id="checkout-credit-card">
+                                <option value="" selected disabled>Choose a card...</option>
+                            </select>
+                        </div>
+                        <div class="mb-3 d-none" id="checkout-wallet-select-container">
+                            <label class="form-label">Select Wallet</label>
+                            <select class="form-select" id="checkout-wallet">
+                                <option value="" selected disabled>Choose a wallet...</option>
+                            </select>
+                        </div>
+                        <div class="mb-3 d-none" id="checkout-bank-account-select-container">
+                            <label class="form-label">Bank Account <span class="text-muted small">(optional)</span></label>
+                            <select class="form-select" id="checkout-bank-account">
+                                <option value="" selected>Select bank account…</option>
                             </select>
                         </div>
                     </div>
@@ -1651,6 +1678,9 @@ window.deleteGroceryItem = async function(id) {
 };
 
 window.initiateCheckout = function() {
+    const user = auth.currentUser;
+    if (!user) return;
+
     if (groceryCart.size === 0) {
         if (window.dashboard) window.dashboard.showNotification('Add items to basket first', 'warning');
         return;
@@ -1729,6 +1759,61 @@ window.initiateCheckout = function() {
     
     calculateCheckoutTotal(); // Initial calculation
     updateCheckoutModalState();
+
+    // Wire up change listener on checkout-payment-mode
+    const paymentModeSelect = document.getElementById('checkout-payment-mode');
+    if (paymentModeSelect) {
+        paymentModeSelect.value = 'upi';
+        if (!paymentModeSelect.dataset.listenerWired) {
+            paymentModeSelect.dataset.listenerWired = 'true';
+            paymentModeSelect.addEventListener('change', function() {
+                const val = this.value;
+                const BANK_MODES = new Set(['bank', 'upi', 'upi-bhim', 'upi-phonepe', 'upi-gpay', 'upi-navi', 'upi-cred', 'debit-card']);
+                
+                document.getElementById('checkout-cc-select-container')?.classList.toggle('d-none', val !== 'credit-card');
+                document.getElementById('checkout-wallet-select-container')?.classList.toggle('d-none', val !== 'wallet');
+                document.getElementById('checkout-bank-account-select-container')?.classList.toggle('d-none', !BANK_MODES.has(val));
+                
+                const ccSelect = document.getElementById('checkout-credit-card');
+                if (ccSelect) ccSelect.required = (val === 'credit-card');
+                
+                const walletSelect = document.getElementById('checkout-wallet');
+                if (walletSelect) walletSelect.required = (val === 'wallet');
+            });
+        }
+    }
+
+    // Populate selects dynamically
+    const ccSelect = document.getElementById('checkout-credit-card');
+    if (ccSelect) {
+        ccSelect.innerHTML = '<option value="" selected disabled>Choose a card...</option>';
+        db.collection('credit_cards').where('userId', '==', user.uid).get().then(snapshot => {
+            snapshot.forEach(doc => {
+                ccSelect.innerHTML += `<option value="${doc.id}">${doc.data().name} (..${doc.data().last4 || ''})</option>`;
+            });
+        }).catch(e => console.error('Error fetching cards for checkout:', e));
+    }
+
+    const walletSelect = document.getElementById('checkout-wallet');
+    if (walletSelect) {
+        walletSelect.innerHTML = '<option value="" selected disabled>Choose a wallet...</option>';
+        db.collection('wallets').where('userId', '==', user.uid).get().then(snapshot => {
+            snapshot.forEach(doc => {
+                walletSelect.innerHTML += `<option value="${doc.id}">${doc.data().name} (₹${doc.data().balance})</option>`;
+            });
+        }).catch(e => console.error('Error fetching wallets for checkout:', e));
+    }
+
+    if (window.populateBankAccountSelect) {
+        window.populateBankAccountSelect('checkout-bank-account', {
+            placeholder: 'Select bank account…'
+        });
+    }
+
+    if (paymentModeSelect) {
+        paymentModeSelect.dispatchEvent(new Event('change'));
+    }
+
     modal.show();
 };
 
@@ -1775,6 +1860,9 @@ window.confirmCheckout = async function() {
     const storeKey = storeMeta.key;
     const addToLedger = document.getElementById('checkout-ledger').checked;
     const paymentMode = document.getElementById('checkout-payment-mode').value;
+    const creditCardId = document.getElementById('checkout-credit-card')?.value || '';
+    const walletId = document.getElementById('checkout-wallet')?.value || '';
+    const bankAccountId = document.getElementById('checkout-bank-account')?.value || '';
     
     const items = [];
     let totalAmount = 0;
@@ -1835,10 +1923,25 @@ window.confirmCheckout = async function() {
             });
         });
 
+        let txPayload = null;
         // 3. Add to Ledger (Optional)
         if (addToLedger && totalAmount > 0) {
-            const txRef = db.collection('transactions').doc();
-            batch.set(txRef, {
+            const accountMeta = window.getTransactionAccountMeta
+                ? window.getTransactionAccountMeta(paymentMode)
+                : { type: paymentMode === 'cash' ? 'cash' : 'bank', label: paymentMode === 'cash' ? 'Cash' : 'Bank' };
+
+            let resolvedAccountLabel = accountMeta.label;
+            let resolvedBankAccountId = null;
+            let resolvedBankAccountName = null;
+            if (accountMeta.type === 'bank' && bankAccountId) {
+                resolvedBankAccountId = bankAccountId;
+                resolvedBankAccountName = window.getBankAccountLabel ? window.getBankAccountLabel(bankAccountId) : null;
+                if (resolvedBankAccountName && resolvedBankAccountName !== 'Bank') {
+                    resolvedAccountLabel = resolvedBankAccountName;
+                }
+            }
+
+            txPayload = {
                 userId: user.uid,
                 date,
                 amount: totalAmount,
@@ -1846,13 +1949,25 @@ window.confirmCheckout = async function() {
                 category: 'Groceries',
                 description: `Grocery Run: ${store || 'Supermarket'} (${items.length} items)`,
                 paymentMode,
+                accountType: accountMeta.type,
+                accountLabel: resolvedAccountLabel,
+                bankAccountId: resolvedBankAccountId,
+                bankAccountName: resolvedBankAccountName,
+                creditCardId: (paymentMode === 'credit-card' && creditCardId) ? creditCardId : null,
+                walletId: (paymentMode === 'wallet' && walletId) ? walletId : null,
                 relatedId: logRef.id,
                 section: 'groceries',
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
+            };
+            const txRef = db.collection('transactions').doc();
+            batch.set(txRef, txPayload);
         }
 
         await batch.commit();
+        
+        if (txPayload && window.adjustBalancesForTxChange) {
+            await window.adjustBalancesForTxChange(null, txPayload);
+        }
         
         window.setBtnLoading(btn, false);
         bootstrap.Modal.getInstance(document.getElementById('checkoutModal')).hide();
@@ -2101,9 +2216,19 @@ window.deleteGroceryLog = async function(id) {
             .where('userId', '==', user.uid)
             .where('relatedId', '==', id)
             .get();
-        txSnap.forEach(doc => batch.delete(doc.ref));
+        
+        let deletedTxData = null;
+        txSnap.forEach(doc => {
+            deletedTxData = doc.data();
+            batch.delete(doc.ref);
+        });
 
         await batch.commit();
+
+        if (deletedTxData && window.adjustBalancesForTxChange) {
+            await window.adjustBalancesForTxChange(deletedTxData, null);
+        }
+
         await loadGroceryLogsData();
         populateGroceryInsightControls();
         await loadGroceryHistory();

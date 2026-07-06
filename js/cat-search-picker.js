@@ -74,7 +74,10 @@ window.renderCatSearchList = function(categories) {
 window.selectCatSearchOption = function(value, icon) {
     const hiddenInput = document.getElementById('transaction-category');
     const display = document.getElementById('cat-search-display');
-    if (hiddenInput) hiddenInput.value = value;
+    if (hiddenInput) {
+        hiddenInput.value = value;
+        hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
     if (display) {
         display.innerHTML =
             '<span class="cat-search-item-icon me-2">' + (icon || '\uD83C\uDFF7\uFE0F') + '</span>' +

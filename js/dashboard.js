@@ -1903,8 +1903,20 @@ class Dashboard {
                 recurring: isRecurring,
                 frequency: isRecurring ? frequency : null,
                 nextDueDate: isRecurring ? this.calculateNextDate(date, frequency) : null,
-                relatedId: (paymentMode === 'credit-card' && creditCardId) ? creditCardId : ((paymentMode === 'wallet' && walletId) ? walletId : null)
+                creditCardId: (paymentMode === 'credit-card' || category === 'Credit Card Bill') ? (creditCardId || null) : null,
+                walletId: (paymentMode === 'wallet') ? (walletId || null) : null,
+                relatedId: (paymentMode === 'credit-card' && creditCardId) ? creditCardId : 
+                           (category === 'Credit Card Bill' && creditCardId ? creditCardId : 
+                           ((paymentMode === 'wallet' && walletId) ? walletId : null))
             };
+
+            let oldTx = null;
+            if (id) {
+                const oldDoc = await db.collection('transactions').doc(id).get();
+                if (oldDoc.exists) {
+                    oldTx = oldDoc.data();
+                }
+            }
 
             if (!id && type === 'expense' && this.isUpiPaymentMode(paymentMode)) {
                 this.pendingUpiTransaction = transaction;
@@ -1921,20 +1933,11 @@ class Dashboard {
             } else {
                 transaction.createdAt = firebase.firestore.FieldValue.serverTimestamp();
                 await db.collection('transactions').add(transaction);
+            }
 
-                // Handle Credit Card Deduction (Increase Outstanding)
-                if (type === 'expense' && paymentMode === 'credit-card' && creditCardId) {
-                    await db.collection('credit_cards').doc(creditCardId).update({
-                        currentOutstanding: firebase.firestore.FieldValue.increment(amount)
-                    });
-                }
-
-                // Handle Wallet Deduction
-                if (type === 'expense' && paymentMode === 'wallet' && walletId) {
-                    await db.collection('wallets').doc(walletId).update({
-                        balance: firebase.firestore.FieldValue.increment(-amount)
-                    });
-                }
+            // Adjust Credit Card and Wallet balances globally
+            if (window.adjustBalancesForTxChange) {
+                await window.adjustBalancesForTxChange(oldTx, transaction);
             }
 
             // Close modal
@@ -2025,6 +2028,10 @@ class Dashboard {
 
         try {
             await db.collection('transactions').add(tx);
+
+            if (window.adjustBalancesForTxChange) {
+                await window.adjustBalancesForTxChange(null, tx);
+            }
 
             bootstrap.Modal.getOrCreateInstance(document.getElementById('upiPaymentModal')).hide();
             this.pendingUpiTransaction = null;

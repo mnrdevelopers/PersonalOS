@@ -24,7 +24,8 @@ service cloud.firestore {
 
     // Transactions
     match /transactions/{docId} {
-      allow read, update, delete: if isOwner(resource.data.userId);
+      allow read, update: if isOwner(resource.data.userId);
+      allow delete: if resource == null || isOwner(resource.data.userId);
       allow create: if isOwnerCreate();
     }
 
@@ -66,12 +67,13 @@ service cloud.firestore {
 
     // Loans & Repayments
     match /loans/{docId} {
-      allow read, update, delete: if isOwner(resource.data.userId);
+      allow read, update: if isOwner(resource.data.userId);
+      allow delete: if resource == null || isOwner(resource.data.userId);
       allow create: if isOwnerCreate();
       
       match /repayments/{repaymentId} {
-        allow read, update, delete: if isOwner(resource.data.userId);
-        allow create: if isOwnerCreate();
+        allow read, update, delete: if resource == null || isOwner(resource.data.userId) || isOwner(get(/databases/$(database)/documents/loans/$(docId)).data.userId);
+        allow create: if isOwnerCreate() || isOwner(get(/databases/$(database)/documents/loans/$(docId)).data.userId);
       }
     }
 
