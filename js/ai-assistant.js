@@ -839,6 +839,13 @@ C. Adding a Grocery Item:
 }
 
 4. Keep descriptions concise. Always use the Indian Rupee symbol (₹) for monetary values. Explain the action you are performing in the text reply.
+
+5. SYSTEM ARCHITECTURE & BUSINESS RULES:
+- Financial Year: Dashboard cash positions are calculated for the current Financial Year starting April 1st.
+- Net Worth & Assets: Borrowed/EMI loans are liabilities and MUST be completely excluded from Net Worth and dashboard asset lists. Only Lent loans (assets) are counted.
+- Earmarked Funds: Money held for family/friends. Earmarked locked amounts must be subtracted from Available Capital and parent accounts (wallets, bank, cash). They have a badge indicator and a deposit/release history ledger.
+- Habits: Habits check-ins are logged in habit_logs. Streaks are computed client-side sequentially.
+- Vehicles: Maintenance odometer limits trigger service logs reminders. Odometer values should match log values.
 `;
     return context;
 }

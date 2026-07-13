@@ -371,6 +371,14 @@
             const vehiclesSnap = await db.collection('vehicles').where('userId', '==', user.uid).get();
 
             systemContext += `\nTransactions list count: ${txsSnap.size}\nActive Habits count: ${habitsSnap.size}\nLoans count: ${loansSnap.size}\nCredit Cards limit count: ${CCsSnap.size}\n`;
+            systemContext += `
+Business Rules:
+- Financial Year: Cash positions are calculated for the current Financial Year starting April 1st.
+- Net Worth & Assets: Borrowed/EMI loans are liabilities and MUST be completely excluded from Net Worth. Only Lent loans (assets) are counted.
+- Earmarked Funds: Money held for family/friends. Earmarked locked amounts must be subtracted from Available Capital and parent accounts (wallets, bank, cash).
+- Habits: Habits check-ins are logged in habit_logs. Streaks are computed client-side sequentially.
+- Vehicles: Maintenance odometer limits trigger service logs reminders. Odometer values should match log values.
+`;
             const isOpenRouter = apiKey.startsWith('sk-or-');
             let text = '';
 
