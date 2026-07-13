@@ -1056,6 +1056,7 @@ body {
     flex-direction: column-reverse;
     align-items: center;
     gap: 15px;
+    pointer-events: none;
 }
 
 .fab-main {
@@ -1070,6 +1071,7 @@ body {
     transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     z-index: 1051;
     padding: 0;
+    pointer-events: auto;
 }
 
 .fab-options {
@@ -1104,6 +1106,7 @@ body {
     position: relative;
     padding: 0;
     transition: transform 0.2s;
+    pointer-events: auto;
 }
 
 .fab-option:active {
@@ -1137,6 +1140,36 @@ body {
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
     .fab-container {
         bottom: calc(30px + env(safe-area-inset-bottom));
+    }
+}
+
+/* Global Floating AI Co-Pilot Button Mobile Styling & Layout */
+#global-ai-copilot-trigger {
+    position: fixed;
+    bottom: 85px;
+    right: 20px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    z-index: 1040;
+    background: linear-gradient(135deg, #6366f1, #a855f7);
+    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);
+    transition: var(--transition);
+}
+
+@media (max-width: 991.98px) {
+    #global-ai-copilot-trigger {
+        bottom: 30px;
+        left: 20px;
+        right: auto;
+    }
+}
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    @media (max-width: 991.98px) {
+        #global-ai-copilot-trigger {
+            bottom: calc(30px + env(safe-area-inset-bottom));
+        }
     }
 }
 
