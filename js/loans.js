@@ -267,11 +267,19 @@ window.loadLoansSection = async function() {
                                                 <option value="3">3 times a day</option>
                                             </select>
                                         </div>
+                                        <div class="mb-2">
+                                            <label class="form-label small mb-1">Custom Message Template</label>
+                                            <textarea class="form-control form-control-sm" id="loan-reminder-template" rows="3" placeholder="Leave blank to use default template..."></textarea>
+                                            <div class="form-text small" style="font-size: 0.75rem;">
+                                                Placeholders: <code>{name}</code>, <code>{amount}</code>, <code>{dueDate}</code>, <code>{context}</code>
+                                            </div>
+                                        </div>
                                         <div class="p-2 bg-success bg-opacity-10 rounded small text-success">
                                             <i class="fas fa-info-circle me-1"></i>
                                             Requires WA server at <span id="wa-server-url-hint" class="fw-semibold">localhost:3001</span>
                                         </div>
                                     </div>
+
                                 </div>
                             </div>
                             <div class="row">
@@ -1440,7 +1448,10 @@ window.resetLoanForm = async function() {
     if (reminderDays) reminderDays.value = 3;
     const reminderTimes = document.getElementById('loan-reminder-times');
     if (reminderTimes) reminderTimes.value = 1;
+    const reminderTemplate = document.getElementById('loan-reminder-template');
+    if (reminderTemplate) reminderTemplate.value = '';
     toggleReminderConfig(false);
+
 
     await window.populateLoanPaymentSelects();
 
@@ -1599,6 +1610,7 @@ window.saveLoan = async function() {
     const reminderEnabled = document.getElementById('loan-reminder-enabled')?.checked || false;
     const reminderDaysBefore = parseInt(document.getElementById('loan-reminder-days')?.value) || 3;
     const reminderTimesPerDay = parseInt(document.getElementById('loan-reminder-times')?.value) || 1;
+    const reminderTemplate = document.getElementById('loan-reminder-template')?.value.trim() || '';
     const user = auth.currentUser;
 
     if (!name || !amount || !startDate) {
@@ -1638,8 +1650,10 @@ window.saveLoan = async function() {
             reminderEnabled: reminderEnabled,
             reminderDaysBefore: reminderDaysBefore,
             reminderTimesPerDay: reminderTimesPerDay,
+            reminderTemplate: reminderTemplate,
             status: 'active',
         };
+
 
         if (id) {
             // Update existing loan
@@ -1658,7 +1672,8 @@ window.saveLoan = async function() {
                 messageContext: messageContext || '',
                 reminderEnabled: reminderEnabled,
                 reminderDaysBefore: reminderDaysBefore,
-                reminderTimesPerDay: reminderTimesPerDay
+                reminderTimesPerDay: reminderTimesPerDay,
+                reminderTemplate: reminderTemplate
             };
 
             // If EMI, ensure initialDueDate is consistent with the new dueDate (which represents the NEXT due date)
@@ -1893,7 +1908,8 @@ window.loadLoansGrid = async function(status = 'active') {
                     paidAmount: d.paidAmount || 0,
                     reminderDaysBefore: d.reminderDaysBefore || 3,
                     reminderTimesPerDay: d.reminderTimesPerDay || 1,
-                    messageContext: d.messageContext || ''
+                    messageContext: d.messageContext || '',
+                    reminderTemplate: d.reminderTemplate || ''
                 };
             });
 
@@ -2253,6 +2269,8 @@ window.editLoan = async function(id) {
             document.getElementById('loan-reminder-days').value = data.reminderDaysBefore || 3;
         if (document.getElementById('loan-reminder-times'))
             document.getElementById('loan-reminder-times').value = data.reminderTimesPerDay || 1;
+        if (document.getElementById('loan-reminder-template'))
+            document.getElementById('loan-reminder-template').value = data.reminderTemplate || '';
         
         // Set radio button
         const typeRadio = document.querySelector(`input[name="loan-type"][value="${data.type}"]`);

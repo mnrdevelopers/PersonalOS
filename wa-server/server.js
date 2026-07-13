@@ -118,17 +118,27 @@ function buildMessage(data) {
     const amount = (data.totalAmount - (data.paidAmount || 0)).toLocaleString('en-IN', {
         minimumFractionDigits: 0, maximumFractionDigits: 0
     });
-    const context = data.messageContext ? `📋 *Ref:* ${data.messageContext}\n` : '';
+    const context = data.messageContext || '';
     const dueDate = data.dueDate
         ? new Date(data.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
         : 'soon';
 
+    if (data.reminderTemplate && data.reminderTemplate.trim()) {
+        let msg = data.reminderTemplate;
+        msg = msg.replace(/{name}/g, name);
+        msg = msg.replace(/{amount}/g, amount);
+        msg = msg.replace(/{dueDate}/g, dueDate);
+        msg = msg.replace(/{context}/g, context);
+        return msg;
+    }
+
+    const contextLine = context ? `📋 *Ref:* ${context}\n` : '';
     return (
         `Hi *${name}* 👋\n\n` +
         `This is a friendly reminder about your outstanding loan repayment.\n\n` +
         `💰 *Outstanding:* ₹${amount}\n` +
         `📅 *Due Date:* ${dueDate}\n` +
-        `${context}\n` +
+        `${contextLine}\n` +
         `Please arrange the payment at your earliest convenience. Thank you! 🙏\n\n` +
         `_— PersonalOS Auto-Reminder_`
     );
