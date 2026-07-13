@@ -1875,11 +1875,42 @@ window.loadLoansGrid = async function(status = 'active') {
             .get()
     ]);
 
+    // Sync active lent loans with reminders to the local server
+    if (status === 'active') {
+        const activeLentWithReminders = snapshot.docs
+            .filter(doc => {
+                const d = doc.data();
+                return d.type === 'lent' && d.status === 'active' && d.reminderEnabled === true;
+            })
+            .map(doc => {
+                const d = doc.data();
+                return {
+                    id: doc.id,
+                    name: d.name,
+                    mobile: d.mobile,
+                    dueDate: d.dueDate,
+                    totalAmount: d.totalAmount,
+                    paidAmount: d.paidAmount || 0,
+                    reminderDaysBefore: d.reminderDaysBefore || 3,
+                    reminderTimesPerDay: d.reminderTimesPerDay || 1,
+                    messageContext: d.messageContext || ''
+                };
+            });
+
+        const serverUrl = (localStorage.getItem('waServerUrl') || 'http://localhost:3001').replace(/\/$/, '');
+        fetch(`${serverUrl}/sync-loans`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(activeLentWithReminders)
+        }).catch(err => console.log("Local WA server not running or unreachable for sync."));
+    }
+
     // Client-side filtering for type (since Firestore compound queries with != or multiple filters can be tricky without composite indexes)
     let docs = snapshot.docs;
     if (currentLoanTypeFilter !== 'all') {
         docs = docs.filter(doc => doc.data().type === currentLoanTypeFilter);
     }
+
 
     const container = document.getElementById('loans-grid');
     const statsContainer = document.getElementById('loan-stats-container');

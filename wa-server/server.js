@@ -2,13 +2,12 @@
  * PersonalOS WhatsApp Auto-Reminder Server
  * =========================================
  * Runs locally to send automatic WhatsApp reminders
- * for lent loans. Uses whatsapp-web.js + Firebase Admin.
+ * for lent loans. Synced directly from PWA browser client.
  *
  * Setup:
- *  1. Place your Firebase serviceAccountKey.json in this folder
- *  2. npm install
- *  3. node server.js  → scan the QR code once with WhatsApp
- *  4. Scheduler runs every 30 minutes automatically
+ *  1. npm install
+ *  2. node server.js  → scan the QR code once with WhatsApp
+ *  3. Scheduler runs every 30 minutes automatically
  */
 
 const { Client, LocalAuth } = require('whatsapp-web.js');
@@ -17,24 +16,13 @@ const qrcodeTerminal = require('qrcode-terminal');
 const express = require('express');
 const cors = require('cors');
 const cron = require('node-cron');
-const admin = require('firebase-admin');
 const fs = require('fs');
 const path = require('path');
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001;
 const LOG_FILE = path.join(__dirname, 'reminder-log.json');
-const SA_KEY_PATH = path.join(__dirname, 'serviceAccountKey.json');
-
-// ─── Firebase Admin init ─────────────────────────────────────────────────────
-if (!fs.existsSync(SA_KEY_PATH)) {
-    console.error('❌ serviceAccountKey.json not found in wa-server/');
-    console.error('   Download from Firebase Console → Project Settings → Service Accounts');
-    process.exit(1);
-}
-const serviceAccount = require(SA_KEY_PATH);
-admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-const db = admin.firestore();
+const LOANS_FILE = path.join(__dirname, 'local-loans.json');
 
 // ─── WhatsApp Client ──────────────────────────────────────────────────────────
 const client = new Client({
@@ -93,9 +81,6 @@ function saveLog(log) {
     fs.writeFileSync(LOG_FILE, JSON.stringify(log, null, 2));
 }
 
-/**
- * Returns how many reminders have been sent for a loan today.
- */
 function getSentTodayCount(loanId) {
     const log = loadLog();
     const today = new Date().toISOString().split('T')[0];
@@ -108,6 +93,18 @@ function recordSent(loanId) {
     if (!log[loanId]) log[loanId] = {};
     log[loanId][today] = (log[loanId][today] || 0) + 1;
     saveLog(log);
+}
+
+// ─── Local Loans Storage Helpers ──────────────────────────────────────────────
+function loadLocalLoans() {
+    try {
+        if (fs.existsSync(LOANS_FILE)) return JSON.parse(fs.readFileSync(LOANS_FILE, 'utf8'));
+    } catch { /* ignore */ }
+    return [];
+}
+
+function saveLocalLoans(loans) {
+    fs.writeFileSync(LOANS_FILE, JSON.stringify(loans, null, 2));
 }
 
 // ─── Message Builder ──────────────────────────────────────────────────────────
@@ -144,27 +141,17 @@ async function runReminderJob() {
     today.setHours(0, 0, 0, 0);
 
     try {
-        // Single where clause only (no composite index needed) — filter rest client-side
-        const snapshot = await db.collection('loans')
-            .where('type', '==', 'lent')
-            .get();
-
-        // Client-side filter for active + reminderEnabled
-        const eligibleDocs = snapshot.docs.filter(doc => {
-            const d = doc.data();
-            return d.status === 'active' && d.reminderEnabled === true;
-        });
+        const eligibleDocs = loadLocalLoans();
 
         if (eligibleDocs.length === 0) {
-            console.log('[Scheduler] No active lent loans with reminders enabled.');
+            console.log('[Scheduler] No synced lent loans found in local database.');
             return;
         }
 
         let sent = 0, skipped = 0;
 
-        for (const doc of eligibleDocs) {
-            const data = doc.data();
-            const loanId = doc.id;
+        for (const data of eligibleDocs) {
+            const loanId = data.id;
 
             // Must have a mobile number
             if (!data.mobile) { skipped++; continue; }
@@ -240,6 +227,17 @@ app.get('/status', (req, res) => {
     });
 });
 
+/** POST /sync-loans — sync active lent loans with reminders enabled from PWA */
+app.post('/sync-loans', (req, res) => {
+    const loans = req.body;
+    if (!Array.isArray(loans)) {
+        return res.status(400).json({ error: 'Body must be an array of loans' });
+    }
+    saveLocalLoans(loans);
+    console.log(`📥 Synced ${loans.length} active lent loans from client.`);
+    res.json({ success: true, count: loans.length });
+});
+
 /** POST /test-message — send a test WhatsApp message */
 app.post('/test-message', async (req, res) => {
     const { phone, message } = req.body;
@@ -272,6 +270,7 @@ app.listen(PORT, () => {
     console.log(`\n🚀 PersonalOS WA Reminder Server running at http://localhost:${PORT}`);
     console.log('   Endpoints:');
     console.log(`   GET  /status       — connection status & QR code`);
+    console.log(`   POST /sync-loans   — sync active reminders from PWA`);
     console.log(`   POST /test-message — send a test message`);
     console.log(`   POST /run-now      — trigger reminders immediately`);
     console.log(`   GET  /log          — view sent reminder log\n`);

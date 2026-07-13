@@ -199,6 +199,10 @@ window.loadSettingsSection = async function() {
             </div>
         </div>
     `;
+
+    setTimeout(() => {
+        if (typeof checkWaStatus === 'function') checkWaStatus();
+    }, 100);
 };
 
 window.renderToggle = function(label, key, isChecked) {
@@ -370,14 +374,27 @@ window.triggerWaJobNow = async function() {
 };
 
 window.openWaLog = async function() {
+    // Open new tab immediately to bypass popup blocker
+    const win = window.open('', '_blank');
+    if (!win) {
+        if (window.dashboard) window.dashboard.showNotification('Popup blocked! Enable popups to view logs.', 'warning');
+        return;
+    }
+    win.document.write('<pre style="font-family:monospace;padding:1rem;color:#555">Loading logs from WhatsApp Server...</pre>');
+
     try {
         const res = await fetch(`${getWaServerUrl()}/log`, { signal: AbortSignal.timeout(5000) });
         const data = await res.json();
         const text = JSON.stringify(data, null, 2);
-        const win = window.open('', '_blank');
-        win.document.write(`<pre style="font-family:monospace;padding:1rem">${text}</pre>`);
+        
+        // Clear loading screen and write logs
+        win.document.open();
+        win.document.write(`<pre style="font-family:monospace;padding:1rem;background:#f8f9fa;border-radius:4px">${text}</pre>`);
         win.document.close();
     } catch (err) {
-        if(window.dashboard) window.dashboard.showNotification('Cannot fetch log: server offline', 'danger');
+        win.document.open();
+        win.document.write(`<pre style="font-family:monospace;padding:1rem;color:#b91c1c;background:#fef2f2">❌ Failed to fetch logs: server offline or unreachable.</pre>`);
+        win.document.close();
     }
-};
+};
+

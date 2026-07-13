@@ -3,4 +3,5 @@ node_modules/
 .wwebjs_cache/
 serviceAccountKey.json
 reminder-log.json
+local-loans.json
 *.log
