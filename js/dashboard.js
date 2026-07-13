@@ -21,12 +21,20 @@ class Dashboard {
         if (hashSection && document.getElementById(`${hashSection}-section`)) {
             this.switchSection(hashSection);
         } else {
-            this.initializeDashboard();
+            try {
+                await this.initializeDashboard();
+            } catch (e) {
+                console.error("Error during dashboard initialization:", e);
+            }
             this.switchSection('dashboard');
         }
         this.startGlobalAlertSystem();
         // Await recurring transactions so hideLoading() only fires after processing completes
-        await this.processRecurringTransactions();
+        try {
+            await this.processRecurringTransactions();
+        } catch (e) {
+            console.error("Error processing recurring transactions:", e);
+        }
         this.hideLoading();
     }
 
@@ -613,14 +621,18 @@ class Dashboard {
     }
 
     async initializeDashboard() {
-        await Promise.all([
-            this.updateStats(),
-            this.loadRecentTransactions(),
-            this.loadTodaysHabits(),
-            this.loadUpcomingTasks(),
-            this.updateFinanceChart(),
-            this.loadHabitStreaks()
-        ]);
+        try {
+            await Promise.all([
+                this.updateStats().catch(err => console.error("Error in updateStats:", err)),
+                this.loadRecentTransactions().catch(err => console.error("Error in loadRecentTransactions:", err)),
+                this.loadTodaysHabits().catch(err => console.error("Error in loadTodaysHabits:", err)),
+                this.loadUpcomingTasks().catch(err => console.error("Error in loadUpcomingTasks:", err)),
+                this.updateFinanceChart().catch(err => console.error("Error in updateFinanceChart:", err)),
+                this.loadHabitStreaks().catch(err => console.error("Error in loadHabitStreaks:", err))
+            ]);
+        } catch (e) {
+            console.error("Critical error in initializeDashboard Promise.all:", e);
+        }
         this.setupNotificationListener();
 
         this.updateGreeting();
@@ -1020,9 +1032,221 @@ class Dashboard {
                 document.getElementById('total-distance-month').textContent = `${totalDistance} km`;
             }
 
+            // Update net worth and available capital summary
+            await this.updateNetWorthStats();
+
         } catch (error) {
             console.error('Error updating stats:', error);
             this.showNotification('Error updating dashboard stats', 'danger');
+        }
+    }
+
+    async updateNetWorthStats() {
+        try {
+            if (!this.currentUser) return;
+            const uid = this.currentUser.uid;
+
+            const emptySnap = { docs: [], forEach: function(cb) { this.docs.forEach(cb); } };
+
+            // 1. Fetch bank accounts, transactions, wallets, credit cards, investments, and active loans
+            const [bankAccounts, allTx, walletsSnap, creditCardsSnap, investmentsSnap, loansSnap] = await Promise.all([
+                Promise.resolve(window.getUserBankAccounts ? window.getUserBankAccounts(true) : []).catch(err => { console.error("Error fetching bankAccounts:", err); return []; }),
+                Promise.resolve(window.getTransactions ? window.getTransactions(uid) : []).catch(err => { console.error("Error fetching transactions:", err); return []; }),
+                db.collection('wallets').where('userId', '==', uid).get().catch(err => { console.error("Error fetching wallets:", err); return emptySnap; }),
+                db.collection('credit_cards').where('userId', '==', uid).get().catch(err => { console.error("Error fetching credit cards:", err); return emptySnap; }),
+                db.collection('investments').where('userId', '==', uid).get().catch(err => { console.error("Error fetching investments:", err); return emptySnap; }),
+                db.collection('loans').where('userId', '==', uid).where('status', '==', 'active').get().catch(err => { console.error("Error fetching loans:", err); return emptySnap; })
+            ]);
+
+            // 2. Calculate Cash & Bank Account Balances from transactions (Filtered by current Financial Year)
+            let cashIncome = 0;
+            let cashExpense = 0;
+            const bankBalances = {};
+
+            const todayDate = new Date();
+            const startYear = todayDate.getMonth() >= 3 ? todayDate.getFullYear() : todayDate.getFullYear() - 1;
+            const fyStart = `${startYear}-04-01`;
+            const fyEnd = `${startYear + 1}-03-31`;
+
+            allTx.forEach(doc => {
+                const data = doc.data();
+                
+                // Skip transactions outside the current financial year
+                if (!data.date || data.date < fyStart || data.date > fyEnd) return;
+
+                const amount = Number(data.amount) || 0;
+
+                if (data.type === 'transfer') {
+                    // Cash transfer tracking
+                    if (data.sourceAccountType === 'cash') cashExpense += amount;
+                    if (data.destinationAccountType === 'cash') cashIncome += amount;
+
+                    // Bank account transfer tracking
+                    if (data.sourceAccountType === 'bank') {
+                        if (data.bankAccountId) {
+                            bankBalances[data.bankAccountId] = (bankBalances[data.bankAccountId] || 0) - amount;
+                        }
+                    }
+                    if (data.destinationAccountType === 'bank') {
+                        if (data.destinationBankAccountId) {
+                            bankBalances[data.destinationBankAccountId] = (bankBalances[data.destinationBankAccountId] || 0) + amount;
+                        }
+                    }
+                    return;
+                }
+
+                // Resolve account type robustly
+                let resolvedType = 'cash';
+                if (data.accountType) {
+                    resolvedType = data.accountType;
+                } else if (data.paymentMode) {
+                    const mode = data.paymentMode;
+                    if (
+                        mode === 'bank' ||
+                        mode === 'upi' ||
+                        mode === 'debit-card' ||
+                        (typeof mode === 'string' && mode.startsWith('upi-'))
+                    ) {
+                        resolvedType = 'bank';
+                    } else if (mode === 'wallet' || mode === 'fastag_wallet') {
+                        resolvedType = 'wallet';
+                    } else if (mode === 'credit-card' || mode === 'card') {
+                        resolvedType = 'credit-card';
+                    } else if (mode === 'cash') {
+                        resolvedType = 'cash';
+                    } else {
+                        resolvedType = 'other';
+                    }
+                }
+
+                if (resolvedType === 'cash') {
+                    if (data.type === 'income') cashIncome += amount;
+                    else if (data.type === 'expense') cashExpense += amount;
+                } else if (resolvedType === 'bank') {
+                    const accId = data.bankAccountId;
+                    if (accId) {
+                        bankBalances[accId] = (bankBalances[accId] || 0) + (data.type === 'income' ? amount : -amount);
+                    }
+                }
+            });
+
+            const cashBalance = cashIncome - cashExpense;
+
+            // 3. Sum up bank accounts
+            let totalBankBalance = 0;
+            const bankAccountsListHTML = bankAccounts.map(acc => {
+                const balance = bankBalances[acc.id] || 0;
+                totalBankBalance += balance;
+                const color = acc.color || '#0284c7';
+                const sign = balance >= 0 ? '' : '-';
+                return `
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="text-truncate me-2 small" style="max-width: 150px;">
+                            <span class="me-1" style="color: ${color}">${acc.icon || '🏦'}</span>${acc.name}
+                        </span>
+                        <span class="fw-semibold small ${balance >= 0 ? 'text-success' : 'text-danger'}">${sign}₹${Math.abs(balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                `;
+            }).join('');
+
+            // 4. Sum up wallets
+            let totalWallets = 0;
+            const walletsListHTML = walletsSnap.docs.map(doc => {
+                const data = doc.data();
+                const bal = data.balance || 0;
+                totalWallets += bal;
+                return `
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="text-truncate me-2 small" style="max-width: 150px;">
+                            <span class="me-1 text-info">📱</span>${data.name}
+                        </span>
+                        <span class="fw-semibold small text-info">₹${bal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                `;
+            }).join('');
+
+            // 5. Sum up credit cards
+            let totalCCLimit = 0;
+            let totalCCOutstanding = 0;
+            creditCardsSnap.forEach(doc => {
+                const data = doc.data();
+                totalCCLimit += (data.creditLimit || 0);
+                totalCCOutstanding += (data.currentOutstanding || 0);
+            });
+            const ccAvailable = totalCCLimit - totalCCOutstanding;
+
+            // 6. Sum up investments
+            let totalInvested = 0;
+            let totalCurrentValue = 0;
+            investmentsSnap.forEach(doc => {
+                const data = doc.data();
+                totalInvested += (data.investedAmount || 0);
+                totalCurrentValue += (data.currentValue || data.investedAmount || 0);
+            });
+
+            // 7. Sum up loans
+            let totalLent = 0;
+            loansSnap.forEach(doc => {
+                const data = doc.data();
+                const remaining = data.totalAmount - (data.paidAmount || 0);
+                if (data.type === 'lent') {
+                    totalLent += remaining;
+                }
+            });
+
+            // 8. Calculations
+            // Available Liquid Capital = Cash + Total Bank Balance + Total Wallets
+            const totalAvailable = cashBalance + totalBankBalance + totalWallets;
+
+            // Actual Net Capital = Total Assets - Credit Card Outstanding
+            // Assets: Cash + Bank + Wallets + Investments + Lent
+            // Liabilities: Credit Card Outstanding
+            const totalAssets = totalAvailable + totalCurrentValue + totalLent;
+            const netWorth = totalAssets - totalCCOutstanding;
+
+            // 9. Update UI
+            if (document.getElementById('net-available-amount')) {
+                document.getElementById('net-available-amount').textContent = `₹${totalAvailable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
+            if (document.getElementById('net-worth-amount')) {
+                document.getElementById('net-worth-amount').textContent = `${netWorth >= 0 ? '' : '-'}₹${Math.abs(netWorth).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
+            if (document.getElementById('breakdown-cash')) {
+                document.getElementById('breakdown-cash').textContent = `₹${cashBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
+            
+            const walletsContainer = document.getElementById('breakdown-wallets-list');
+            if (walletsContainer) {
+                walletsContainer.innerHTML = walletsListHTML || '<div class="text-muted small text-center my-1">No active wallets</div>';
+            }
+
+            if (document.getElementById('breakdown-liquid-subtotal')) {
+                document.getElementById('breakdown-liquid-subtotal').textContent = `₹${(cashBalance + totalWallets).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
+
+            const banksContainer = document.getElementById('breakdown-banks-list');
+            if (banksContainer) {
+                banksContainer.innerHTML = bankAccountsListHTML || '<div class="text-muted small text-center my-2">No bank accounts added</div>';
+            }
+            if (document.getElementById('breakdown-banks-subtotal')) {
+                document.getElementById('breakdown-banks-subtotal').textContent = `₹${totalBankBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
+
+            if (document.getElementById('breakdown-investments')) {
+                document.getElementById('breakdown-investments').textContent = `₹${totalCurrentValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
+            if (document.getElementById('breakdown-lent')) {
+                document.getElementById('breakdown-lent').textContent = `₹${totalLent.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
+            if (document.getElementById('breakdown-credit-cards')) {
+                document.getElementById('breakdown-credit-cards').textContent = `₹${totalCCOutstanding.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
+            if (document.getElementById('breakdown-credit-cards-limit-info')) {
+                document.getElementById('breakdown-credit-cards-limit-info').textContent = `Limit: ₹${totalCCLimit.toLocaleString('en-IN', { maximumFractionDigits: 0 })} | Avail: ₹${ccAvailable.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+            }
+
+        } catch (e) {
+            console.error("Error updating Net Worth dashboard widget:", e);
         }
     }
 

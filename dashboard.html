@@ -443,6 +443,119 @@
                     </div>
                 </details>
 
+                <!-- Net Worth & Available Capital Overview -->
+                <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden animate-fade-in" style="animation-delay: 0.35s;">
+                    <div class="card-body p-4">
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <h5 class="fw-bold mb-0 d-flex align-items-center">
+                                <i class="fas fa-wallet text-primary me-2"></i> Net Worth & Liquid Capital
+                            </h5>
+                            <button class="btn btn-sm btn-link text-decoration-none p-0" type="button" data-bs-toggle="collapse" data-bs-target="#networth-details" aria-expanded="true" aria-controls="networth-details">
+                                <i class="fas fa-chevron-down text-muted" id="networth-collapse-icon"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- Summary metrics -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <div class="p-3 rounded-4 bg-primary bg-opacity-10 border border-primary border-opacity-10 d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <div class="text-muted small mb-1 fw-medium">Available (Liquid) Capital</div>
+                                        <h3 class="mb-0 fw-bold text-primary" id="net-available-amount">₹0.00</h3>
+                                        <small class="text-muted text-xs">Cash + Banks + Wallets</small>
+                                    </div>
+                                    <div class="bg-primary text-white rounded-circle p-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                                        <i class="fas fa-money-bill-wave"></i>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="p-3 rounded-4 bg-success bg-opacity-10 border border-success border-opacity-10 d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <div class="text-muted small mb-1 fw-medium">Actual Net Worth</div>
+                                        <h3 class="mb-0 fw-bold text-success" id="net-worth-amount">₹0.00</h3>
+                                        <small class="text-muted text-xs">Assets - Liabilities</small>
+                                    </div>
+                                    <div class="bg-success text-white rounded-circle p-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                                        <i class="fas fa-chart-line"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Detailed Collapsible Grid -->
+                        <div class="collapse show" id="networth-details">
+                            <div class="row g-3">
+                                <!-- Cash & Wallets -->
+                                <div class="col-md-4 col-sm-12">
+                                    <div class="p-3 rounded-4 bg-light border border-opacity-10 h-100">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <span class="fs-5">💵</span>
+                                            <h6 class="fw-bold mb-0">Liquid & Wallets</h6>
+                                        </div>
+                                        <hr class="my-2 opacity-10">
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span class="text-muted small">Cash</span>
+                                            <span class="fw-bold small" id="breakdown-cash">₹0.00</span>
+                                        </div>
+                                        <div id="breakdown-wallets-list" class="d-flex flex-column gap-1 mb-2">
+                                            <!-- Dynamic Wallets -->
+                                        </div>
+                                        <div class="d-flex justify-content-between border-top pt-2 mt-2 font-monospace text-muted small">
+                                            <span>Subtotal</span>
+                                            <span class="fw-bold" id="breakdown-liquid-subtotal">₹0.00</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Bank Accounts -->
+                                <div class="col-md-4 col-sm-12">
+                                    <div class="p-3 rounded-4 bg-light border border-opacity-10 h-100">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <span class="fs-5">🏦</span>
+                                            <h6 class="fw-bold mb-0">Bank Accounts</h6>
+                                        </div>
+                                        <hr class="my-2 opacity-10">
+                                        <div id="breakdown-banks-list" class="d-flex flex-column gap-1 mb-2" style="max-height: 150px; overflow-y: auto;">
+                                            <!-- Dynamic Bank accounts -->
+                                        </div>
+                                        <div class="d-flex justify-content-between border-top pt-2 mt-2 font-monospace text-muted small">
+                                            <span>Subtotal</span>
+                                            <span class="fw-bold" id="breakdown-banks-subtotal">₹0.00</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Investments, Loans & CC -->
+                                <div class="col-md-4 col-sm-12">
+                                    <div class="p-3 rounded-4 bg-light border border-opacity-10 h-100">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <span class="fs-5">📈</span>
+                                            <h6 class="fw-bold mb-0">Portfolio & Credit</h6>
+                                        </div>
+                                        <hr class="my-2 opacity-10">
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span class="text-muted small">Investments (Value)</span>
+                                            <span class="fw-bold text-success small" id="breakdown-investments">₹0.00</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span class="text-muted small">Lented Amount</span>
+                                            <span class="fw-bold text-success small" id="breakdown-lent">₹0.00</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between mb-1">
+                                            <span class="text-muted small">Credit Cards (O/S)</span>
+                                            <span class="fw-bold text-danger small" id="breakdown-credit-cards">₹0.00</span>
+                                        </div>
+                                        <div id="breakdown-credit-cards-limit-info" class="text-muted text-xs text-end mb-1">
+                                            <!-- CC Limit details -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Main Stats Overview (Premium Cards) -->
                 <div class="row g-4 mb-5">
                     <!-- Balance Card -->
