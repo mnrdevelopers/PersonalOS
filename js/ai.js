@@ -403,13 +403,32 @@
                         break;
                     } else {
                         let errMsg = `HTTP ${response.status}`;
+                        let apiErrorMsg = '';
                         try {
                             const errData = await response.json();
                             if (errData.error?.message) {
-                                errMsg += `: ${errData.error.message}`;
+                                apiErrorMsg = errData.error.message;
+                                errMsg += `: ${apiErrorMsg}`;
                             }
                         } catch (err) {}
+                        
                         lastError = errMsg;
+
+                        // Immediately halt on rate limits (429) to avoid masking with subsequent 404s
+                        if (response.status === 429) {
+                            lastError = `Rate limit/quota exceeded (429). Please wait a minute and try again. (Detail: ${apiErrorMsg || 'Resource exhausted'})`;
+                            break;
+                        }
+
+                        // Immediately halt on auth issues (400/403) to prevent fallback attempts
+                        if (response.status === 400 || response.status === 403) {
+                            const msgLower = apiErrorMsg.toLowerCase();
+                            if (msgLower.includes('key') || msgLower.includes('invalid') || msgLower.includes('permission')) {
+                                lastError = `Authentication failed (${response.status}): ${apiErrorMsg || 'Invalid API Key'}. Please update your Gemini API key in Settings.`;
+                                break;
+                            }
+                        }
+
                         console.warn(`Model ${model} failed with ${errMsg}. Trying fallback...`);
                     }
                 } catch (err) {
