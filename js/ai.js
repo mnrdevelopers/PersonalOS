@@ -387,14 +387,8 @@ Business Rules:
                 const OPENROUTER_MODELS = [
                     'google/gemini-2.5-flash:free',
                     'google/gemini-2.0-flash-exp:free',
-                    'google/gemini-1.5-flash:free',
                     'openrouter/free',
-                    'google/gemma-4-31b-it:free',
-                    'qwen/qwen3-coder:free',
-                    'meta-llama/llama-3.3-70b-instruct:free',
-                    'qwen/qwen-2.5-72b-instruct:free',
-                    'google/gemini-2.5-flash',
-                    'google/gemini-1.5-flash'
+                    'google/gemini-2.5-flash'
                 ];
 
                 const messages = [
@@ -409,6 +403,9 @@ Business Rules:
                 let lastError = null;
 
                 for (const model of OPENROUTER_MODELS) {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout
+
                     try {
                         response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                             method: 'POST',
@@ -421,8 +418,11 @@ Business Rules:
                             body: JSON.stringify({
                                 model: model,
                                 messages: messages
-                            })
+                            }),
+                            signal: controller.signal
                         });
+
+                        clearTimeout(timeoutId);
 
                         if (response.ok) {
                             resData = await response.json();
@@ -440,7 +440,9 @@ Business Rules:
                             console.warn(`OpenRouter model ${model} failed with ${errMsg}. Trying fallback...`);
                         }
                     } catch (err) {
-                        lastError = err.message || err;
+                        clearTimeout(timeoutId);
+                        const isAbort = (err.name === 'AbortError');
+                        lastError = isAbort ? 'Request timed out after 6 seconds' : (err.message || err);
                         console.warn(`OpenRouter model ${model} failed: ${lastError}. Trying fallback...`);
                     }
                 }
@@ -471,12 +473,18 @@ Business Rules:
                 let lastError = null;
 
                 for (const model of MODELS_TO_TRY) {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout
+
                     try {
                         response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ contents })
+                            body: JSON.stringify({ contents }),
+                            signal: controller.signal
                         });
+
+                        clearTimeout(timeoutId);
 
                         if (response.ok) {
                             resData = await response.json();
@@ -512,8 +520,22 @@ Business Rules:
                             console.warn(`Model ${model} failed with ${errMsg}. Trying fallback...`);
                         }
                     } catch (err) {
-                        lastError = err.message || err;
-                        console.warn(`Model ${model} failed: ${lastError}. Trying fallback...`);
+                        clearTimeout(timeoutId);
+                        const isAbort = (err.name === 'AbortError');
+                        lastError = isAbort ? 'Request timed out after 6 seconds' : (err.message || err);
+                        const isTransientOrModelErr = lastError.includes('not found') || 
+                                                       lastError.includes('not supported') || 
+                                                       lastError.includes('Model') || 
+                                                       lastError.includes('is not found') || 
+                                                       lastError.includes('503') || 
+                                                       lastError.includes('429') || 
+                                                       lastError.includes('fetch') || 
+                                                       lastError.includes('timeout') ||
+                                                       lastError.includes('NetworkError');
+                        if (isTransientOrModelErr) {
+                            continue;
+                        }
+                        break;
                     }
                 }
 
