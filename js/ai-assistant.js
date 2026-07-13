@@ -846,6 +846,7 @@ C. Adding a Grocery Item:
 - Earmarked Funds: Money held for family/friends. Earmarked locked amounts must be subtracted from Available Capital and parent accounts (wallets, bank, cash). They have a badge indicator and a deposit/release history ledger.
 - Habits: Habits check-ins are logged in habit_logs. Streaks are computed client-side sequentially.
 - Vehicles: Maintenance odometer limits trigger service logs reminders. Odometer values should match log values.
+- LaTeX Formatting: DO NOT use LaTeX math equations or tags (e.g., $...$ or $$...$$) for normal labels, category words, or currencies. Use standard plain text or markdown formatting.
 `;
     return context;
 }
@@ -1277,11 +1278,12 @@ window.sendAIChatMessage = async function() {
                 });
 
                 const OPENROUTER_MODELS = [
-                    'google/gemma-4-31b-it:free',
-                    'qwen/qwen3-coder:free',
-                    'openrouter/free',
                     'google/gemini-2.5-flash:free',
                     'google/gemini-2.0-flash-exp:free',
+                    'google/gemini-1.5-flash:free',
+                    'openrouter/free',
+                    'google/gemma-4-31b-it:free',
+                    'qwen/qwen3-coder:free',
                     'meta-llama/llama-3.3-70b-instruct:free',
                     'qwen/qwen-2.5-72b-instruct:free',
                     'google/gemini-2.5-flash',
