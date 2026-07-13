@@ -378,18 +378,49 @@
                     text: systemContext + `\nPrompt: Review the details of the active section context "${activeSectionContext}" and output a smart budget planning summary, warning tips, and look for any data bugs or anomalies. Keep it concise, structured in professional markdown sections.`
                 }]
             }];
+            const MODELS_TO_TRY = [
+                'gemini-1.5-flash',
+                'gemini-2.0-flash',
+                'gemini-1.5-flash-latest',
+                'gemini-1.5-pro-latest',
+                'gemini-1.0-pro'
+            ];
 
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents })
-            });
+            let response = null;
+            let resData = null;
+            let lastError = null;
 
-            if (!response.ok) {
-                throw new Error(`REST Error: ${response.statusText}`);
+            for (const model of MODELS_TO_TRY) {
+                try {
+                    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ contents })
+                    });
+
+                    if (response.ok) {
+                        resData = await response.json();
+                        break;
+                    } else {
+                        let errMsg = `HTTP ${response.status}`;
+                        try {
+                            const errData = await response.json();
+                            if (errData.error?.message) {
+                                errMsg += `: ${errData.error.message}`;
+                            }
+                        } catch (err) {}
+                        lastError = errMsg;
+                        console.warn(`Model ${model} failed with ${errMsg}. Trying fallback...`);
+                    }
+                } catch (err) {
+                    lastError = err.message || err;
+                    console.warn(`Model ${model} failed: ${lastError}. Trying fallback...`);
+                }
             }
 
-            const resData = await response.json();
+            if (!resData) {
+                throw new Error(lastError || 'Unknown API connection error');
+            }
             const text = resData.candidates?.[0]?.content?.parts?.[0]?.text;
 
             if (text) {
@@ -422,7 +453,7 @@
 
         } catch (e) {
             console.error("Gemini Copilot Report failed:", e);
-            if (window.dashboard) window.dashboard.showNotification('Gemini Report generation failed.', 'danger');
+            if (window.dashboard) window.dashboard.showNotification(`AI Report failed: ${e.message || e}`, 'danger');
             suggestionsPane.innerHTML = originalHtml;
         }
     };
