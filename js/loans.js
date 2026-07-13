@@ -1050,6 +1050,110 @@ window.loadLoansSection = async function() {
                 </div>
             </div>
         </div>
+
+        <!-- Earmarked History / Ledger Modal -->
+        <div class="modal fade" id="earmarkedHistoryModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content border-0 shadow-lg rounded-4">
+                    <div class="modal-header border-0 pb-0">
+                        <h5 class="modal-title fw-bold" id="earmarkedHistoryTitle"><i class="fas fa-history text-primary me-2"></i>Fund History & Ledger</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <h6 class="fw-bold mb-0" id="history-fund-title">Fund Title</h6>
+                                <small class="text-muted" id="history-fund-owner">Held for: ...</small>
+                            </div>
+                            <button class="btn btn-sm btn-primary rounded-pill px-3" onclick="showAddEarmarkedHistoryEntry()">
+                                <i class="fas fa-plus me-1"></i>Add Entry
+                            </button>
+                        </div>
+                        
+                        <!-- Summary card inside history -->
+                        <div class="bg-light p-3 rounded-4 mb-3 d-flex justify-content-around text-center border">
+                            <div>
+                                <span class="text-muted text-xs d-block mb-1">Initial Lock</span>
+                                <div class="fw-semibold" id="history-initial-amount">₹0.00</div>
+                            </div>
+                            <div class="border-start border-end px-3">
+                                <span class="text-muted text-xs d-block mb-1">Net Adjustments</span>
+                                <div class="fw-semibold text-warning" id="history-adjustments-amount">₹0.00</div>
+                            </div>
+                            <div>
+                                <span class="text-muted text-xs d-block mb-1">Total Current Lock</span>
+                                <div class="fw-bold text-success" id="history-current-amount">₹0.00</div>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                            <table class="table table-hover align-middle text-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Type</th>
+                                        <th>Note</th>
+                                        <th class="text-end">Amount</th>
+                                        <th class="text-end">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="earmarked-history-table-body">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0">
+                        <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Earmarked History Entry Modal -->
+        <div class="modal fade" id="addEarmarkedHistoryEntryModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg rounded-4">
+                    <div class="modal-header border-0 pb-0">
+                        <h5 class="modal-title fw-bold"><i class="fas fa-plus text-primary me-2"></i>Add History Entry</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="earmarked-history-form">
+                            <input type="hidden" id="eh-fund-id">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Entry Type</label>
+                                <div class="btn-group w-100" role="group">
+                                    <input type="radio" class="btn-check" name="eh-type" id="eh-type-deposit" value="deposit" checked>
+                                    <label class="btn btn-outline-warning" for="eh-type-deposit">💵 Deposit (Add money)</label>
+                                    <input type="radio" class="btn-check" name="eh-type" id="eh-type-release" value="release">
+                                    <label class="btn btn-outline-success" for="eh-type-release">🔓 Release (Return money)</label>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Amount</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0">₹</span>
+                                    <input type="number" class="form-control rounded-end-3 border-start-0" id="eh-amount" step="0.01" min="0.01" required>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Date</label>
+                                <input type="date" class="form-control rounded-3" id="eh-date" required>
+                              </div>
+                              <div class="mb-3">
+                                  <label class="form-label fw-semibold">Note / Remarks</label>
+                                  <input type="text" class="form-control rounded-3" id="eh-note" placeholder="e.g. Monthly addition, partial return" required>
+                              </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer border-0">
+                        <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary rounded-pill px-4 fw-semibold" id="btn-save-eh-entry" onclick="saveEarmarkedHistoryEntry()">Save Entry</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     `;
 
     // Initialize default tab state immediately so toolbar actions are available
@@ -4313,20 +4417,33 @@ window.saveEarmarkedFund = async function() {
         userId: user.uid,
         title,
         owner,
-        amount,
         source,
         notes,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
-    if (!id) {
-        payload.status = 'active';
-        payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-    }
 
     try {
         if (id) {
+            // Read current adjustments from history first so editing parent amount does not lose history
+            const doc = await db.collection('earmarked_funds').doc(id).get();
+            let netAdjustments = 0;
+            if (doc.exists) {
+                const historySnap = await db.collection('earmarked_funds').doc(id).collection('history').get();
+                historySnap.forEach(hDoc => {
+                    const hData = hDoc.data();
+                    const hAmt = Number(hData.amount) || 0;
+                    if (hData.type === 'deposit') netAdjustments += hAmt;
+                    else if (hData.type === 'release') netAdjustments -= hAmt;
+                });
+            }
+            payload.initialAmount = amount; // new initial amount from form
+            payload.amount = amount + netAdjustments; // actual total
             await db.collection('earmarked_funds').doc(id).update(payload);
         } else {
+            payload.initialAmount = amount;
+            payload.amount = amount;
+            payload.status = 'active';
+            payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
             await db.collection('earmarked_funds').add(payload);
         }
 
@@ -4336,7 +4453,7 @@ window.saveEarmarkedFund = async function() {
         
         if (window.dashboard) {
             window.dashboard.showNotification(id ? 'Locked fund updated' : 'Money locked successfully', 'success');
-            window.dashboard.updateStats(); // refresh dashboard totals
+            window.dashboard.updateStats();
         }
     } catch (e) {
         window.setBtnLoading(btn, false);
@@ -4358,7 +4475,7 @@ window.toggleEarmarkedStatus = async function(id, currentStatus) {
         if (window.dashboard) {
             const msg = newStatus === 'returned' ? 'Funds marked as returned/released' : 'Funds marked as active (locked)';
             window.dashboard.showNotification(msg, 'success');
-            window.dashboard.updateStats(); // refresh dashboard totals
+            window.dashboard.updateStats();
         }
     } catch (e) {
         console.error("Error toggling status:", e);
@@ -4452,6 +4569,9 @@ window.loadEarmarkedGrid = async function() {
                             <button class="btn btn-sm ${buttonClass} flex-grow-1 rounded-pill text-xs fw-semibold" onclick="toggleEarmarkedStatus('${id}', '${data.status || 'active'}')">
                                 ${buttonText}
                             </button>
+                            <button class="btn btn-sm btn-outline-primary rounded-pill p-1 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" onclick="showEarmarkedHistory('${id}')" title="View History/Ledger">
+                                <i class="fas fa-history text-xs"></i>
+                            </button>
                             <button class="btn btn-sm btn-outline-secondary rounded-pill p-1 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" onclick="showAddEarmarkedModal('${id}')">
                                 <i class="fas fa-edit text-xs"></i>
                             </button>
@@ -4469,5 +4589,208 @@ window.loadEarmarkedGrid = async function() {
     } catch (e) {
         console.error("Error loading earmarked grid:", e);
         grid.innerHTML = '<div class="col-12 text-center text-danger py-4">Error loading data.</div>';
+    }
+};
+
+// --- Earmarked Funds History / Ledger Logic ---
+let activeHistoryFundId = null;
+
+window.showEarmarkedHistory = async function(fundId) {
+    activeHistoryFundId = fundId;
+    
+    document.getElementById('earmarked-history-table-body').innerHTML = '<tr><td colspan="5" class="text-center"><div class="spinner-border spinner-border-sm text-primary"></div></td></tr>';
+    document.getElementById('history-initial-amount').textContent = '₹0.00';
+    document.getElementById('history-adjustments-amount').textContent = '₹0.00';
+    document.getElementById('history-current-amount').textContent = '₹0.00';
+
+    try {
+        const fundDoc = await db.collection('earmarked_funds').doc(fundId).get();
+        if (!fundDoc.exists) return;
+        const fundData = fundDoc.data();
+        
+        document.getElementById('history-fund-title').textContent = fundData.title || '';
+        document.getElementById('history-fund-owner').textContent = `Held for: ${fundData.owner || ''}`;
+
+        const historySnap = await db.collection('earmarked_funds').doc(fundId).collection('history')
+            .orderBy('date', 'desc')
+            .orderBy('createdAt', 'desc')
+            .get();
+
+        const initialAmount = Number(fundData.initialAmount !== undefined ? fundData.initialAmount : fundData.amount) || 0;
+        
+        let netAdjustments = 0;
+        let rowsHtml = '';
+
+        if (historySnap.empty) {
+            rowsHtml = '<tr><td colspan="5" class="text-center text-muted">No history entries found. Click Add Entry to log additions or releases.</td></tr>';
+        } else {
+            historySnap.forEach(doc => {
+                const data = doc.data();
+                const amt = Number(data.amount) || 0;
+                const date = data.date || '';
+                const note = data.note || '';
+                const type = data.type || 'deposit';
+                const entryId = doc.id;
+
+                if (type === 'deposit') {
+                    netAdjustments += amt;
+                } else if (type === 'release') {
+                    netAdjustments -= amt;
+                }
+
+                const typeBadge = type === 'deposit' 
+                    ? '<span class="badge bg-warning bg-opacity-10 text-warning px-2 py-1"><i class="fas fa-arrow-down me-1"></i>Deposit</span>' 
+                    : '<span class="badge bg-success bg-opacity-10 text-success px-2 py-1"><i class="fas fa-arrow-up me-1"></i>Release</span>';
+
+                rowsHtml += `
+                    <tr>
+                        <td>${date}</td>
+                        <td>${typeBadge}</td>
+                        <td class="text-truncate" style="max-width: 150px;">${note}</td>
+                        <td class="text-end fw-semibold ${type === 'deposit' ? 'text-warning' : 'text-success'}">
+                            ${type === 'deposit' ? '+' : '-'}₹${amt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-link text-danger p-0" onclick="deleteEarmarkedHistoryEntry('${entryId}')">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        const currentAmount = initialAmount + netAdjustments;
+
+        document.getElementById('history-initial-amount').textContent = `₹${initialAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+        document.getElementById('history-adjustments-amount').innerHTML = `<span class="${netAdjustments >= 0 ? 'text-warning' : 'text-success'}">${netAdjustments >= 0 ? '+' : '-'}₹${Math.abs(netAdjustments).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>`;
+        document.getElementById('history-current-amount').textContent = `₹${currentAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+        document.getElementById('earmarked-history-table-body').innerHTML = rowsHtml;
+
+        if (Number(fundData.amount) !== currentAmount || Number(fundData.initialAmount) !== initialAmount) {
+            await db.collection('earmarked_funds').doc(fundId).update({
+                amount: currentAmount,
+                initialAmount: initialAmount
+            });
+            loadEarmarkedGrid();
+            if (window.dashboard) window.dashboard.updateStats();
+        }
+
+    } catch (e) {
+        console.error("Error loading earmarked history:", e);
+        document.getElementById('earmarked-history-table-body').innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error loading history.</td></tr>';
+    }
+
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('earmarkedHistoryModal'));
+    modal.show();
+};
+
+window.showAddEarmarkedHistoryEntry = function() {
+    document.getElementById('earmarked-history-form').reset();
+    document.getElementById('eh-fund-id').value = activeHistoryFundId;
+    document.getElementById('eh-date').value = new Date().toISOString().split('T')[0];
+
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addEarmarkedHistoryEntryModal'));
+    modal.show();
+};
+
+window.saveEarmarkedHistoryEntry = async function() {
+    const btn = document.getElementById('btn-save-eh-entry');
+    const fundId = document.getElementById('eh-fund-id').value;
+    const type = document.querySelector('input[name="eh-type"]:checked')?.value;
+    const amount = parseFloat(document.getElementById('eh-amount').value);
+    const date = document.getElementById('eh-date').value;
+    const note = document.getElementById('eh-note').value.trim();
+
+    if (!fundId || !type || isNaN(amount) || amount <= 0 || !date || !note) {
+        if(window.dashboard) window.dashboard.showNotification('Please fill all fields', 'warning');
+        return;
+    }
+
+    window.setBtnLoading(btn, true);
+
+    try {
+        const payload = {
+            type,
+            amount,
+            date,
+            note,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        await db.collection('earmarked_funds').doc(fundId).collection('history').add(payload);
+
+        const fundDoc = await db.collection('earmarked_funds').doc(fundId).get();
+        if (fundDoc.exists) {
+            const fundData = fundDoc.data();
+            const initialAmount = Number(fundData.initialAmount !== undefined ? fundData.initialAmount : fundData.amount) || 0;
+            
+            const historySnap = await db.collection('earmarked_funds').doc(fundId).collection('history').get();
+            let netAdjustments = 0;
+            historySnap.forEach(doc => {
+                const data = doc.data();
+                const amt = Number(data.amount) || 0;
+                if (data.type === 'deposit') netAdjustments += amt;
+                else if (data.type === 'release') netAdjustments -= amt;
+            });
+
+            const newTotal = initialAmount + netAdjustments;
+            await db.collection('earmarked_funds').doc(fundId).update({
+                amount: newTotal,
+                initialAmount: initialAmount
+            });
+        }
+
+        window.setBtnLoading(btn, false);
+        bootstrap.Modal.getInstance(document.getElementById('addEarmarkedHistoryEntryModal')).hide();
+        
+        showEarmarkedHistory(fundId);
+        
+        if (window.dashboard) {
+            window.dashboard.showNotification('History entry added successfully', 'success');
+            window.dashboard.updateStats();
+        }
+    } catch (e) {
+        window.setBtnLoading(btn, false);
+        console.error("Error saving history entry:", e);
+        if (window.dashboard) window.dashboard.showNotification('Failed to add entry', 'danger');
+    }
+};
+
+window.deleteEarmarkedHistoryEntry = async function(entryId) {
+    if (!confirm('Are you sure you want to delete this history record?')) return;
+    const fundId = activeHistoryFundId;
+    try {
+        await db.collection('earmarked_funds').doc(fundId).collection('history').doc(entryId).delete();
+
+        const fundDoc = await db.collection('earmarked_funds').doc(fundId).get();
+        if (fundDoc.exists) {
+            const fundData = fundDoc.data();
+            const initialAmount = Number(fundData.initialAmount !== undefined ? fundData.initialAmount : fundData.amount) || 0;
+            
+            const historySnap = await db.collection('earmarked_funds').doc(fundId).collection('history').get();
+            let netAdjustments = 0;
+            historySnap.forEach(doc => {
+                const data = doc.data();
+                const amt = Number(data.amount) || 0;
+                if (data.type === 'deposit') netAdjustments += amt;
+                else if (data.type === 'release') netAdjustments -= amt;
+            });
+
+            const newTotal = initialAmount + netAdjustments;
+            await db.collection('earmarked_funds').doc(fundId).update({
+                amount: newTotal,
+                initialAmount: initialAmount
+            });
+        }
+
+        showEarmarkedHistory(fundId);
+        
+        if (window.dashboard) {
+            window.dashboard.showNotification('History entry deleted', 'success');
+            window.dashboard.updateStats();
+        }
+    } catch (e) {
+        console.error("Error deleting history entry:", e);
     }
 };

@@ -105,6 +105,11 @@ service cloud.firestore {
     match /earmarked_funds/{docId} {
       allow read, update, delete: if isOwner(resource.data.userId);
       allow create: if isOwnerCreate();
+
+      match /history/{historyId} {
+        allow read, update, delete: if resource == null || isOwner(resource.data.userId) || isOwner(get(/databases/$(database)/documents/earmarked_funds/$(docId)).data.userId);
+        allow create: if isOwnerCreate() || isOwner(get(/databases/$(database)/documents/earmarked_funds/$(docId)).data.userId);
+      }
     }
 
     // Categories
