@@ -1270,6 +1270,7 @@ window.sendAIChatMessage = async function() {
                 });
 
                 const OPENROUTER_MODELS = [
+                    'google/gemma-4-31b-it:free',
                     'qwen/qwen3-coder:free',
                     'openrouter/free',
                     'google/gemini-2.5-flash:free',
