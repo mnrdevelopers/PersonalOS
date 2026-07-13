@@ -686,13 +686,15 @@ Here is the user's current live data summary from their PersonalOS database:
         const promises = [];
         
         // Push conditional queries based on chosen scope
-        if (scope === 'all' || scope === 'finance') {
+        if (scope === 'all' || scope === 'finance' || scope === 'loans') {
             promises.push(db.collection('bank_accounts').where('userId', '==', user.uid).get());
             promises.push(db.collection('credit_cards').where('userId', '==', user.uid).get());
             promises.push(db.collection('wallets').where('userId', '==', user.uid).get());
             promises.push(db.collection('transactions').where('userId', '==', user.uid).get());
+            promises.push(db.collection('loans').where('userId', '==', user.uid).get());
+            promises.push(db.collection('earmarked_funds').where('userId', '==', user.uid).get());
         } else {
-            promises.push(Promise.resolve(null), Promise.resolve(null), Promise.resolve(null), Promise.resolve(null));
+            promises.push(Promise.resolve(null), Promise.resolve(null), Promise.resolve(null), Promise.resolve(null), Promise.resolve(null), Promise.resolve(null));
         }
 
         if (scope === 'all' || scope === 'tasks') {
@@ -707,8 +709,14 @@ Here is the user's current live data summary from their PersonalOS database:
             promises.push(Promise.resolve(null));
         }
 
+        if (scope === 'all' || scope === 'habits') {
+            promises.push(db.collection('habits').where('userId', '==', user.uid).where('active', '==', true).get());
+        } else {
+            promises.push(Promise.resolve(null));
+        }
+
         // Fetch snapshots in parallel to minimize latency
-        const [accountsSnap, ccSnap, walletSnap, txSnap, tasksSnap, grocerySnap] = await Promise.all(promises);
+        const [accountsSnap, ccSnap, walletSnap, txSnap, loansSnap, earmarkedSnap, tasksSnap, grocerySnap, habitsSnap] = await Promise.all(promises);
 
         const bankBalances = {};
         let allTxList = [];
@@ -773,7 +781,23 @@ Here is the user's current live data summary from their PersonalOS database:
         if (allTxList.length > 0) {
             context += `- Full Ledger Transactions (Total: ${allTxList.length}):\n`;
             allTxList.forEach(d => {
-                context += `  * [${d.date}] ${d.type.toUpperCase()}: ₹${d.amount} for ${d.category} - "${d.description || ''}" (Mode: ${d.paymentMode})\n`;
+                context += `  * ID: "${d.id}", [${d.date}] ${d.type.toUpperCase()}: ₹${d.amount} for ${d.category} - "${d.description || ''}" (Mode: ${d.paymentMode})\n`;
+            });
+        }
+
+        if (loansSnap && !loansSnap.empty) {
+            context += `- Active Loans & EMIs:\n`;
+            loansSnap.forEach(doc => {
+                const d = doc.data();
+                context += `  * ID: "${doc.id}", Borrower: "${d.borrower || ''}", Title: "${d.title || ''}", Type: "${d.type}" (lent/borrowed), Status: "${d.status}" (active/completed), Total: ₹${d.totalAmount || 0}, Paid: ₹${d.paidAmount || 0}\n`;
+            });
+        }
+
+        if (earmarkedSnap && !earmarkedSnap.empty) {
+            context += `- Earmarked Funds (Locked money for family/friends):\n`;
+            earmarkedSnap.forEach(doc => {
+                const d = doc.data();
+                context += `  * ID: "${doc.id}", Title: "${d.title}", Owner: "${d.owner}", Amount: ₹${d.amount || 0}, Status: "${d.status || 'active'}"\n`;
             });
         }
 
@@ -781,12 +805,24 @@ Here is the user's current live data summary from their PersonalOS database:
             context += `- Uncompleted Tasks / Reminders:\n`;
             tasksSnap.forEach(doc => {
                 const d = doc.data();
-                context += `  * "${d.title}" (Due: ${d.dueDate || 'No Date'}, Priority: ${d.priority || 'medium'})\n`;
+                context += `  * ID: "${doc.id}", Title: "${d.title}" (Due: ${d.dueDate || 'No Date'}, Priority: ${d.priority || 'medium'})\n`;
             });
         }
 
         if (grocerySnap && !grocerySnap.empty) {
-            context += `- Items to buy in Grocery List: ${grocerySnap.docs.map(d => d.data().name).join(', ')}\n`;
+            context += `- Items to buy in Grocery List:\n`;
+            grocerySnap.forEach(doc => {
+                const d = doc.data();
+                context += `  * ID: "${doc.id}", Name: "${d.name}", Quantity: ${d.quantity || 1}\n`;
+            });
+        }
+
+        if (habitsSnap && !habitsSnap.empty) {
+            context += `- Active Habits:\n`;
+            habitsSnap.forEach(doc => {
+                const d = doc.data();
+                context += `  * ID: "${doc.id}", Name: "${d.name}", Streak: ${d.streak || 0} days\n`;
+            });
         }
 
     } catch (e) {
@@ -797,7 +833,7 @@ Here is the user's current live data summary from their PersonalOS database:
 Instructions:
 1. Provide extremely professional, clear, and actionable advice to the user.
 2. Structure your replies using clean markdown tables, neat sections, and professional language suitable for a personal CFO.
-3. If the user asks you to write, add, record, create, complete, or save any database items (e.g. transaction, income, expense, task, grocery list item), you MUST output a JSON block matching one of the following schemas. Wrap the JSON block in a markdown code block with language "json". Make sure the JSON is valid and complete.
+3. If the user asks you to write, add, record, create, complete, save, edit, modify, update, delete, or remove any database items (e.g. transaction, income, expense, task, grocery list item, loan), you MUST output a JSON block matching one of the following schemas. Wrap the JSON block in a markdown code block with language "json". Make sure the JSON is valid and complete.
 
 Action Schemas:
 
@@ -835,6 +871,38 @@ C. Adding a Grocery Item:
     "name": string,
     "quantity": number,
     "category": string (e.g. "Vegetables", "Dairy", "Fruits", "Snacks")
+  }
+}
+
+D. Editing a Loan:
+{
+  "action": "edit_loan",
+  "data": {
+    "id": string,
+    "paidAmount": number (optional),
+    "totalAmount": number (optional),
+    "status": "active" | "completed" (optional)
+  }
+}
+
+E. Editing a Task:
+{
+  "action": "edit_task",
+  "data": {
+    "id": string,
+    "title": string (optional),
+    "dueDate": "YYYY-MM-DD" | "" (optional),
+    "priority": "low" | "medium" | "high" (optional),
+    "completed": boolean (optional)
+  }
+}
+
+F. Deleting an Item:
+{
+  "action": "delete_item",
+  "data": {
+    "collection": "transactions" | "reminders" | "grocery_items" | "loans" | "earmarked_funds" | "habits",
+    "id": string
   }
 }
 
@@ -1649,6 +1717,69 @@ async function executeAIAction(action, data) {
             
             if (window.dashboard) {
                 window.dashboard.showNotification('Grocery item added via AI! ✓', 'success');
+            }
+        }
+        else if (action === 'edit_loan') {
+            if (!data.id) throw new Error('Loan ID is required to edit a loan.');
+            const loanRef = db.collection('loans').doc(data.id);
+            const updates = {};
+            if (data.paidAmount !== undefined) updates.paidAmount = parseFloat(data.paidAmount);
+            if (data.totalAmount !== undefined) updates.totalAmount = parseFloat(data.totalAmount);
+            if (data.status !== undefined) updates.status = data.status;
+            
+            await loanRef.update(updates);
+            
+            if (window.loadLoansSection) {
+                await window.loadLoansSection();
+            }
+            if (window.dashboard) {
+                window.dashboard.showNotification('Loan updated via AI! ✓', 'success');
+                window.dashboard.updateStats();
+            }
+        }
+        else if (action === 'edit_task') {
+            if (!data.id) throw new Error('Task ID is required to edit a task.');
+            const taskRef = db.collection('reminders').doc(data.id);
+            const updates = {};
+            if (data.title !== undefined) updates.title = data.title;
+            if (data.dueDate !== undefined) updates.dueDate = data.dueDate;
+            if (data.priority !== undefined) updates.priority = data.priority;
+            if (data.completed !== undefined) updates.completed = data.completed;
+            
+            await taskRef.update(updates);
+            
+            if (window.dashboard) {
+                window.dashboard.showNotification('Task updated via AI! ✓', 'success');
+                const activeSec = document.querySelector('.nav-link.active')?.getAttribute('data-section');
+                if (activeSec === 'tasks' && window.loadTasksSection) {
+                    await window.loadTasksSection();
+                }
+            }
+        }
+        else if (action === 'delete_item') {
+            if (!data.id || !data.collection) throw new Error('Collection and ID are required to delete.');
+            
+            const allowedCollections = ['transactions', 'reminders', 'grocery_items', 'loans', 'earmarked_funds', 'habits'];
+            if (!allowedCollections.includes(data.collection)) {
+                throw new Error(`Unauthorized collection deletion: ${data.collection}`);
+            }
+            
+            await db.collection(data.collection).doc(data.id).delete();
+            
+            if (window.dashboard) {
+                window.dashboard.showNotification('Item deleted via AI! ✓', 'success');
+                window.dashboard.updateStats();
+            }
+            
+            const activeSec = document.querySelector('.nav-link.active')?.getAttribute('data-section');
+            if (activeSec === 'loans' && window.loadLoansSection) {
+                await window.loadLoansSection();
+            } else if (activeSec === 'tasks' && window.loadTasksSection) {
+                await window.loadTasksSection();
+            } else if (activeSec === 'groceries' && window.loadGroceriesSection) {
+                await window.loadGroceriesSection();
+            } else if (activeSec === 'habits' && window.loadHabitsSection) {
+                await window.loadHabitsSection();
             }
         }
     } catch (e) {
