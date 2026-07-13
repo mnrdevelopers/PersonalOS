@@ -124,6 +124,71 @@ window.loadSettingsSection = async function() {
             </div>
         </div>
 
+        <div class="card mb-4" id="wa-server-settings-card">
+            <div class="card-header d-flex align-items-center gap-2">
+                <i class="fab fa-whatsapp text-success fs-5"></i>
+                <h5 class="mb-0">WhatsApp Auto-Reminder Server</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    A local Node.js server that automatically sends WhatsApp payment reminders for your lent loans.
+                    Run <code>node server.js</code> inside <code>wa-server/</code> to start.
+                </p>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Server URL</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="wa-server-url-input"
+                               placeholder="http://localhost:3001"
+                               value="${localStorage.getItem('waServerUrl') || 'http://localhost:3001'}">
+                        <button class="btn btn-outline-primary" onclick="saveWaServerUrl()">Save</button>
+                        <button class="btn btn-outline-secondary" onclick="checkWaStatus()">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                    <div class="form-text">Must be running on this machine. Default: http://localhost:3001</div>
+                </div>
+
+                <!-- Status Badge -->
+                <div id="wa-status-area" class="mb-3">
+                    <div class="wa-status-badge" id="wa-status-badge">
+                        <span class="wa-status-dot"></span>
+                        <span id="wa-status-text">Click refresh to check</span>
+                    </div>
+                </div>
+
+                <!-- QR Code area (shown when auth needed) -->
+                <div id="wa-qr-area" class="d-none text-center mb-3">
+                    <p class="small text-muted mb-2">Scan this QR code with WhatsApp to connect</p>
+                    <img id="wa-qr-img" src="" alt="WhatsApp QR Code"
+                         class="img-fluid rounded border" style="max-width: 220px;">
+                    <div class="small text-muted mt-2">WhatsApp → Settings → Linked Devices → Link a Device</div>
+                </div>
+
+                <!-- Test Message -->
+                <div class="border-top pt-3">
+                    <label class="form-label small fw-semibold">Send Test Message</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control" id="wa-test-phone"
+                               placeholder="Phone with country code e.g. 919876543210">
+                        <button class="btn btn-success" onclick="sendWaTestMessage()">
+                            <i class="fab fa-whatsapp me-1"></i>Test
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Trigger Now -->
+                <div class="mt-3 d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-primary" onclick="triggerWaJobNow()">
+                        <i class="fas fa-bolt me-1"></i>Run Reminders Now
+                    </button>
+                    <a href="#" onclick="openWaLog()" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-list me-1"></i>View Send Log
+                    </a>
+                </div>
+            </div>
+        </div>
+
         <div class="card border-danger">
             <div class="card-header bg-danger text-white">
                 <h5 class="mb-0">Danger Zone</h5>
@@ -225,3 +290,94 @@ window.togglePasswordVisibility = function(id) {
         el.type = 'password';
     }
 };
+
+// ─── WhatsApp Server Helpers ─────────────────────────────────────────────────
+
+function getWaServerUrl() {
+    return (localStorage.getItem('waServerUrl') || 'http://localhost:3001').replace(/\/$/, '');
+}
+
+window.saveWaServerUrl = function() {
+    const val = (document.getElementById('wa-server-url-input')?.value || '').trim();
+    if (val) {
+        localStorage.setItem('waServerUrl', val);
+        if(window.dashboard) window.dashboard.showNotification('WA server URL saved', 'success');
+        checkWaStatus();
+    }
+};
+
+window.checkWaStatus = async function() {
+    const badge = document.getElementById('wa-status-badge');
+    const statusText = document.getElementById('wa-status-text');
+    const qrArea = document.getElementById('wa-qr-area');
+    const qrImg = document.getElementById('wa-qr-img');
+
+    if (badge) badge.className = 'wa-status-badge wa-status-checking';
+    if (statusText) statusText.textContent = 'Checking...';
+    if (qrArea) qrArea.classList.add('d-none');
+
+    try {
+        const res = await fetch(`${getWaServerUrl()}/status`, { signal: AbortSignal.timeout(5000) });
+        const data = await res.json();
+
+        if (badge) {
+            badge.className = `wa-status-badge wa-status-${data.status}`;
+        }
+        if (statusText) statusText.textContent = data.message || data.status;
+
+        // Show QR code if needed
+        if (data.status === 'qr_required' && data.qrCode && qrArea && qrImg) {
+            qrImg.src = data.qrCode;
+            qrArea.classList.remove('d-none');
+        }
+    } catch (err) {
+        if (badge) badge.className = 'wa-status-badge wa-status-disconnected';
+        if (statusText) statusText.textContent = 'Server offline — is node server.js running?';
+    }
+};
+
+window.sendWaTestMessage = async function() {
+    const phone = document.getElementById('wa-test-phone')?.value.trim();
+    if (!phone) {
+        if(window.dashboard) window.dashboard.showNotification('Enter a phone number first', 'warning');
+        return;
+    }
+    try {
+        const res = await fetch(`${getWaServerUrl()}/test-message`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone }),
+            signal: AbortSignal.timeout(10000)
+        });
+        const data = await res.json();
+        if (data.success) {
+            if(window.dashboard) window.dashboard.showNotification('✅ Test message sent to ' + data.to, 'success');
+        } else {
+            if(window.dashboard) window.dashboard.showNotification('❌ ' + (data.error || 'Failed'), 'danger');
+        }
+    } catch (err) {
+        if(window.dashboard) window.dashboard.showNotification('Server unreachable: ' + err.message, 'danger');
+    }
+};
+
+window.triggerWaJobNow = async function() {
+    try {
+        await fetch(`${getWaServerUrl()}/run-now`, { method: 'POST', signal: AbortSignal.timeout(5000) });
+        if(window.dashboard) window.dashboard.showNotification('Reminder job triggered!', 'success');
+    } catch (err) {
+        if(window.dashboard) window.dashboard.showNotification('Server unreachable', 'danger');
+    }
+};
+
+window.openWaLog = async function() {
+    try {
+        const res = await fetch(`${getWaServerUrl()}/log`, { signal: AbortSignal.timeout(5000) });
+        const data = await res.json();
+        const text = JSON.stringify(data, null, 2);
+        const win = window.open('', '_blank');
+        win.document.write(`<pre style="font-family:monospace;padding:1rem">${text}</pre>`);
+        win.document.close();
+    } catch (err) {
+        if(window.dashboard) window.dashboard.showNotification('Cannot fetch log: server offline', 'danger');
+    }
+};

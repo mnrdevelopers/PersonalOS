@@ -79,35 +79,48 @@ window.loadLoansSection = async function() {
             </details>
 
             <div class="loans-hero card border-0 shadow-lg rounded-4 overflow-hidden animate-slide-up mb-4">
-                <div class="card-body p-3 p-lg-4">
+                <div class="card-body p-3 p-lg-4 pb-0">
                     <div class="loans-hero-grid">
                         <div class="loans-hero-copy">
                             <div class="loans-kicker">Loans Workspace</div>
-                            <h2 class="fw-bold mb-2">Loans, Debts, Wallets and Cards</h2>
-                            <p class="loans-subtitle mb-3">Track what you owe, what others owe you, recurring EMIs, and connected money tools with a cleaner mobile-friendly layout.</p>
-                            <ul class="nav nav-pills loans-workspace-tabs" id="loan-workspace-tabs">
-                                <li class="nav-item">
-                                    <a class="nav-link active rounded-pill" href="javascript:void(0)" onclick="switchLoanView('loans', this)">Loans & Debts</a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link rounded-pill" href="javascript:void(0)" onclick="switchLoanView('investments', this)">Investments</a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link rounded-pill" href="javascript:void(0)" onclick="switchLoanView('wallets', this)">Wallets</a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link rounded-pill" href="javascript:void(0)" onclick="switchLoanView('cards', this)">Credit Cards</a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link rounded-pill" href="javascript:void(0)" onclick="switchLoanView('earmarked', this)">Earmarked (Locked)</a>
-                                </li>
-                            </ul>
+                            <h2 class="fw-bold mb-1">Loans, Debts, Wallets and Cards</h2>
+                            <p class="loans-subtitle mb-0">Track what you owe, what others owe you, recurring EMIs, and connected money tools.</p>
                         </div>
 
                         <div id="finance-toolbar" class="loans-toolbar">
                             <!-- Buttons will be injected here based on active tab -->
                         </div>
                     </div>
+                </div>
+                <!-- Scrollable Tab Strip -->
+                <div class="loans-tab-strip-wrap">
+                    <ul class="loans-workspace-tabs" id="loan-workspace-tabs">
+                        <li>
+                            <a class="lwt-chip active" href="javascript:void(0)" onclick="switchLoanView('loans', this)">
+                                <i class="fas fa-hand-holding-dollar"></i> Loans & Debts
+                            </a>
+                        </li>
+                        <li>
+                            <a class="lwt-chip" href="javascript:void(0)" onclick="switchLoanView('investments', this)">
+                                <i class="fas fa-chart-line"></i> Investments
+                            </a>
+                        </li>
+                        <li>
+                            <a class="lwt-chip" href="javascript:void(0)" onclick="switchLoanView('wallets', this)">
+                                <i class="fas fa-wallet"></i> Wallets
+                            </a>
+                        </li>
+                        <li>
+                            <a class="lwt-chip" href="javascript:void(0)" onclick="switchLoanView('cards', this)">
+                                <i class="fas fa-credit-card"></i> Credit Cards
+                            </a>
+                        </li>
+                        <li>
+                            <a class="lwt-chip" href="javascript:void(0)" onclick="switchLoanView('earmarked', this)">
+                                <i class="fas fa-lock"></i> Earmarked
+                            </a>
+                        </li>
+                    </ul>
                 </div>
             </div>
         
@@ -206,25 +219,59 @@ window.loadLoansSection = async function() {
                             <div id="contact-fields" class="d-none bg-light p-3 rounded mb-3 border">
                                 <div class="mb-3">
                                     <label class="form-label" id="label-contact-info">Borrower Mobile Number</label>
-                                    <div class="input-group">
-                                        <select class="form-select" id="loan-country-code" style="max-width: 110px;">
-                                            <option value="91" selected>🇮🇳 +91</option>
-                                            <option value="1">🇺🇸 +1</option>
-                                            <option value="44">🇬🇧 +44</option>
-                                            <option value="971">🇦🇪 +971</option>
+                                    <div class="d-flex gap-2 align-items-stretch">
+                                        <select class="form-select" id="loan-country-code" style="width: 100px; flex-shrink: 0; min-width: 0;">
+                                            <option value="91" selected>+91</option>
+                                            <option value="1">+1</option>
+                                            <option value="44">+44</option>
+                                            <option value="971">+971</option>
                                             <option value="other">Other</option>
                                         </select>
-                                        <input type="text" class="form-control" id="loan-mobile" placeholder="Number / UPI ID">
+                                        <input type="tel" class="form-control" id="loan-mobile" placeholder="Mobile number" inputmode="numeric">
                                     </div>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">UPI ID (for payments)</label>
                                     <input type="text" class="form-control" id="loan-upi-id" placeholder="e.g. username@bank">
                                 </div>
-                                <div class="mb-3 mb-0">
+                                <div class="mb-3">
                                     <label class="form-label">Reminder Context (Message)</label>
                                     <input type="text" class="form-control" id="loan-message-context" placeholder="e.g. Tatkal, Hand Loan">
                                     <div class="form-text small">Used in WhatsApp: "Your [Context] payment..."</div>
+                                </div>
+
+                                <!-- Auto WhatsApp Reminder Config -->
+                                <div class="wa-reminder-config-panel">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <div>
+                                            <span class="fw-semibold small"><i class="fab fa-whatsapp text-success me-1"></i>Auto WhatsApp Reminder</span>
+                                            <div class="form-text mt-0">Sends automatically via local WA server</div>
+                                        </div>
+                                        <div class="form-check form-switch mb-0">
+                                            <input class="form-check-input" type="checkbox" id="loan-reminder-enabled" onchange="toggleReminderConfig(this.checked)">
+                                        </div>
+                                    </div>
+                                    <div id="reminder-config-body" class="d-none">
+                                        <div class="mb-2">
+                                            <label class="form-label small mb-1">Days before due date to start</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" id="loan-reminder-days" value="3" min="1" max="60" placeholder="3" inputmode="numeric">
+                                                <span class="input-group-text">days before</span>
+                                            </div>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label class="form-label small mb-1">How many times per day?</label>
+                                            <select class="form-select" id="loan-reminder-times">
+                                                <option value="1">Once a day</option>
+                                                <option value="2">Twice a day</option>
+                                                <option value="3">3 times a day</option>
+                                            </select>
+                                        </div>
+                                        <div class="p-2 bg-success bg-opacity-10 rounded small text-success">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            Requires WA server at <span id="wa-server-url-hint" class="fw-semibold">localhost:3001</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             <div class="row">
@@ -1165,7 +1212,7 @@ window.loadLoansSection = async function() {
 window.switchLoanView = function(view, element) {
     currentLoanView = view;
     if(element) {
-        document.querySelectorAll('#loan-workspace-tabs .nav-link').forEach(l => l.classList.remove('active'));
+        document.querySelectorAll('#loan-workspace-tabs .lwt-chip').forEach(l => l.classList.remove('active'));
         element.classList.add('active');
     }
 
@@ -1355,6 +1402,14 @@ window.updateLoanModalUI = function(type) {
     }
 };
 
+window.toggleReminderConfig = function(enabled) {
+    const body = document.getElementById('reminder-config-body');
+    if (body) body.classList.toggle('d-none', !enabled);
+    // Show server URL from localStorage
+    const hint = document.getElementById('wa-server-url-hint');
+    if (hint) hint.textContent = localStorage.getItem('waServerUrl') || 'localhost:3001';
+};
+
 window.calculateEMIAmount = function() {
     const type = document.querySelector('input[name="loan-type"]:checked').value;
     if (type !== 'emi') return;
@@ -1378,6 +1433,14 @@ window.resetLoanForm = async function() {
     document.getElementById('loan-upi-id').value = '';
     document.getElementById('loan-message-context').value = '';
     document.getElementById('loan-duration').value = '';
+    // Reset reminder config
+    const reminderToggle = document.getElementById('loan-reminder-enabled');
+    if (reminderToggle) reminderToggle.checked = false;
+    const reminderDays = document.getElementById('loan-reminder-days');
+    if (reminderDays) reminderDays.value = 3;
+    const reminderTimes = document.getElementById('loan-reminder-times');
+    if (reminderTimes) reminderTimes.value = 1;
+    toggleReminderConfig(false);
 
     await window.populateLoanPaymentSelects();
 
@@ -1533,6 +1596,9 @@ window.saveLoan = async function() {
     const mobileInput = document.getElementById('loan-mobile').value;
     const upiId = document.getElementById('loan-upi-id').value.trim();
     const messageContext = document.getElementById('loan-message-context').value;
+    const reminderEnabled = document.getElementById('loan-reminder-enabled')?.checked || false;
+    const reminderDaysBefore = parseInt(document.getElementById('loan-reminder-days')?.value) || 3;
+    const reminderTimesPerDay = parseInt(document.getElementById('loan-reminder-times')?.value) || 1;
     const user = auth.currentUser;
 
     if (!name || !amount || !startDate) {
@@ -1569,6 +1635,9 @@ window.saveLoan = async function() {
             mobile: fullMobile,
             messageContext: messageContext || '',
             upiId: upiId || '',
+            reminderEnabled: reminderEnabled,
+            reminderDaysBefore: reminderDaysBefore,
+            reminderTimesPerDay: reminderTimesPerDay,
             status: 'active',
         };
 
@@ -1586,7 +1655,10 @@ window.saveLoan = async function() {
                 type,
                 mobile: fullMobile,
                 upiId: upiId || '',
-                messageContext: messageContext || ''
+                messageContext: messageContext || '',
+                reminderEnabled: reminderEnabled,
+                reminderDaysBefore: reminderDaysBefore,
+                reminderTimesPerDay: reminderTimesPerDay
             };
 
             // If EMI, ensure initialDueDate is consistent with the new dueDate (which represents the NEXT due date)
@@ -2000,14 +2072,24 @@ window.loadLoansGrid = async function(status = 'active') {
             const safeName = (data.name || '').replace(/"/g, '&quot;');
             const safeMobile = (data.mobile || '').replace(/"/g, '&quot;');
             const safeContext = (data.messageContext || '').replace(/"/g, '&quot;');
-            
-            whatsappBtn = `
-                <button class="btn btn-sm btn-success me-1" 
-                    data-name="${safeName}" data-amount="${remainingAmount}" data-mobile="${safeMobile}" data-context="${safeContext}"
-                    onclick="sendWhatsAppReminder('${doc.id}', this.getAttribute('data-name'), this.getAttribute('data-amount'), this.getAttribute('data-mobile'), this.getAttribute('data-context'))" 
-                    title="Send WhatsApp Reminder">
-                    <i class="fab fa-whatsapp"></i> Remind
-                </button>`;
+
+            if (data.reminderEnabled) {
+                // Auto-reminder is on — show status chip instead of manual button
+                whatsappBtn = `
+                    <span class="wa-auto-badge" title="Auto WA reminder active">
+                        <i class="fab fa-whatsapp"></i>
+                        Auto · ${data.reminderDaysBefore || 3}d · ${data.reminderTimesPerDay || 1}×/day
+                    </span>`;
+            } else if (safeMobile) {
+                // Manual remind button
+                whatsappBtn = `
+                    <button class="btn btn-sm btn-success me-1" 
+                        data-name="${safeName}" data-amount="${remainingAmount}" data-mobile="${safeMobile}" data-context="${safeContext}"
+                        onclick="sendWhatsAppReminder('${doc.id}', this.getAttribute('data-name'), this.getAttribute('data-amount'), this.getAttribute('data-mobile'), this.getAttribute('data-context'))" 
+                        title="Send WhatsApp Reminder">
+                        <i class="fab fa-whatsapp"></i> Remind
+                    </button>`;
+            }
         }
 
         const col = document.createElement('div');
@@ -2129,6 +2211,17 @@ window.editLoan = async function(id) {
         document.getElementById('loan-upi-id').value = data.upiId || '';
         
         document.getElementById('loan-message-context').value = data.messageContext || '';
+
+        // Reminder config
+        const reminderEnabled = document.getElementById('loan-reminder-enabled');
+        if (reminderEnabled) {
+            reminderEnabled.checked = data.reminderEnabled || false;
+            toggleReminderConfig(data.reminderEnabled || false);
+        }
+        if (document.getElementById('loan-reminder-days'))
+            document.getElementById('loan-reminder-days').value = data.reminderDaysBefore || 3;
+        if (document.getElementById('loan-reminder-times'))
+            document.getElementById('loan-reminder-times').value = data.reminderTimesPerDay || 1;
         
         // Set radio button
         const typeRadio = document.querySelector(`input[name="loan-type"][value="${data.type}"]`);

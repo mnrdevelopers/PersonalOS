@@ -6441,3 +6441,338 @@ body {
 }
 
 
+/* =====================================================
+   Loans Workspace — Hero Card & Tab Strip
+   ===================================================== */
+
+/* Hero card inner layout */
+.loans-hero-grid {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.loans-hero-copy {
+    flex: 1 1 0;
+    min-width: 0;
+}
+.loans-kicker {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--bs-primary);
+    margin-bottom: 0.35rem;
+    opacity: 0.75;
+}
+.loans-subtitle {
+    font-size: 0.8rem;
+    color: var(--bs-secondary-color, #6c757d);
+    line-height: 1.5;
+}
+.loans-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+/* ---- Scrollable tab strip ---- */
+.loans-tab-strip-wrap {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    border-top: 1px solid rgba(0,0,0,0.07);
+    margin-top: 0.75rem;
+    padding: 0 1rem;
+}
+.loans-tab-strip-wrap::-webkit-scrollbar {
+    display: none;
+}
+
+.loans-workspace-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.25rem;
+    list-style: none;
+    margin: 0;
+    padding: 0.5rem 0;
+}
+.loans-workspace-tabs li {
+    flex-shrink: 0;
+}
+
+/* Chip / pill button */
+.lwt-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.38rem 0.9rem;
+    border-radius: 50rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--bs-secondary-color, #6c757d);
+    background: transparent;
+    border: 1.5px solid transparent;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+.lwt-chip i {
+    font-size: 0.72rem;
+    opacity: 0.85;
+}
+.lwt-chip:hover {
+    background: rgba(99, 102, 241, 0.08);
+    color: #6366f1;
+    border-color: rgba(99, 102, 241, 0.25);
+}
+.lwt-chip.active {
+    background: linear-gradient(135deg, #6366f1, #a855f7);
+    color: #fff !important;
+    border-color: transparent;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+}
+
+/* Dark mode */
+[data-theme="dark"] .loans-tab-strip-wrap {
+    border-top-color: rgba(255,255,255,0.08);
+}
+[data-theme="dark"] .lwt-chip {
+    color: rgba(255,255,255,0.55);
+}
+[data-theme="dark"] .lwt-chip:hover {
+    background: rgba(139,92,246,0.15);
+    color: #a78bfa;
+    border-color: rgba(139,92,246,0.3);
+}
+[data-theme="dark"] .lwt-chip.active {
+    color: #fff !important;
+}
+
+/* =====================================================
+   Global Modal Footer — Mobile & iPhone Safe-Area Fix
+   ===================================================== */
+
+/* Base: improve button sizing and layout */
+.modal-footer {
+    gap: 0.6rem;
+    padding: 1rem 1.25rem;
+}
+
+/* Ensure buttons are large enough to tap comfortably */
+.modal-footer .btn {
+    min-height: 46px;
+    font-weight: 600;
+    border-radius: 0.6rem;
+    font-size: 0.9rem;
+}
+
+/* On mobile: stack full-width, Save on top */
+@media (max-width: 575.98px) {
+    .modal-footer {
+        flex-direction: column-reverse;
+        align-items: stretch;
+        padding: 1rem 1.25rem;
+        /* Push buttons above iPhone home indicator */
+        padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    }
+    .modal-footer .btn {
+        width: 100%;
+        min-height: 50px;
+        font-size: 0.95rem;
+    }
+    /* Primary/Save button gets slightly more prominence */
+    .modal-footer .btn-primary,
+    .modal-footer .btn-success,
+    .modal-footer .btn-danger,
+    .modal-footer .btn-warning {
+        order: -1; /* Visually first = closer to content, easier thumb reach */
+    }
+}
+
+/* iOS safe-area support via @supports */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    @media (max-width: 575.98px) {
+        .modal-footer {
+            padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+        }
+    }
+}
+
+/* Dark mode modal footer */
+[data-theme="dark"] .modal-footer {
+    border-top-color: rgba(255,255,255,0.08);
+}
+
+/* =====================================================
+   WhatsApp Auto-Reminder — Form Panel & Badges
+   ===================================================== */
+
+/* Reminder config panel inside loan form contact-fields */
+.wa-reminder-config-panel {
+    background: rgba(37, 211, 102, 0.06);
+    border: 1.5px solid rgba(37, 211, 102, 0.25);
+    border-radius: 0.75rem;
+    padding: 0.85rem 1rem;
+    margin-top: 0.5rem;
+}
+[data-theme="dark"] .wa-reminder-config-panel {
+    background: rgba(37, 211, 102, 0.08);
+    border-color: rgba(37, 211, 102, 0.2);
+}
+
+/* Auto-reminder active badge on loan cards */
+.wa-auto-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.28rem 0.65rem;
+    background: linear-gradient(135deg, #25d366, #128c7e);
+    color: #fff;
+    border-radius: 50rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(37, 211, 102, 0.35);
+}
+.wa-auto-badge i {
+    font-size: 0.85rem;
+}
+
+/* WA server status badge in settings */
+.wa-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.85rem;
+    border-radius: 50rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: rgba(0,0,0,0.05);
+    color: #6c757d;
+    border: 1.5px solid rgba(0,0,0,0.08);
+    transition: background 0.2s, color 0.2s;
+}
+.wa-status-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #6c757d;
+    flex-shrink: 0;
+    animation: none;
+}
+
+/* Connected */
+.wa-status-connected {
+    background: rgba(37, 211, 102, 0.1);
+    color: #128c7e;
+    border-color: rgba(37, 211, 102, 0.35);
+}
+.wa-status-connected .wa-status-dot { background: #25d366; }
+
+/* QR Required */
+.wa-status-qr_required {
+    background: rgba(245, 158, 11, 0.1);
+    color: #92400e;
+    border-color: rgba(245, 158, 11, 0.4);
+}
+.wa-status-qr_required .wa-status-dot {
+    background: #f59e0b;
+    animation: wa-blink 1.2s ease-in-out infinite;
+}
+
+/* Disconnected */
+.wa-status-disconnected {
+    background: rgba(239, 68, 68, 0.08);
+    color: #b91c1c;
+    border-color: rgba(239, 68, 68, 0.3);
+}
+.wa-status-disconnected .wa-status-dot { background: #ef4444; }
+
+/* Checking */
+.wa-status-checking {
+    background: rgba(99, 102, 241, 0.08);
+    color: #4338ca;
+    border-color: rgba(99, 102, 241, 0.25);
+}
+.wa-status-checking .wa-status-dot {
+    background: #6366f1;
+    animation: wa-blink 0.7s ease-in-out infinite;
+}
+
+@keyframes wa-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .wa-status-badge {
+    background: rgba(255,255,255,0.05);
+    border-color: rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.6);
+}
+[data-theme="dark"] .wa-status-connected {
+    background: rgba(37, 211, 102, 0.12);
+    color: #4ade80;
+    border-color: rgba(37, 211, 102, 0.3);
+}
+[data-theme="dark"] .wa-status-qr_required {
+    background: rgba(245, 158, 11, 0.12);
+    color: #fcd34d;
+    border-color: rgba(245, 158, 11, 0.3);
+}
+[data-theme="dark"] .wa-status-disconnected {
+    background: rgba(239, 68, 68, 0.1);
+    color: #fca5a5;
+    border-color: rgba(239, 68, 68, 0.25);
+}
+
+/* =====================================================
+   Loan Form — Contact Fields Mobile Fix
+   ===================================================== */
+
+/* Contact fields container — dark mode aware */
+#contact-fields {
+    border-radius: 0.75rem !important;
+}
+[data-theme="dark"] #contact-fields {
+    background: rgba(255,255,255,0.05) !important;
+    border-color: rgba(255,255,255,0.1) !important;
+}
+
+/* Country code + phone number row — always inline, never wraps */
+#contact-fields .d-flex.gap-2 {
+    flex-wrap: nowrap;
+    align-items: stretch;
+}
+#contact-fields #loan-country-code {
+    width: 90px !important;
+    flex-shrink: 0;
+    flex-grow: 0;
+    min-width: 0;
+    padding-left: 0.5rem;
+    padding-right: 0.25rem;
+    font-weight: 600;
+}
+#contact-fields #loan-mobile {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+/* Ensure all inputs inside contact-fields have good tap height */
+#contact-fields .form-control,
+#contact-fields .form-select {
+    min-height: 44px;
+    font-size: 0.9rem;
+}
+#contact-fields .form-control-sm,
+#contact-fields .form-select-sm {
+    min-height: 38px;
+}

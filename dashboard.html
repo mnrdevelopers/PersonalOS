@@ -1414,7 +1414,7 @@
                 <i class="fa-solid fa-wand-magic-sparkles gradient-text animate-pulse"></i>
                 <span class="gradient-text">AI Co-Pilot Suggestions</span>
             </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" style="padding: 0.75rem; font-size: 1.1rem;"></button>
         </div>
         <div class="offcanvas-body d-flex flex-column p-4">
             <!-- Active Section Badge -->
@@ -1462,6 +1462,10 @@
                     </button>
                     <button class="btn btn-outline-primary rounded-pill px-4 text-xs fw-semibold" onclick="askCopilotAboutThisSection()">
                         <i class="fas fa-comments me-2"></i>Ask Assistant About This Section
+                    </button>
+                    <!-- Mobile-friendly bottom close button -->
+                    <button type="button" class="btn btn-outline-secondary rounded-pill fw-semibold d-lg-none" data-bs-dismiss="offcanvas" style="padding: 0.65rem;">
+                        <i class="fas fa-times me-2"></i>Close Panel
                     </button>
                 </div>
             </div>
