@@ -4604,6 +4604,9 @@ window.showEarmarkedHistory = async function(fundId) {
     document.getElementById('history-current-amount').textContent = '₹0.00';
 
     try {
+        const user = auth.currentUser;
+        if (!user) return;
+
         const fundDoc = await db.collection('earmarked_funds').doc(fundId).get();
         if (!fundDoc.exists) return;
         const fundData = fundDoc.data();
@@ -4612,25 +4615,38 @@ window.showEarmarkedHistory = async function(fundId) {
         document.getElementById('history-fund-owner').textContent = `Held for: ${fundData.owner || ''}`;
 
         const historySnap = await db.collection('earmarked_funds').doc(fundId).collection('history')
-            .orderBy('date', 'desc')
-            .orderBy('createdAt', 'desc')
+            .where('userId', '==', user.uid)
             .get();
+
+        const entries = [];
+        historySnap.forEach(doc => {
+            entries.push({ id: doc.id, ...doc.data() });
+        });
+
+        // Client-side sort by date desc, then createdAt desc
+        entries.sort((a, b) => {
+            const dateA = a.date || '';
+            const dateB = b.date || '';
+            if (dateA !== dateB) return dateB.localeCompare(dateA);
+            const timeA = a.createdAt ? (a.createdAt.toMillis ? a.createdAt.toMillis() : (a.createdAt.seconds * 1000 || 0)) : 0;
+            const timeB = b.createdAt ? (b.createdAt.toMillis ? b.createdAt.toMillis() : (b.createdAt.seconds * 1000 || 0)) : 0;
+            return timeB - timeA;
+        });
 
         const initialAmount = Number(fundData.initialAmount !== undefined ? fundData.initialAmount : fundData.amount) || 0;
         
         let netAdjustments = 0;
         let rowsHtml = '';
 
-        if (historySnap.empty) {
+        if (entries.length === 0) {
             rowsHtml = '<tr><td colspan="5" class="text-center text-muted">No history entries found. Click Add Entry to log additions or releases.</td></tr>';
         } else {
-            historySnap.forEach(doc => {
-                const data = doc.data();
-                const amt = Number(data.amount) || 0;
-                const date = data.date || '';
-                const note = data.note || '';
-                const type = data.type || 'deposit';
-                const entryId = doc.id;
+            entries.forEach(entry => {
+                const amt = Number(entry.amount) || 0;
+                const date = entry.date || '';
+                const note = entry.note || '';
+                const type = entry.type || 'deposit';
+                const entryId = entry.id;
 
                 if (type === 'deposit') {
                     netAdjustments += amt;
@@ -4702,7 +4718,8 @@ window.saveEarmarkedHistoryEntry = async function() {
     const date = document.getElementById('eh-date').value;
     const note = document.getElementById('eh-note').value.trim();
 
-    if (!fundId || !type || isNaN(amount) || amount <= 0 || !date || !note) {
+    const user = auth.currentUser;
+    if (!user || !fundId || !type || isNaN(amount) || amount <= 0 || !date || !note) {
         if(window.dashboard) window.dashboard.showNotification('Please fill all fields', 'warning');
         return;
     }
@@ -4711,6 +4728,7 @@ window.saveEarmarkedHistoryEntry = async function() {
 
     try {
         const payload = {
+            userId: user.uid,
             type,
             amount,
             date,
@@ -4725,7 +4743,9 @@ window.saveEarmarkedHistoryEntry = async function() {
             const fundData = fundDoc.data();
             const initialAmount = Number(fundData.initialAmount !== undefined ? fundData.initialAmount : fundData.amount) || 0;
             
-            const historySnap = await db.collection('earmarked_funds').doc(fundId).collection('history').get();
+            const historySnap = await db.collection('earmarked_funds').doc(fundId).collection('history')
+                .where('userId', '==', user.uid)
+                .get();
             let netAdjustments = 0;
             historySnap.forEach(doc => {
                 const data = doc.data();
@@ -4760,6 +4780,8 @@ window.saveEarmarkedHistoryEntry = async function() {
 window.deleteEarmarkedHistoryEntry = async function(entryId) {
     if (!confirm('Are you sure you want to delete this history record?')) return;
     const fundId = activeHistoryFundId;
+    const user = auth.currentUser;
+    if (!user) return;
     try {
         await db.collection('earmarked_funds').doc(fundId).collection('history').doc(entryId).delete();
 
@@ -4768,7 +4790,9 @@ window.deleteEarmarkedHistoryEntry = async function(entryId) {
             const fundData = fundDoc.data();
             const initialAmount = Number(fundData.initialAmount !== undefined ? fundData.initialAmount : fundData.amount) || 0;
             
-            const historySnap = await db.collection('earmarked_funds').doc(fundId).collection('history').get();
+            const historySnap = await db.collection('earmarked_funds').doc(fundId).collection('history')
+                .where('userId', '==', user.uid)
+                .get();
             let netAdjustments = 0;
             historySnap.forEach(doc => {
                 const data = doc.data();
