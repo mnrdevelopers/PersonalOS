@@ -372,75 +372,146 @@
 
             systemContext += `\nTransactions list count: ${txsSnap.size}\nActive Habits count: ${habitsSnap.size}\nLoans count: ${loansSnap.size}\nCredit Cards limit count: ${CCsSnap.size}\n`;
 
-            const contents = [{
-                role: 'user',
-                parts: [{
-                    text: systemContext + `\nPrompt: Review the details of the active section context "${activeSectionContext}" and output a smart budget planning summary, warning tips, and look for any data bugs or anomalies. Keep it concise, structured in professional markdown sections.`
-                }]
-            }];
-            const MODELS_TO_TRY = [
-                'gemini-1.5-flash',
-                'gemini-2.0-flash',
-                'gemini-1.5-flash-latest',
-                'gemini-1.5-pro-latest',
-                'gemini-1.0-pro'
-            ];
+            const isOpenRouter = apiKey.startsWith('sk-or-');
+            let text = '';
 
-            let response = null;
-            let resData = null;
-            let lastError = null;
+            if (isOpenRouter) {
+                const OPENROUTER_MODELS = [
+                    'google/gemini-2.0-flash:free',
+                    'google/gemini-2.0-flash-exp:free',
+                    'google/gemini-2.0-flash',
+                    'google/gemini-1.5-flash:free',
+                    'google/gemini-1.5-flash',
+                    'meta-llama/llama-3-8b-instruct:free',
+                    'mistralai/mistral-7b-instruct:free'
+                ];
 
-            for (const model of MODELS_TO_TRY) {
-                try {
-                    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ contents })
-                    });
+                const messages = [
+                    { role: 'system', content: systemContext },
+                    {
+                        role: 'user',
+                        content: `Review the details of the active section context "${activeSectionContext}" and output a smart budget planning summary, warning tips, and look for any data bugs or anomalies. Keep it concise, structured in professional markdown sections.`
+                    }
+                ];
 
-                    if (response.ok) {
-                        resData = await response.json();
-                        break;
-                    } else {
-                        let errMsg = `HTTP ${response.status}`;
-                        let apiErrorMsg = '';
-                        try {
-                            const errData = await response.json();
-                            if (errData.error?.message) {
-                                apiErrorMsg = errData.error.message;
-                                errMsg += `: ${apiErrorMsg}`;
-                            }
-                        } catch (err) {}
-                        
-                        lastError = errMsg;
+                let response = null;
+                let resData = null;
+                let lastError = null;
 
-                        // Immediately halt on rate limits (429) to avoid masking with subsequent 404s
-                        if (response.status === 429) {
-                            lastError = `Rate limit/quota exceeded (429). Please wait a minute and try again. (Detail: ${apiErrorMsg || 'Resource exhausted'})`;
+                for (const model of OPENROUTER_MODELS) {
+                    try {
+                        response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${apiKey}`,
+                                'HTTP-Referer': 'https://github.com/mnrdevelopers/PersonalOS',
+                                'X-Title': 'PersonalOS'
+                            },
+                            body: JSON.stringify({
+                                model: model,
+                                messages: messages
+                            })
+                        });
+
+                        if (response.ok) {
+                            resData = await response.json();
+                            window.activeAIModel = model;
                             break;
+                        } else {
+                            let errMsg = `HTTP ${response.status}`;
+                            try {
+                                const errData = await response.json();
+                                if (errData.error?.message) {
+                                    errMsg += `: ${errData.error.message}`;
+                                }
+                            } catch (err) {}
+                            lastError = errMsg;
+                            console.warn(`OpenRouter model ${model} failed with ${errMsg}. Trying fallback...`);
                         }
+                    } catch (err) {
+                        lastError = err.message || err;
+                        console.warn(`OpenRouter model ${model} failed: ${lastError}. Trying fallback...`);
+                    }
+                }
 
-                        // Immediately halt on auth issues (400/403) to prevent fallback attempts
-                        if (response.status === 400 || response.status === 403) {
-                            const msgLower = apiErrorMsg.toLowerCase();
-                            if (msgLower.includes('key') || msgLower.includes('invalid') || msgLower.includes('permission')) {
-                                lastError = `Authentication failed (${response.status}): ${apiErrorMsg || 'Invalid API Key'}. Please update your Gemini API key in Settings.`;
+                if (!resData) {
+                    throw new Error(lastError || 'OpenRouter connection failed');
+                }
+
+                text = resData.choices?.[0]?.message?.content;
+            } else {
+                const contents = [{
+                    role: 'user',
+                    parts: [{
+                        text: systemContext + `\nPrompt: Review the details of the active section context "${activeSectionContext}" and output a smart budget planning summary, warning tips, and look for any data bugs or anomalies. Keep it concise, structured in professional markdown sections.`
+                    }]
+                }];
+
+                const MODELS_TO_TRY = [
+                    'gemini-1.5-flash',
+                    'gemini-2.0-flash',
+                    'gemini-1.5-flash-latest',
+                    'gemini-1.5-pro-latest',
+                    'gemini-1.0-pro'
+                ];
+
+                let response = null;
+                let resData = null;
+                let lastError = null;
+
+                for (const model of MODELS_TO_TRY) {
+                    try {
+                        response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ contents })
+                        });
+
+                        if (response.ok) {
+                            resData = await response.json();
+                            break;
+                        } else {
+                            let errMsg = `HTTP ${response.status}`;
+                            let apiErrorMsg = '';
+                            try {
+                                const errData = await response.json();
+                                if (errData.error?.message) {
+                                    apiErrorMsg = errData.error.message;
+                                    errMsg += `: ${apiErrorMsg}`;
+                                }
+                            } catch (err) {}
+                            
+                            lastError = errMsg;
+
+                            // Immediately halt on rate limits (429) to avoid masking with subsequent 404s
+                            if (response.status === 429) {
+                                lastError = `Rate limit/quota exceeded (429). Please wait a minute and try again. (Detail: ${apiErrorMsg || 'Resource exhausted'})`;
                                 break;
                             }
+
+                            // Immediately halt on auth issues (400/403) to prevent fallback attempts
+                            if (response.status === 400 || response.status === 403) {
+                                const msgLower = apiErrorMsg.toLowerCase();
+                                if (msgLower.includes('key') || msgLower.includes('invalid') || msgLower.includes('permission')) {
+                                    lastError = `Authentication failed (${response.status}): ${apiErrorMsg || 'Invalid API Key'}. Please update your Gemini API key in Settings.`;
+                                    break;
+                                }
+                            }
+
+                            console.warn(`Model ${model} failed with ${errMsg}. Trying fallback...`);
                         }
-
-                        console.warn(`Model ${model} failed with ${errMsg}. Trying fallback...`);
+                    } catch (err) {
+                        lastError = err.message || err;
+                        console.warn(`Model ${model} failed: ${lastError}. Trying fallback...`);
                     }
-                } catch (err) {
-                    lastError = err.message || err;
-                    console.warn(`Model ${model} failed: ${lastError}. Trying fallback...`);
                 }
-            }
 
-            if (!resData) {
-                throw new Error(lastError || 'Unknown API connection error');
+                if (!resData) {
+                    throw new Error(lastError || 'Unknown API connection error');
+                }
+                text = resData.candidates?.[0]?.content?.parts?.[0]?.text;
             }
-            const text = resData.candidates?.[0]?.content?.parts?.[0]?.text;
 
             if (text) {
                 const parsedMarkdown = window.marked && typeof window.marked.parse === 'function' 

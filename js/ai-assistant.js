@@ -1252,6 +1252,117 @@ window.sendAIChatMessage = async function() {
     }
 
     try {
+        const isOpenRouter = apiKey.startsWith('sk-or-');
+        if (isOpenRouter) {
+            try {
+                const systemContext = await getAppOverviewContext();
+                
+                const messages = [
+                    { role: 'system', content: systemContext },
+                    { role: 'user', content: "Hello! I am ready to answer queries." },
+                    { role: 'assistant', content: "Hello! I am your PersonalOS AI Companion. I can see your configurations and transactions data. Let's work together!" },
+                    ..._aiChatHistory.map(h => {
+                        return {
+                            role: h.role === 'model' ? 'assistant' : 'user',
+                            content: h.parts[0].text
+                        };
+                    })
+                ];
+
+                const OPENROUTER_MODELS = [
+                    'google/gemini-2.0-flash:free',
+                    'google/gemini-2.0-flash-exp:free',
+                    'google/gemini-2.0-flash',
+                    'google/gemini-1.5-flash:free',
+                    'google/gemini-1.5-flash',
+                    'meta-llama/llama-3-8b-instruct:free',
+                    'mistralai/mistral-7b-instruct:free'
+                ];
+
+                let response = null;
+                let resData = null;
+                let lastError = null;
+
+                for (const model of OPENROUTER_MODELS) {
+                    try {
+                        response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${apiKey}`,
+                                'HTTP-Referer': 'https://github.com/mnrdevelopers/PersonalOS',
+                                'X-Title': 'PersonalOS'
+                            },
+                            body: JSON.stringify({
+                                model: model,
+                                messages: messages
+                            })
+                        });
+
+                        if (response.ok) {
+                            resData = await response.json();
+                            window.activeAIModel = model;
+                            const subtext = document.getElementById('ai-model-subtext');
+                            if (subtext) {
+                                subtext.textContent = `Powered by OpenRouter (${model})`;
+                            }
+                            break;
+                        } else {
+                            let errMsg = `HTTP ${response.status}`;
+                            try {
+                                const errData = await response.json();
+                                if (errData.error?.message) {
+                                    errMsg += `: ${errData.error.message}`;
+                                }
+                            } catch (err) {}
+                            lastError = errMsg;
+                            console.warn(`OpenRouter model ${model} failed with ${errMsg}. Trying fallback...`);
+                        }
+                    } catch (err) {
+                        lastError = err.message || err;
+                        console.warn(`OpenRouter model ${model} failed: ${lastError}. Trying fallback...`);
+                    }
+                }
+
+                if (!resData) {
+                    throw new Error(lastError || 'OpenRouter connection failed');
+                }
+
+                loadingDiv.remove();
+
+                if (resData.choices && resData.choices[0]?.message?.content) {
+                    const replyText = resData.choices[0].message.content;
+                    
+                    // Extract and run JSON Action payload
+                    const jsonMatch = replyText.match(/```json\s*([\s\S]*?)\s*```/);
+                    if (jsonMatch) {
+                        try {
+                            const actionData = JSON.parse(jsonMatch[1].trim());
+                            if (actionData.action && actionData.data) {
+                                await executeAIAction(actionData.action, actionData.data);
+                            }
+                        } catch (jsonErr) {
+                            console.error('Failed to parse tool action:', jsonErr);
+                        }
+                    }
+
+                    _aiChatHistory.push({ role: 'model', parts: [{ text: replyText }] });
+                } else {
+                    console.error('OpenRouter error response:', resData);
+                    const errDetail = resData.error?.message || 'Empty response received from OpenRouter API.';
+                    _aiChatHistory.push({ role: 'model', parts: [{ text: `⚠️ Error calling OpenRouter model: ${errDetail}` }] });
+                }
+
+            } catch (e) {
+                console.error(e);
+                if (document.body.contains(loadingDiv)) loadingDiv.remove();
+                _aiChatHistory.push({ role: 'model', parts: [{ text: `⚠️ OpenRouter API Error: ${e.message || e}` }] });
+            }
+
+            renderAIChatMessages();
+            return;
+        }
+
         const systemContext = await getAppOverviewContext();
         
         // Assemble conversation history for multi-turn chat
