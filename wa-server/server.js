@@ -21,8 +21,13 @@ const path = require('path');
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001;
-const LOG_FILE = path.join(__dirname, 'reminder-log.json');
-const LOANS_FILE = path.join(__dirname, 'local-loans.json');
+const DATA_DIR = path.join(__dirname, '.wwebjs_auth');
+if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+const LOG_FILE = path.join(DATA_DIR, 'reminder-log.json');
+const LOANS_FILE = path.join(DATA_DIR, 'local-loans.json');
+
 
 // ─── WhatsApp Client ──────────────────────────────────────────────────────────
 const client = new Client({

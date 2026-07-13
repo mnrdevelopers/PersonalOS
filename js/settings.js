@@ -182,12 +182,22 @@ window.loadSettingsSection = async function() {
                     <button class="btn btn-sm btn-outline-primary" onclick="triggerWaJobNow()">
                         <i class="fas fa-bolt me-1"></i>Run Reminders Now
                     </button>
-                    <a href="#" onclick="openWaLog()" class="btn btn-sm btn-outline-secondary">
+                    <button type="button" onclick="toggleWaLog()" class="btn btn-sm btn-outline-secondary">
                         <i class="fas fa-list me-1"></i>View Send Log
-                    </a>
+                    </button>
+                </div>
+
+                <!-- Inline Log Container -->
+                <div id="wa-log-area" class="d-none mt-3 border-top pt-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label small fw-semibold mb-0">📋 Sent Reminders Log</label>
+                        <button type="button" class="btn btn-sm btn-link p-0 text-muted text-decoration-none" onclick="toggleWaLog(false)">Hide</button>
+                    </div>
+                    <pre id="wa-log-content" class="p-3 rounded small border mb-0" style="max-height: 250px; overflow-y: auto; font-family: monospace; white-space: pre-wrap; word-break: break-all;"></pre>
                 </div>
             </div>
         </div>
+
 
         <div class="card border-danger">
             <div class="card-header bg-danger text-white">
@@ -373,28 +383,40 @@ window.triggerWaJobNow = async function() {
     }
 };
 
-window.openWaLog = async function() {
-    // Open new tab immediately to bypass popup blocker
-    const win = window.open('', '_blank');
-    if (!win) {
-        if (window.dashboard) window.dashboard.showNotification('Popup blocked! Enable popups to view logs.', 'warning');
+window.toggleWaLog = async function(forceState) {
+    const area = document.getElementById('wa-log-area');
+    const content = document.getElementById('wa-log-content');
+    if (!area || !content) return;
+
+    // Resolve state to toggle
+    const currentlyHidden = area.classList.contains('d-none');
+    const targetShow = forceState !== undefined ? forceState : currentlyHidden;
+
+    if (!targetShow) {
+        area.classList.add('d-none');
         return;
     }
-    win.document.write('<pre style="font-family:monospace;padding:1rem;color:#555">Loading logs from WhatsApp Server...</pre>');
+
+    // Show area and set loading state
+    area.classList.remove('d-none');
+    content.textContent = 'Loading logs from server...';
+    content.className = 'p-3 rounded small border mb-0 bg-light text-muted';
 
     try {
         const res = await fetch(`${getWaServerUrl()}/log`, { signal: AbortSignal.timeout(5000) });
         const data = await res.json();
-        const text = JSON.stringify(data, null, 2);
         
-        // Clear loading screen and write logs
-        win.document.open();
-        win.document.write(`<pre style="font-family:monospace;padding:1rem;background:#f8f9fa;border-radius:4px">${text}</pre>`);
-        win.document.close();
+        if (Object.keys(data).length === 0) {
+            content.textContent = 'No logs found. Reminders haven\'t run or sent any messages yet today.';
+            content.className = 'p-3 rounded small border mb-0 bg-light text-muted';
+        } else {
+            content.textContent = JSON.stringify(data, null, 2);
+            content.className = 'p-3 rounded small border mb-0 bg-light text-dark';
+        }
     } catch (err) {
-        win.document.open();
-        win.document.write(`<pre style="font-family:monospace;padding:1rem;color:#b91c1c;background:#fef2f2">❌ Failed to fetch logs: server offline or unreachable.</pre>`);
-        win.document.close();
+        content.textContent = '❌ Failed to fetch logs. Is the node server running?';
+        content.className = 'p-3 rounded small border mb-0 bg-danger bg-opacity-10 text-danger';
     }
 };
+
 

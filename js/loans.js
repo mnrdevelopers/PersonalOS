@@ -96,29 +96,29 @@ window.loadLoansSection = async function() {
                 <div class="loans-tab-strip-wrap">
                     <ul class="loans-workspace-tabs" id="loan-workspace-tabs">
                         <li>
-                            <a class="lwt-chip active" href="javascript:void(0)" onclick="switchLoanView('loans', this)">
+                            <button type="button" class="lwt-chip active" onclick="switchLoanView('loans', this)">
                                 <i class="fas fa-hand-holding-dollar"></i> Loans & Debts
-                            </a>
+                            </button>
                         </li>
                         <li>
-                            <a class="lwt-chip" href="javascript:void(0)" onclick="switchLoanView('investments', this)">
+                            <button type="button" class="lwt-chip" onclick="switchLoanView('investments', this)">
                                 <i class="fas fa-chart-line"></i> Investments
-                            </a>
+                            </button>
                         </li>
                         <li>
-                            <a class="lwt-chip" href="javascript:void(0)" onclick="switchLoanView('wallets', this)">
+                            <button type="button" class="lwt-chip" onclick="switchLoanView('wallets', this)">
                                 <i class="fas fa-wallet"></i> Wallets
-                            </a>
+                            </button>
                         </li>
                         <li>
-                            <a class="lwt-chip" href="javascript:void(0)" onclick="switchLoanView('cards', this)">
+                            <button type="button" class="lwt-chip" onclick="switchLoanView('cards', this)">
                                 <i class="fas fa-credit-card"></i> Credit Cards
-                            </a>
+                            </button>
                         </li>
                         <li>
-                            <a class="lwt-chip" href="javascript:void(0)" onclick="switchLoanView('earmarked', this)">
+                            <button type="button" class="lwt-chip" onclick="switchLoanView('earmarked', this)">
                                 <i class="fas fa-lock"></i> Earmarked
-                            </a>
+                            </button>
                         </li>
                     </ul>
                 </div>
@@ -133,8 +133,8 @@ window.loadLoansSection = async function() {
             <div id="loans-view-container">
                 <div class="loans-filter-bar">
                     <ul class="nav nav-pills gap-2 small loans-status-tabs">
-                    <li class="nav-item"><a class="nav-link active py-1 px-3" href="javascript:void(0)" onclick="filterLoans('active', this)">Active</a></li>
-                    <li class="nav-item"><a class="nav-link py-1 px-3" href="javascript:void(0)" onclick="filterLoans('closed', this)">Closed</a></li>
+                    <li class="nav-item"><button type="button" class="nav-link active py-1 px-3 border-0 bg-transparent" onclick="filterLoans('active', this)">Active</button></li>
+                    <li class="nav-item"><button type="button" class="nav-link py-1 px-3 border-0 bg-transparent" onclick="filterLoans('closed', this)">Closed</button></li>
                     </ul>
                     <select class="form-select form-select-sm loans-type-filter" id="loan-type-filter" onchange="filterLoanType(this.value)">
                         <option value="all">All Types</option>
@@ -173,8 +173,8 @@ window.loadLoansSection = async function() {
             <div id="earmarked-view-container" class="d-none">
                 <div class="loans-filter-bar mb-3">
                     <ul class="nav nav-pills gap-2 small loans-status-tabs" id="earmarked-status-tabs">
-                        <li class="nav-item"><a class="nav-link active py-1 px-3" href="javascript:void(0)" onclick="filterEarmarked('active', this)">Locked</a></li>
-                        <li class="nav-item"><a class="nav-link py-1 px-3" href="javascript:void(0)" onclick="filterEarmarked('returned', this)">Returned / Released</a></li>
+                        <li class="nav-item"><button type="button" class="nav-link active py-1 px-3 border-0 bg-transparent" onclick="filterEarmarked('active', this)">Locked</button></li>
+                        <li class="nav-item"><button type="button" class="nav-link py-1 px-3 border-0 bg-transparent" onclick="filterEarmarked('returned', this)">Returned / Released</button></li>
                     </ul>
                 </div>
                 <div class="row g-3" id="earmarked-grid">
@@ -1205,7 +1205,7 @@ window.loadLoansSection = async function() {
 
     // Initialize default tab state immediately so toolbar actions are available
     // without waiting for data reads.
-    const defaultLoanTab = document.querySelector('#loan-workspace-tabs .nav-link');
+    const defaultLoanTab = document.querySelector('#loan-workspace-tabs .lwt-chip');
     switchLoanView('loans', defaultLoanTab);
 };
 
