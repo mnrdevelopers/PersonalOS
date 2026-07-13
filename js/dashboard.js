@@ -1129,6 +1129,7 @@ class Dashboard {
                         bankBalances[accId] = (bankBalances[accId] || 0) + (data.type === 'income' ? amount : -amount);
                     }
                 }
+            });
 
             // 2.5 Group and calculate active earmarked / locked funds
             let totalEarmarked = 0;
