@@ -377,20 +377,19 @@
 
             if (isOpenRouter) {
                 const OPENROUTER_MODELS = [
-                    'google/gemini-2.0-flash:free',
+                    'openrouter/free',
+                    'google/gemini-2.5-flash:free',
                     'google/gemini-2.0-flash-exp:free',
-                    'google/gemini-2.0-flash',
-                    'google/gemini-1.5-flash:free',
-                    'google/gemini-1.5-flash',
-                    'meta-llama/llama-3-8b-instruct:free',
-                    'mistralai/mistral-7b-instruct:free'
+                    'meta-llama/llama-3.3-70b-instruct:free',
+                    'qwen/qwen-2.5-72b-instruct:free',
+                    'google/gemini-2.5-flash',
+                    'google/gemini-1.5-flash'
                 ];
 
                 const messages = [
-                    { role: 'system', content: systemContext },
                     {
                         role: 'user',
-                        content: `Review the details of the active section context "${activeSectionContext}" and output a smart budget planning summary, warning tips, and look for any data bugs or anomalies. Keep it concise, structured in professional markdown sections.`
+                        content: systemContext + `\nPrompt: Review the details of the active section context "${activeSectionContext}" and output a smart budget planning summary, warning tips, and look for any data bugs or anomalies. Keep it concise, structured in professional markdown sections.`
                     }
                 ];
 

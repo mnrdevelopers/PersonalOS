@@ -1258,25 +1258,25 @@ window.sendAIChatMessage = async function() {
                 const systemContext = await getAppOverviewContext();
                 
                 const messages = [
-                    { role: 'system', content: systemContext },
-                    { role: 'user', content: "Hello! I am ready to answer queries." },
-                    { role: 'assistant', content: "Hello! I am your PersonalOS AI Companion. I can see your configurations and transactions data. Let's work together!" },
-                    ..._aiChatHistory.map(h => {
-                        return {
-                            role: h.role === 'model' ? 'assistant' : 'user',
-                            content: h.parts[0].text
-                        };
-                    })
+                    { role: 'user', content: systemContext + "\n\nInitial prompt: Hello! I am ready to answer queries." },
+                    { role: 'assistant', content: "Hello! I am your PersonalOS AI Companion. I can see your configurations and transactions data. Let's work together!" }
                 ];
+                
+                _aiChatHistory.forEach(h => {
+                    messages.push({
+                        role: h.role === 'model' ? 'assistant' : 'user',
+                        content: h.parts[0].text
+                    });
+                });
 
                 const OPENROUTER_MODELS = [
-                    'google/gemini-2.0-flash:free',
+                    'openrouter/free',
+                    'google/gemini-2.5-flash:free',
                     'google/gemini-2.0-flash-exp:free',
-                    'google/gemini-2.0-flash',
-                    'google/gemini-1.5-flash:free',
-                    'google/gemini-1.5-flash',
-                    'meta-llama/llama-3-8b-instruct:free',
-                    'mistralai/mistral-7b-instruct:free'
+                    'meta-llama/llama-3.3-70b-instruct:free',
+                    'qwen/qwen-2.5-72b-instruct:free',
+                    'google/gemini-2.5-flash',
+                    'google/gemini-1.5-flash'
                 ];
 
                 let response = null;
