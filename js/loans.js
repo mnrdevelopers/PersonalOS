@@ -98,6 +98,9 @@ window.loadLoansSection = async function() {
                                 <li class="nav-item">
                                     <a class="nav-link rounded-pill" href="javascript:void(0)" onclick="switchLoanView('cards', this)">Credit Cards</a>
                                 </li>
+                                <li class="nav-item">
+                                    <a class="nav-link rounded-pill" href="javascript:void(0)" onclick="switchLoanView('earmarked', this)">Earmarked (Locked)</a>
+                                </li>
                             </ul>
                         </div>
 
@@ -149,6 +152,19 @@ window.loadLoansSection = async function() {
             <!-- Wallets View -->
             <div id="wallets-view-container" class="d-none">
                 <div class="row g-3" id="wallets-grid">
+                    <div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>
+                </div>
+            </div>
+
+            <!-- Earmarked Funds View -->
+            <div id="earmarked-view-container" class="d-none">
+                <div class="loans-filter-bar mb-3">
+                    <ul class="nav nav-pills gap-2 small loans-status-tabs" id="earmarked-status-tabs">
+                        <li class="nav-item"><a class="nav-link active py-1 px-3" href="javascript:void(0)" onclick="filterEarmarked('active', this)">Locked</a></li>
+                        <li class="nav-item"><a class="nav-link py-1 px-3" href="javascript:void(0)" onclick="filterEarmarked('returned', this)">Returned / Released</a></li>
+                    </ul>
+                </div>
+                <div class="row g-3" id="earmarked-grid">
                     <div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>
                 </div>
             </div>
@@ -987,6 +1003,53 @@ window.loadLoansSection = async function() {
                 </div>
             </div>
         </div>
+
+        <!-- Add Earmarked Fund Modal -->
+        <div class="modal fade" id="addEarmarkedModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg rounded-4">
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold" id="earmarkedModalTitle"><i class="fas fa-lock text-warning me-2"></i>Lock / Earmark Money</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="earmarked-form">
+                            <input type="hidden" id="earmarked-id">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Purpose / Title</label>
+                                <input type="text" class="form-control rounded-3" id="earmarked-title" placeholder="e.g. Saved for Uncle, Hold for Alice" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Owner / Person Name</label>
+                                <input type="text" class="form-control rounded-3" id="earmarked-owner" placeholder="e.g. Alice, Dad, Bro" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Amount</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0">₹</span>
+                                    <input type="number" class="form-control rounded-end-3 border-start-0" id="earmarked-amount" step="0.01" min="0.01" required>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Where is this money kept?</label>
+                                <select class="form-select rounded-3" id="earmarked-source" required>
+                                    <option value="cash">💵 Cash (In-hand)</option>
+                                    <!-- Options populated dynamically -->
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Notes / expected return timeline</label>
+                                <textarea class="form-control rounded-3" id="earmarked-notes" rows="2" placeholder="e.g. To return in December, do not spend!"></textarea>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer border-0">
+                        <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-warning text-dark rounded-pill px-4 fw-semibold" id="btn-save-earmarked" onclick="saveEarmarkedFund()">Lock Funds</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     `;
 
     // Initialize default tab state immediately so toolbar actions are available
@@ -1039,6 +1102,12 @@ window.switchLoanView = function(view, element) {
                     <i class="fas fa-credit-card me-2"></i>Add Card
                 </button>
             `;
+        } else if (view === 'earmarked') {
+            buttons = `
+                <button class="btn btn-sm btn-warning text-dark loans-toolbar-btn" onclick="showAddEarmarkedModal()">
+                    <i class="fas fa-lock me-2"></i>Lock / Earmark Cash
+                </button>
+            `;
         }
         toolbar.innerHTML = buttons;
     }
@@ -1049,24 +1118,35 @@ window.switchLoanView = function(view, element) {
         document.getElementById('investments-view-container').classList.add('d-none');
         document.getElementById('cards-view-container').classList.add('d-none');
         document.getElementById('wallets-view-container').classList.add('d-none');
+        document.getElementById('earmarked-view-container').classList.add('d-none');
         loadLoansGrid('active');
     } else if (view === 'investments') {
         document.getElementById('loans-view-container').classList.add('d-none');
         document.getElementById('investments-view-container').classList.remove('d-none');
         document.getElementById('cards-view-container').classList.add('d-none');
         document.getElementById('wallets-view-container').classList.add('d-none');
+        document.getElementById('earmarked-view-container').classList.add('d-none');
         loadInvestmentsGrid();
     } else if (view === 'cards') {
         document.getElementById('loans-view-container').classList.add('d-none');
         document.getElementById('investments-view-container').classList.add('d-none');
         document.getElementById('cards-view-container').classList.remove('d-none');
         document.getElementById('wallets-view-container').classList.add('d-none');
+        document.getElementById('earmarked-view-container').classList.add('d-none');
         loadCreditCardsGrid();
+    } else if (view === 'earmarked') {
+        document.getElementById('loans-view-container').classList.add('d-none');
+        document.getElementById('investments-view-container').classList.add('d-none');
+        document.getElementById('cards-view-container').classList.add('d-none');
+        document.getElementById('wallets-view-container').classList.add('d-none');
+        document.getElementById('earmarked-view-container').classList.remove('d-none');
+        loadEarmarkedGrid();
     } else {
         document.getElementById('loans-view-container').classList.add('d-none');
         document.getElementById('investments-view-container').classList.add('d-none');
         document.getElementById('cards-view-container').classList.add('d-none');
         document.getElementById('wallets-view-container').classList.remove('d-none');
+        document.getElementById('earmarked-view-container').classList.add('d-none');
         loadWalletsGrid();
     }
 };
@@ -4132,4 +4212,262 @@ window.calculateAmortization = function() {
     }
     document.getElementById('calc-schedule-body').innerHTML = scheduleHtml;
     document.getElementById('calc-results').classList.remove('d-none');
+};
+
+
+// --- Earmarked Funds (Locked Holdings) Functions ---
+let currentEarmarkedFilter = 'active';
+
+window.filterEarmarked = function(status, element) {
+    currentEarmarkedFilter = status;
+    if(element) {
+        document.querySelectorAll('#earmarked-status-tabs .nav-link').forEach(l => l.classList.remove('active'));
+        element.classList.add('active');
+    }
+    loadEarmarkedGrid();
+};
+
+window.showAddEarmarkedModal = async function(id = null) {
+    document.getElementById('earmarked-form').reset();
+    document.getElementById('earmarked-id').value = id || '';
+    
+    await populateEarmarkedSelects();
+
+    if (id) {
+        document.getElementById('earmarkedModalTitle').innerHTML = '<i class="fas fa-edit text-warning me-2"></i>Edit Locked Funds';
+        document.getElementById('btn-save-earmarked').textContent = 'Update Lock';
+        
+        try {
+            const doc = await db.collection('earmarked_funds').doc(id).get();
+            if (doc.exists) {
+                const data = doc.data();
+                document.getElementById('earmarked-title').value = data.title || '';
+                document.getElementById('earmarked-owner').value = data.owner || '';
+                document.getElementById('earmarked-amount').value = data.amount || 0;
+                document.getElementById('earmarked-source').value = data.source || 'cash';
+                document.getElementById('earmarked-notes').value = data.notes || '';
+            }
+        } catch (e) {
+            console.error("Error loading earmarked fund data:", e);
+        }
+    } else {
+        document.getElementById('earmarkedModalTitle').innerHTML = '<i class="fas fa-lock text-warning me-2"></i>Lock / Earmark Money';
+        document.getElementById('btn-save-earmarked').textContent = 'Lock Funds';
+    }
+
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addEarmarkedModal'));
+    modal.show();
+};
+
+window.populateEarmarkedSelects = async function() {
+    const user = auth.currentUser;
+    if (!user) return;
+    const select = document.getElementById('earmarked-source');
+    if (!select) return;
+
+    let options = `<option value="cash">💵 Cash (In-hand)</option>`;
+
+    // Bank accounts
+    let bankAccounts = [];
+    if (window.getUserBankAccounts) {
+        bankAccounts = await window.getUserBankAccounts();
+    }
+    bankAccounts.forEach(acc => {
+        options += `<option value="bank-${acc.id}">🏦 Bank: ${acc.name}</option>`;
+    });
+
+    // Wallets
+    try {
+        const walletsSnap = await db.collection('wallets').where('userId', '==', user.uid).get();
+        walletsSnap.forEach(doc => {
+            const data = doc.data();
+            options += `<option value="wallet-${doc.id}">📱 Wallet: ${data.name}</option>`;
+        });
+    } catch (e) {
+        console.error("Error populating wallets in earmarked select:", e);
+    }
+
+    select.innerHTML = options;
+};
+
+window.saveEarmarkedFund = async function() {
+    const btn = document.getElementById('btn-save-earmarked');
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const id = document.getElementById('earmarked-id').value;
+    const title = document.getElementById('earmarked-title').value.trim();
+    const owner = document.getElementById('earmarked-owner').value.trim();
+    const amount = parseFloat(document.getElementById('earmarked-amount').value);
+    const source = document.getElementById('earmarked-source').value;
+    const notes = document.getElementById('earmarked-notes').value.trim();
+
+    if (!title || !owner || isNaN(amount) || amount <= 0) {
+        if(window.dashboard) window.dashboard.showNotification('Please fill all fields correctly', 'warning');
+        return;
+    }
+
+    window.setBtnLoading(btn, true);
+
+    const payload = {
+        userId: user.uid,
+        title,
+        owner,
+        amount,
+        source,
+        notes,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    if (!id) {
+        payload.status = 'active';
+        payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+    }
+
+    try {
+        if (id) {
+            await db.collection('earmarked_funds').doc(id).update(payload);
+        } else {
+            await db.collection('earmarked_funds').add(payload);
+        }
+
+        window.setBtnLoading(btn, false);
+        bootstrap.Modal.getInstance(document.getElementById('addEarmarkedModal')).hide();
+        loadEarmarkedGrid();
+        
+        if (window.dashboard) {
+            window.dashboard.showNotification(id ? 'Locked fund updated' : 'Money locked successfully', 'success');
+            window.dashboard.updateStats(); // refresh dashboard totals
+        }
+    } catch (e) {
+        window.setBtnLoading(btn, false);
+        console.error("Error saving earmarked fund:", e);
+        if (window.dashboard) window.dashboard.showNotification('Failed to lock money', 'danger');
+    }
+};
+
+window.toggleEarmarkedStatus = async function(id, currentStatus) {
+    const newStatus = currentStatus === 'active' ? 'returned' : 'active';
+    try {
+        await db.collection('earmarked_funds').doc(id).update({
+            status: newStatus,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        loadEarmarkedGrid();
+        
+        if (window.dashboard) {
+            const msg = newStatus === 'returned' ? 'Funds marked as returned/released' : 'Funds marked as active (locked)';
+            window.dashboard.showNotification(msg, 'success');
+            window.dashboard.updateStats(); // refresh dashboard totals
+        }
+    } catch (e) {
+        console.error("Error toggling status:", e);
+        if (window.dashboard) window.dashboard.showNotification('Error updating status', 'danger');
+    }
+};
+
+window.deleteEarmarkedFund = async function(id) {
+    if (!confirm('Are you sure you want to delete this lock record?')) return;
+    try {
+        await db.collection('earmarked_funds').doc(id).delete();
+        loadEarmarkedGrid();
+        if (window.dashboard) {
+            window.dashboard.showNotification('Lock record deleted', 'success');
+            window.dashboard.updateStats();
+        }
+    } catch (e) {
+        console.error("Error deleting earmarked record:", e);
+    }
+};
+
+window.loadEarmarkedGrid = async function() {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const grid = document.getElementById('earmarked-grid');
+    if (!grid) return;
+
+    grid.innerHTML = '<div class="col-12 text-center"><div class="spinner-border text-primary"></div></div>';
+
+    try {
+        const snapshot = await db.collection('earmarked_funds')
+            .where('userId', '==', user.uid)
+            .where('status', '==', currentEarmarkedFilter)
+            .get();
+
+        if (snapshot.empty) {
+            grid.innerHTML = `
+                <div class="col-12 text-center py-5">
+                    <div class="text-muted mb-2">
+                        <i class="fas fa-lock-open fa-3x mb-3 text-opacity-25"></i>
+                        <p class="mb-0">No ${currentEarmarkedFilter === 'active' ? 'locked' : 'returned'} funds found</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        let html = '';
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const id = doc.id;
+            const amt = data.amount || 0;
+            const title = data.title || '';
+            const owner = data.owner || '';
+            const notes = data.notes || '';
+            const source = data.source || 'cash';
+            
+            let sourceLabel = '💵 Cash';
+            if (source.startsWith('bank-')) {
+                sourceLabel = '🏦 Bank';
+            } else if (source.startsWith('wallet-')) {
+                sourceLabel = '📱 Wallet';
+            }
+
+            const buttonText = currentEarmarkedFilter === 'active' ? 'Mark Returned' : 'Mark Locked';
+            const buttonClass = currentEarmarkedFilter === 'active' ? 'btn-success' : 'btn-warning text-dark';
+            const badgeClass = currentEarmarkedFilter === 'active' ? 'bg-danger bg-opacity-10 text-danger' : 'bg-success bg-opacity-10 text-success';
+            const badgeLabel = currentEarmarkedFilter === 'active' ? 'Locked' : 'Returned';
+
+            html += `
+                <div class="col-md-4 col-sm-6 animate-slide-up">
+                    <div class="card border-0 shadow-sm rounded-4 h-100 p-3 position-relative">
+                        <span class="position-absolute top-0 end-0 m-3 badge rounded-pill ${badgeClass}">
+                            ${badgeLabel}
+                        </span>
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <span class="fs-4">${currentEarmarkedFilter === 'active' ? '🔒' : '🔓'}</span>
+                            <div class="text-truncate" style="max-width: 75%;">
+                                <h6 class="fw-bold mb-0 text-truncate">${title}</h6>
+                                <small class="text-muted">Held for: ${owner}</small>
+                            </div>
+                        </div>
+                        <div class="mt-2 mb-3">
+                            <div class="text-muted text-xs">Locked Amount</div>
+                            <h3 class="fw-bold mb-0 text-warning">₹${amt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h3>
+                            <small class="text-muted text-xs">Stored in: <strong>${sourceLabel}</strong></small>
+                        </div>
+                        ${notes ? `<div class="bg-light p-2 rounded mb-3 text-xs text-muted font-monospace">${notes}</div>` : ''}
+                        <div class="d-flex gap-2 mt-auto border-top pt-2">
+                            <button class="btn btn-sm ${buttonClass} flex-grow-1 rounded-pill text-xs fw-semibold" onclick="toggleEarmarkedStatus('${id}', '${data.status || 'active'}')">
+                                ${buttonText}
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary rounded-pill p-1 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" onclick="showAddEarmarkedModal('${id}')">
+                                <i class="fas fa-edit text-xs"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger rounded-pill p-1 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" onclick="deleteEarmarkedFund('${id}')">
+                                <i class="fas fa-trash text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        grid.innerHTML = html;
+
+    } catch (e) {
+        console.error("Error loading earmarked grid:", e);
+        grid.innerHTML = '<div class="col-12 text-center text-danger py-4">Error loading data.</div>';
+    }
 };

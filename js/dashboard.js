@@ -1048,14 +1048,15 @@ class Dashboard {
 
             const emptySnap = { docs: [], forEach: function(cb) { this.docs.forEach(cb); } };
 
-            // 1. Fetch bank accounts, transactions, wallets, credit cards, investments, and active loans
-            const [bankAccounts, allTx, walletsSnap, creditCardsSnap, investmentsSnap, loansSnap] = await Promise.all([
+            // 1. Fetch bank accounts, transactions, wallets, credit cards, investments, active loans, and earmarked funds
+            const [bankAccounts, allTx, walletsSnap, creditCardsSnap, investmentsSnap, loansSnap, earmarkedSnap] = await Promise.all([
                 Promise.resolve(window.getUserBankAccounts ? window.getUserBankAccounts(true) : []).catch(err => { console.error("Error fetching bankAccounts:", err); return []; }),
                 Promise.resolve(window.getTransactions ? window.getTransactions(uid) : []).catch(err => { console.error("Error fetching transactions:", err); return []; }),
                 db.collection('wallets').where('userId', '==', uid).get().catch(err => { console.error("Error fetching wallets:", err); return emptySnap; }),
                 db.collection('credit_cards').where('userId', '==', uid).get().catch(err => { console.error("Error fetching credit cards:", err); return emptySnap; }),
                 db.collection('investments').where('userId', '==', uid).get().catch(err => { console.error("Error fetching investments:", err); return emptySnap; }),
-                db.collection('loans').where('userId', '==', uid).where('status', '==', 'active').get().catch(err => { console.error("Error fetching loans:", err); return emptySnap; })
+                db.collection('loans').where('userId', '==', uid).where('status', '==', 'active').get().catch(err => { console.error("Error fetching loans:", err); return emptySnap; }),
+                db.collection('earmarked_funds').where('userId', '==', uid).where('status', '==', 'active').get().catch(err => { console.error("Error fetching earmarked:", err); return emptySnap; })
             ]);
 
             // 2. Calculate Cash & Bank Account Balances from transactions (Filtered by current Financial Year)
@@ -1128,39 +1129,83 @@ class Dashboard {
                         bankBalances[accId] = (bankBalances[accId] || 0) + (data.type === 'income' ? amount : -amount);
                     }
                 }
+
+            // 2.5 Group and calculate active earmarked / locked funds
+            let totalEarmarked = 0;
+            const earmarkedBalances = { cash: 0, bank: {}, wallet: {} };
+            
+            earmarkedSnap.forEach(doc => {
+                const data = doc.data();
+                const amt = Number(data.amount) || 0;
+                totalEarmarked += amt;
+                
+                const source = data.source || 'cash';
+                if (source === 'cash') {
+                    earmarkedBalances.cash += amt;
+                } else if (source.startsWith('bank-')) {
+                    const bankId = source.substring(5);
+                    earmarkedBalances.bank[bankId] = (earmarkedBalances.bank[bankId] || 0) + amt;
+                } else if (source.startsWith('wallet-')) {
+                    const walletId = source.substring(7);
+                    earmarkedBalances.wallet[walletId] = (earmarkedBalances.wallet[walletId] || 0) + amt;
+                }
             });
 
             const cashBalance = cashIncome - cashExpense;
+            const cashSpendable = cashBalance - earmarkedBalances.cash;
 
             // 3. Sum up bank accounts
             let totalBankBalance = 0;
+            let totalBankSpendable = 0;
             const bankAccountsListHTML = bankAccounts.map(acc => {
                 const balance = bankBalances[acc.id] || 0;
+                const locked = earmarkedBalances.bank[acc.id] || 0;
+                const spendable = balance - locked;
+                
                 totalBankBalance += balance;
+                totalBankSpendable += spendable;
+                
                 const color = acc.color || '#0284c7';
-                const sign = balance >= 0 ? '' : '-';
+                const sign = spendable >= 0 ? '' : '-';
+                
+                let lockedLabel = '';
+                if (locked > 0) {
+                    lockedLabel = `<br><span class="text-xs text-warning" style="font-size: 10px;"><i class="fas fa-lock"></i> ₹${locked.toLocaleString('en-IN')} locked</span>`;
+                }
+
                 return `
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <span class="text-truncate me-2 small" style="max-width: 150px;">
-                            <span class="me-1" style="color: ${color}">${acc.icon || '🏦'}</span>${acc.name}
+                    <div class="d-flex justify-content-between align-items-center mb-1 border-bottom border-light pb-1">
+                        <span class="text-truncate me-2 small" style="max-width: 150px; line-height: 1.2;">
+                            <span class="me-1" style="color: ${color}">${acc.icon || '🏦'}</span>${acc.name}${lockedLabel}
                         </span>
-                        <span class="fw-semibold small ${balance >= 0 ? 'text-success' : 'text-danger'}">${sign}₹${Math.abs(balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span class="fw-semibold small ${spendable >= 0 ? 'text-success' : 'text-danger'}">${sign}₹${Math.abs(spendable).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                 `;
             }).join('');
 
             // 4. Sum up wallets
             let totalWallets = 0;
+            let totalWalletsSpendable = 0;
             const walletsListHTML = walletsSnap.docs.map(doc => {
                 const data = doc.data();
                 const bal = data.balance || 0;
+                const locked = earmarkedBalances.wallet[doc.id] || 0;
+                const spendable = bal - locked;
+                
                 totalWallets += bal;
+                totalWalletsSpendable += spendable;
+
+                let lockedLabel = '';
+                if (locked > 0) {
+                    lockedLabel = `<br><span class="text-xs text-warning" style="font-size: 10px;"><i class="fas fa-lock"></i> ₹${locked.toLocaleString('en-IN')} locked</span>`;
+                }
+
                 return `
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <span class="text-truncate me-2 small" style="max-width: 150px;">
-                            <span class="me-1 text-info">📱</span>${data.name}
+                    <div class="d-flex justify-content-between align-items-center mb-1 border-bottom border-light pb-1">
+                        <span class="text-truncate me-2 small" style="max-width: 150px; line-height: 1.2;">
+                            <span class="me-1 text-info">📱</span>${data.name}${lockedLabel}
                         </span>
-                        <span class="fw-semibold small text-info">₹${bal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span class="fw-semibold small text-info">₹${spendable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                 `;
             }).join('');
@@ -1195,24 +1240,34 @@ class Dashboard {
             });
 
             // 8. Calculations
-            // Available Liquid Capital = Cash + Total Bank Balance + Total Wallets
-            const totalAvailable = cashBalance + totalBankBalance + totalWallets;
+            // Available Spendable Capital = Cash Spendable + Total Bank Spendable + Total Wallets Spendable
+            const totalAvailableSpendable = cashSpendable + totalBankSpendable + totalWalletsSpendable;
+            const totalLiquidRaw = cashBalance + totalBankBalance + totalWallets;
 
-            // Actual Net Capital = Total Assets - Credit Card Outstanding
-            // Assets: Cash + Bank + Wallets + Investments + Lent
-            // Liabilities: Credit Card Outstanding
-            const totalAssets = totalAvailable + totalCurrentValue + totalLent;
-            const netWorth = totalAssets - totalCCOutstanding;
+            // Actual Net Capital = Total Assets - Credit Card Outstanding - Earmarked Locked Funds
+            const netWorth = totalAvailableSpendable + totalCurrentValue + totalLent - totalCCOutstanding;
 
             // 9. Update UI
             if (document.getElementById('net-available-amount')) {
-                document.getElementById('net-available-amount').textContent = `₹${totalAvailable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                document.getElementById('net-available-amount').textContent = `₹${totalAvailableSpendable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                
+                const parent = document.getElementById('net-available-amount').parentElement;
+                const smallEl = parent.querySelector('small');
+                if (smallEl) {
+                    if (totalEarmarked > 0) {
+                        smallEl.innerHTML = `<span class="text-warning fw-semibold"><i class="fas fa-lock"></i> ₹${totalEarmarked.toLocaleString('en-IN')} locked</span> | Total Liquid: ₹${totalLiquidRaw.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+                    } else {
+                        smallEl.textContent = 'Cash + Banks + Wallets';
+                    }
+                }
             }
             if (document.getElementById('net-worth-amount')) {
                 document.getElementById('net-worth-amount').textContent = `${netWorth >= 0 ? '' : '-'}₹${Math.abs(netWorth).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             }
             if (document.getElementById('breakdown-cash')) {
-                document.getElementById('breakdown-cash').textContent = `₹${cashBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                const cashText = `₹${cashSpendable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                const lockedLabel = earmarkedBalances.cash > 0 ? ` <span class="text-xs text-warning" style="font-size: 10px;"><i class="fas fa-lock"></i> ₹${earmarkedBalances.cash.toLocaleString('en-IN')} locked</span>` : '';
+                document.getElementById('breakdown-cash').innerHTML = cashText + lockedLabel;
             }
             
             const walletsContainer = document.getElementById('breakdown-wallets-list');
@@ -1221,7 +1276,7 @@ class Dashboard {
             }
 
             if (document.getElementById('breakdown-liquid-subtotal')) {
-                document.getElementById('breakdown-liquid-subtotal').textContent = `₹${(cashBalance + totalWallets).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                document.getElementById('breakdown-liquid-subtotal').textContent = `₹${(cashSpendable + totalWalletsSpendable).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             }
 
             const banksContainer = document.getElementById('breakdown-banks-list');
@@ -1229,7 +1284,7 @@ class Dashboard {
                 banksContainer.innerHTML = bankAccountsListHTML || '<div class="text-muted small text-center my-2">No bank accounts added</div>';
             }
             if (document.getElementById('breakdown-banks-subtotal')) {
-                document.getElementById('breakdown-banks-subtotal').textContent = `₹${totalBankBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                document.getElementById('breakdown-banks-subtotal').textContent = `₹${totalBankSpendable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             }
 
             if (document.getElementById('breakdown-investments')) {
