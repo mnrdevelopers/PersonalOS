@@ -371,12 +371,12 @@
             const vehiclesSnap = await db.collection('vehicles').where('userId', '==', user.uid).get();
 
             systemContext += `\nTransactions list count: ${txsSnap.size}\nActive Habits count: ${habitsSnap.size}\nLoans count: ${loansSnap.size}\nCredit Cards limit count: ${CCsSnap.size}\n`;
-
             const isOpenRouter = apiKey.startsWith('sk-or-');
             let text = '';
 
             if (isOpenRouter) {
                 const OPENROUTER_MODELS = [
+                    'qwen/qwen3-coder:free',
                     'openrouter/free',
                     'google/gemini-2.5-flash:free',
                     'google/gemini-2.0-flash-exp:free',
