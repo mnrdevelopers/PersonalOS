@@ -1407,6 +1407,72 @@
         </div>
     </div>
 
+    <!-- AI Co-Pilot Offcanvas Panel -->
+    <div class="offcanvas offcanvas-end border-0 shadow-lg" tabindex="-1" id="aiCopilotOffcanvas" style="width: min(450px, 100vw); background: rgba(var(--bs-body-bg-rgb), 0.95); backdrop-filter: blur(15px); border-radius: 1.5rem 0 0 1.5rem;">
+        <div class="offcanvas-header border-bottom border-light pb-2">
+            <h5 class="offcanvas-title fw-bold text-primary d-flex align-items-center gap-2">
+                <i class="fa-solid fa-wand-magic-sparkles gradient-text animate-pulse"></i>
+                <span class="gradient-text">AI Co-Pilot Suggestions</span>
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+        </div>
+        <div class="offcanvas-body d-flex flex-column p-4">
+            <!-- Active Section Badge -->
+            <div class="mb-3 d-flex justify-content-between align-items-center">
+                <span class="text-xs text-muted fw-semibold">Current Context:</span>
+                <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-1 rounded-pill" id="ai-copilot-context-badge">Dashboard</span>
+            </div>
+
+            <!-- Tab pills -->
+            <ul class="nav nav-pills nav-fill bg-light p-1 rounded-3 mb-4 text-xs" role="tablist">
+                <li class="nav-item">
+                    <button class="nav-link active py-2 rounded-2 fw-semibold" id="ai-suggestions-tab" data-bs-toggle="pill" data-bs-target="#ai-suggestions-pane" type="button" role="tab">
+                        💡 Smart Tips
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link py-2 rounded-2 fw-semibold position-relative" id="ai-bugs-tab" data-bs-toggle="pill" data-bs-target="#ai-bugs-pane" type="button" role="tab">
+                        🐛 Sanity Check
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" id="ai-bugs-count-badge">0</span>
+                    </button>
+                </li>
+            </ul>
+
+            <!-- Tab content -->
+            <div class="tab-content flex-grow-1 overflow-y-auto mb-3" style="max-height: calc(100vh - 280px);">
+                <!-- Suggestions Pane -->
+                <div class="tab-pane fade show active" id="ai-suggestions-pane" role="tabpanel">
+                    <div id="ai-copilot-suggestions-content">
+                        <!-- Local tips rendered dynamically -->
+                    </div>
+                </div>
+                <!-- Sanity / Bug Checks Pane -->
+                <div class="tab-pane fade" id="ai-bugs-pane" role="tabpanel">
+                    <div id="ai-copilot-bugs-content">
+                        <!-- Local data sanity alerts rendered dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat redirection & Gemini advanced report trigger -->
+            <div class="mt-auto border-top border-light pt-3">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-warning text-dark fw-bold rounded-pill px-4" onclick="triggerGeminiCopilotReport()">
+                        <i class="fa-solid fa-wand-magic-sparkles me-2"></i>Generate Advanced AI Report
+                    </button>
+                    <button class="btn btn-outline-primary rounded-pill px-4 text-xs fw-semibold" onclick="askCopilotAboutThisSection()">
+                        <i class="fas fa-comments me-2"></i>Ask Assistant About This Section
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Floating AI Co-Pilot Button -->
+    <button class="btn btn-primary d-flex align-items-center justify-content-center shadow-lg border-0" id="global-ai-copilot-trigger" onclick="openAICopilotPanel()" style="position: fixed; bottom: 85px; right: 20px; width: 56px; height: 56px; border-radius: 50%; z-index: 1040; background: linear-gradient(135deg, #6366f1, #a855f7); box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);">
+        <i class="fa-solid fa-wand-magic-sparkles text-white fs-4"></i>
+    </button>
+
     <!-- Floating Bulk Actions Bar -->
     <div id="bulk-actions-bar" class="bulk-actions-bar d-none">
         <div class="bulk-actions-content">
@@ -1456,6 +1522,7 @@
     <script src="js/pwa.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="js/ai-assistant.js"></script>
+    <script src="js/ai.js"></script>
     <script>
         // UI Logic for Transaction Modal - Credit Card Selection
         document.addEventListener('DOMContentLoaded', function () {
