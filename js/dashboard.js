@@ -1,7 +1,7 @@
 class Dashboard {
     constructor() {
         this.currentUser = null;
-        this.currentSection = 'dashboard';
+        this.currentSection = null;
         this.financeChart = null;
         this.notificationTimeouts = {};
         this.pendingUpiTransaction = null;
@@ -19,14 +19,17 @@ class Dashboard {
 
         const hashSection = window.location.hash.substring(1);
         if (hashSection && document.getElementById(`${hashSection}-section`)) {
-            this.switchSection(hashSection);
+            try {
+                await this.switchSection(hashSection);
+            } catch (e) {
+                console.error(`Error loading section ${hashSection}:`, e);
+            }
         } else {
             try {
-                await this.initializeDashboard();
+                await this.switchSection('dashboard');
             } catch (e) {
-                console.error("Error during dashboard initialization:", e);
+                console.error("Error loading dashboard:", e);
             }
-            this.switchSection('dashboard');
         }
         this.startGlobalAlertSystem();
         // Await recurring transactions so hideLoading() only fires after processing completes
@@ -57,11 +60,13 @@ class Dashboard {
     bindEvents() {
         // Handle hash changes
         window.addEventListener('hashchange', () => {
-            const section = window.location.hash.substring(1);
-            if (section && document.getElementById(`${section}-section`)) {
-                this.switchSection(section);
-            } else if (!section) {
-                this.switchSection('dashboard');
+            let section = window.location.hash.substring(1);
+            if (!section) section = 'dashboard';
+            
+            if (this.currentSection !== section) {
+                if (document.getElementById(`${section}-section`)) {
+                    this.switchSection(section);
+                }
             }
         });
 
@@ -1881,11 +1886,8 @@ class Dashboard {
         }
     }
 
-    switchSection(section) {
-        if (window.location.hash.substring(1) !== section) {
-            window.location.hash = section;
-            return;
-        }
+    async switchSection(section) {
+        if (this.currentSection === section) return;
 
         localStorage.setItem('currentSection', section);
         // Update active state
@@ -1894,8 +1896,8 @@ class Dashboard {
         });
 
         // Hide all sections
-        document.querySelectorAll('.content-section').forEach(section => {
-            section.classList.add('d-none');
+        document.querySelectorAll('.content-section').forEach(sec => {
+            sec.classList.add('d-none');
         });
 
         // Show selected section
@@ -1904,12 +1906,19 @@ class Dashboard {
             sectionElement.classList.remove('d-none');
 
             // Load section-specific content
-            this.loadSectionContent(section).catch(error => {
+            try {
+                await this.loadSectionContent(section);
+            } catch (error) {
                 console.error(`Error loading section ${section}:`, error);
-            });
+            }
         }
 
         this.currentSection = section;
+
+        // Sync URL hash without early return
+        if (window.location.hash.substring(1) !== section) {
+            window.location.hash = section;
+        }
 
         // Handle Mobile Navigation State & Back Button
         const body = document.body;
@@ -1996,9 +2005,6 @@ class Dashboard {
                 break;
             case 'add-reminder':
                 this.showReminderModal();
-                break;
-            case 'add-memory':
-                this.showMemoryModal();
                 break;
             case 'view-report':
                 this.switchSection('reports');
@@ -2630,42 +2636,6 @@ class Dashboard {
                 // Cleanup timeout reference
                 delete this.notificationTimeouts[reminder.id];
             }, timeUntilDue);
-        }
-    }
-
-    showMemoryModal() {
-        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addMemoryModal'));
-
-        // Set default values
-        document.getElementById('memory-id').value = '';
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('memory-title').value = '';
-        document.getElementById('memory-description').value = '';
-        document.getElementById('memory-date').value = today;
-        document.getElementById('memory-image').value = '';
-        document.getElementById('memory-tags').value = '';
-
-        // Clear preview
-        const previewContainer = document.querySelector('.preview-container');
-        if (previewContainer) {
-            previewContainer.classList.add('d-none');
-        }
-
-        modal.show();
-    }
-
-    previewImage(event) {
-        const file = event.target.files[0];
-        const preview = document.getElementById('image-preview');
-        const previewContainer = document.querySelector('.preview-container');
-
-        if (file && preview && previewContainer) {
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                preview.src = e.target.result;
-                previewContainer.classList.remove('d-none');
-            };
-            reader.readAsDataURL(file);
         }
     }
 

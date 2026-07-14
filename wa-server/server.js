@@ -72,6 +72,17 @@ client.on('disconnected', (reason) => {
     console.warn('⚠️  WhatsApp disconnected:', reason);
 });
 
+// Clean up leftover DevToolsActivePort file from previous crashes
+const activePortPath = path.join(__dirname, '.wwebjs_auth', 'session', 'DevToolsActivePort');
+if (fs.existsSync(activePortPath)) {
+    try {
+        fs.unlinkSync(activePortPath);
+        console.log('🧹 Cleaned up leftover DevToolsActivePort lock file from previous crash');
+    } catch (err) {
+        console.error('⚠️ Failed to delete DevToolsActivePort:', err.message);
+    }
+}
+
 client.initialize();
 
 // ─── Reminder Log Helpers ─────────────────────────────────────────────────────
