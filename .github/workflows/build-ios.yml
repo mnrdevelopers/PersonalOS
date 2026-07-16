@@ -29,8 +29,33 @@ jobs:
             npm install
           fi
 
-      - name: Run Build and Sync
-        run: npm run cap-sync
+      - name: Build Web Assets
+        run: npm run build
+
+      - name: Delete existing iOS platform
+        run: rm -rf ios
+
+      - name: Add iOS Platform
+        run: npx cap add ios
+
+      - name: Sync iOS Platform
+        run: npx cap sync ios
+
+      - name: CocoaPods Update & Install (if applicable)
+        run: |
+          if [ -f ios/App/Podfile ]; then
+            cd ios/App
+            pod repo update
+            pod install
+          else
+            echo "No Podfile found, skipping CocoaPods setup (using Swift Package Manager)."
+          fi
+
+      - name: Clean Xcode and Dependency Caches
+        run: |
+          rm -rf ~/Library/Developer/Xcode/DerivedData
+          rm -rf ios/App/Package.resolved
+          rm -rf ios/App/Pods
 
       - name: Resolve Swift Package Dependencies
         run: |
