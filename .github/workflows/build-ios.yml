@@ -19,7 +19,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
 
       - name: Install Dependencies
         run: |
@@ -41,58 +40,14 @@ jobs:
       - name: Sync iOS Platform
         run: npx cap sync ios
 
-      - name: Patch AppDelegate.swift (bridge restorationHandler type mismatch)
+      - name: Verify and print AppDelegate.swift
         run: |
-          python3 - <<'EOF'
-          import re, sys
+          echo "=== AppDelegate.swift content ==="
+          cat ios/App/App/AppDelegate.swift
 
-          path = "ios/App/App/AppDelegate.swift"
-          with open(path, "r") as f:
-              src = f.read()
-
-          # Replace the continue userActivity method entirely with a bridged version
-          old = re.compile(
-              r'func application\(_ application: UIApplication, continue userActivity: NSUserActivity, '
-              r'restorationHandler: @escaping \([^\)]*\)\s*->\s*Void\)\s*->\s*Bool \{[^}]*\}',
-              re.DOTALL
-          )
-
-          new = (
-              "func application(_ application: UIApplication, continue userActivity: NSUserActivity, "
-              "restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {\n"
-              "        // Called when the app was launched with an activity, including Universal Links.\n"
-              "        // Feel free to add additional processing here, but if you want the App API to support\n"
-              "        // tracking app url opens, make sure to keep this call\n"
-              "        return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)\n"
-              "    }"
-          )
-
-          result, n = old.subn(new, src)
-          if n == 0:
-              print("WARNING: pattern not found, no replacement made", file=sys.stderr)
-              sys.exit(1)
-
-          with open(path, "w") as f:
-              f.write(result)
-
-          print("AppDelegate.swift patched successfully.")
-          EOF
-
-      - name: CocoaPods Update & Install (if applicable)
-        run: |
-          if [ -f ios/App/Podfile ]; then
-            cd ios/App
-            pod repo update
-            pod install
-          else
-            echo "No Podfile found, skipping CocoaPods setup (using Swift Package Manager)."
-          fi
-
-      - name: Clean Xcode and Dependency Caches
+      - name: Clean Xcode derived data
         run: |
           rm -rf ~/Library/Developer/Xcode/DerivedData
-          rm -rf ios/App/Package.resolved
-          rm -rf ios/App/Pods
 
       - name: Resolve Swift Package Dependencies
         run: |
