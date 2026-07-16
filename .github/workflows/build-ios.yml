@@ -41,6 +41,11 @@ jobs:
       - name: Sync iOS Platform
         run: npx cap sync ios
 
+      - name: Patch AppDelegate.swift for Swift 5.7+ Existential Types
+        run: |
+          perl -pi -e 's/\[UIUserActivityRestoring\]/\[any UIUserActivityRestoring\]/g' ios/App/App/AppDelegate.swift
+          perl -pi -e 's/\[Any\]/\[any UIUserActivityRestoring\]/g' ios/App/App/AppDelegate.swift
+
       - name: CocoaPods Update & Install (if applicable)
         run: |
           if [ -f ios/App/Podfile ]; then
