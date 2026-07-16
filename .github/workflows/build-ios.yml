@@ -32,12 +32,15 @@ jobs:
       - name: Run Build and Sync
         run: npm run cap-sync
 
-      - name: Build Xcode Project (Unsigned)
+      - name: Resolve Swift Package Dependencies
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj \
+                     -resolvePackageDependencies
+
+      - name: Build Xcode Project (Simulator)
         run: |
           xcodebuild -project ios/App/App.xcodeproj \
                      -scheme App \
-                     -sdk iphoneos \
-                     -configuration Release \
-                     CODE_SIGNING_ALLOWED=NO \
-                     CODE_SIGNING_REQUIRED=NO \
+                     -sdk iphonesimulator \
+                     -configuration Debug \
                      clean build
