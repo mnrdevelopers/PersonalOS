@@ -1,0 +1,18 @@
+{
+  "name": "personalos",
+  "version": "1.0.0",
+  "description": "Your Life Operating System",
+  "main": "index.html",
+  "scripts": {
+    "build": "node build.js",
+    "cap-sync": "npm run build && npx cap sync"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@capacitor/cli": "^8.4.2",
+    "@capacitor/core": "^8.4.2",
+    "@capacitor/ios": "^8.4.2"
+  }
+}

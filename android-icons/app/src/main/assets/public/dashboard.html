@@ -1,0 +1,1595 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#4f46e5">
+    <title>Dashboard - PersonalOS</title>
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- PDF Export Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+
+    <!-- App Styles -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/3094/3094845.png">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3094/3094845.png">
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-remote-config-compat.js"></script>
+    <style>
+        /* PWA Mobile Modal Improvements (Bottom Sheet Style) */
+        @media (max-width: 576px) {
+            .modal-dialog {
+                margin: 0;
+                max-width: 100%;
+                min-height: 100%;
+                display: flex;
+                align-items: flex-end;
+            }
+
+            .modal.fade .modal-dialog {
+                transform: translate(0, 100%);
+            }
+
+            .modal.show .modal-dialog {
+                transform: none;
+                transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+            }
+
+            .modal-content {
+                border-radius: 1.5rem 1.5rem 0 0;
+                border: none;
+                box-shadow: 0 -10px 20px rgba(0, 0, 0, 0.1);
+                width: 100%;
+                max-height: 85vh;
+                /* Reduced height to show backdrop */
+            }
+
+            /* Drag Handle Visual */
+            .modal-header {
+                border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+                position: relative;
+                padding-top: 1.5rem;
+                /* Space for handle */
+            }
+
+            .modal-header::before {
+                content: '';
+                position: absolute;
+                top: 0.75rem;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 40px;
+                height: 4px;
+                background-color: #e0e0e0;
+                border-radius: 2px;
+            }
+
+            /* Ensure scrollable content works well */
+            .modal-dialog-scrollable {
+                height: auto;
+                max-height: 100%;
+            }
+
+            .modal-dialog-scrollable .modal-content {
+                max-height: 85vh;
+                overflow: hidden;
+            }
+        }
+
+        .upi-logo-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.65rem;
+        }
+
+        .upi-logo-btn {
+            border: 1px solid #dbe3f0;
+            border-radius: 0.85rem;
+            padding: 0.65rem 0.7rem;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            text-align: left;
+            transition: all 0.18s ease;
+        }
+
+        .upi-logo-btn:hover {
+            border-color: #9db2ff;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.12);
+        }
+
+        .upi-logo-btn.active {
+            border-color: #4f46e5;
+            background: #eef0ff;
+            box-shadow: 0 6px 14px rgba(79, 70, 229, 0.18);
+        }
+
+        .upi-logo-mark {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 1.1rem;
+            font-weight: 700;
+            flex-shrink: 0;
+            letter-spacing: 0.2px;
+            overflow: hidden;
+        }
+
+        .logo-bhim, .logo-phonepe, .logo-gpay, .logo-navi, .logo-cred, .logo-paytm, .logo-upi {
+            background: #fff;
+            border: 1px solid #e9ecef;
+        }
+
+        .upi-logo-mark img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            padding: 4px;
+        }
+
+        .upi-logo-text {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.1;
+        }
+
+        .upi-logo-text .name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #212529;
+        }
+
+        .upi-logo-text .hint {
+            font-size: 0.72rem;
+            color: #6c757d;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Ambient Background Aurora Blobs -->
+    <div class="ambient-glow" aria-hidden="true">
+        <div class="glow-blob glow-1"></div>
+        <div class="glow-blob glow-2"></div>
+        <div class="glow-blob glow-3"></div>
+    </div>
+
+    <!-- Main Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+        <div class="container-fluid">
+            <button class="btn btn-link text-white d-none me-2 p-0" id="nav-back-btn" aria-label="Back">
+                <i class="fas fa-arrow-left fa-lg"></i>
+            </button>
+            <a class="navbar-brand fw-bold" href="#">
+                <i class="fas fa-chart-line me-2"></i><span>PersonalOS</span>
+            </a>
+            <div class="d-flex align-items-center">
+                <button class="btn btn-link text-white text-decoration-none me-2 p-2"
+                    id="header-ai-assistant-btn" onclick="window.switchSection('ai-assistant')" aria-label="AI Assistant" title="AI Assistant">
+                    <i class="fa-solid fa-wand-magic-sparkles fa-lg"></i>
+                </button>
+                <button class="btn btn-link text-white text-decoration-none me-2 p-2 position-relative"
+                    id="notifications-btn" aria-label="Notifications">
+                    <i class="fas fa-bell fa-lg"></i>
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none"
+                        id="notification-badge">
+                        0
+                    </span>
+                </button>
+                <button class="btn btn-link text-white text-decoration-none me-2 p-2" id="calculator-btn"
+                    aria-label="Calculator">
+                    <i class="fas fa-calculator fa-lg"></i>
+                </button>
+                <div id="current-time" class="me-3 d-none d-md-block"></div>
+                <button class="btn btn-link text-white text-decoration-none d-lg-none me-2 p-2" id="mobile-logout-btn"
+                    aria-label="Logout">
+                    <i class="fas fa-sign-out-alt fa-lg"></i>
+                </button>
+                <button class="navbar-toggler border-0 p-0" type="button" id="hamburger-menu" aria-expanded="false">
+                    <div class="hamburger-lines">
+                        <span></span><span></span><span></span>
+                    </div>
+                </button>
+            </div>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user-circle"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#" data-section="profile"><i
+                                        class="fas fa-user me-2"></i>Profile</a></li>
+                            <li><a class="dropdown-item" href="#" data-section="settings"><i
+                                        class="fas fa-cog me-2"></i>Settings</a></li>
+                            <li><a class="dropdown-item d-none" href="#" id="install-app-btn"><i
+                                        class="fas fa-download me-2"></i>Install App</a></li>
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
+                            <li><a class="dropdown-item text-danger" href="#" id="logout-btn"><i
+                                        class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid main-container">
+        <!-- Sidebar Overlay -->
+        <div class="sidebar-overlay"></div>
+
+        <!-- Desktop Sidebar -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <div class="user-info">
+                    <div class="avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="user-details">
+                        <h6 id="user-name">Loading...</h6>
+                        <small id="user-email" class="text-muted">Loading...</small>
+                        <div id="member-since-badge" class="mt-1"></div>
+                        <div class="mt-3 pe-2">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="text-muted"
+                                    style="font-size: 0.65rem; text-transform: uppercase;">Profile</span>
+                                <span class="fw-bold text-primary" style="font-size: 0.65rem;"
+                                    id="profile-completion-text">0%</span>
+                            </div>
+                            <div class="progress" style="height: 3px;">
+                                <div class="progress-bar bg-primary" role="progressbar" style="width: 0%"
+                                    id="profile-completion-bar"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-menu">
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#" data-section="dashboard">
+                            <i class="fas fa-home me-2"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-section="notifications">
+                            <i class="fas fa-bell me-2"></i> Notifications
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-section="finance">
+                            <i class="fas fa-money-bill-wave me-2"></i> Income/Expense
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-section="transactions">
+                            <i class="fas fa-exchange-alt me-2"></i> Transaction Ledger
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-section="loans">
+                            <i class="fas fa-hand-holding-usd me-2"></i> Finance
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-section="reminders">
+                            <i class="fas fa-bell me-2"></i> Tasks & Reminders
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-section="habits">
+                            <i class="fas fa-check-circle me-2"></i> Habits Tracker
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-section="reports">
+                            <i class="fas fa-chart-bar me-2"></i> Reports
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-section="entertainment">
+                            <i class="fas fa-film me-2"></i> Entertainment
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-section="vehicles">
+                            <i class="fas fa-car me-2"></i> Vehicles
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-section="groceries">
+                            <i class="fas fa-shopping-basket me-2"></i> Grocery Tracker
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-section="expiry">
+                            <i class="fas fa-passport me-2"></i> Expiry Tracker
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-section="ai-assistant">
+                            <i class="fas fa-robot me-2"></i> AI Assistant
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-section="profile">
+                            <i class="fas fa-user me-2"></i> Profile
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-section="settings">
+                            <i class="fas fa-cog me-2"></i> Settings
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="quick-actions">
+                    <button class="btn btn-primary btn-sm w-100 mb-2" data-action="add-income">
+                        <i class="fas fa-plus-circle me-1"></i> Add Income
+                    </button>
+                    <button class="btn btn-danger btn-sm w-100 mb-2" data-action="add-expense">
+                        <i class="fas fa-minus-circle me-1"></i> Add Expense
+                    </button>
+                    <button class="btn btn-success btn-sm w-100" data-action="add-habit">
+                        <i class="fas fa-plus me-1"></i> New Habit
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Dashboard Section -->
+            <section id="dashboard-section" class="content-section">
+                <!-- Mobile Hero Section (Visible only on mobile) -->
+                <div class="mobile-hero d-lg-none">
+                    <div class="mobile-hero-aurora" aria-hidden="true"></div>
+                    <div class="mobile-hero-orbs" aria-hidden="true">
+                        <span class="orb orb-1"></span>
+                        <span class="orb orb-2"></span>
+                        <span class="orb orb-3"></span>
+                    </div>
+                    <div class="mobile-hero-content">
+                        <div class="mobile-hero-badge">Your day at a glance</div>
+                        <h1 class="display-5 fw-bold mb-1" id="mobile-welcome-message">Hello!</h1>
+                        <p class="opacity-90 mb-0 fs-6" id="mobile-date-display"></p>
+                    </div>
+                </div>
+
+                <!-- Mobile Quick Nav (Visible only on mobile) -->
+                <div class="mobile-quick-nav d-lg-none mb-4">
+                    <div class="nav-card" onclick="window.switchSection('finance')">
+                        <div class="icon-circle bg-primary bg-opacity-10 text-primary"><i class="fas fa-wallet"></i>
+                        </div>
+                        <span>Finance</span>
+                    </div>
+                    <div class="nav-card" onclick="window.switchSection('habits')">
+                        <div class="icon-circle bg-success bg-opacity-10 text-success"><i
+                                class="fas fa-check-circle"></i></div>
+                        <span>Habits</span>
+                    </div>
+                    <div class="nav-card" onclick="window.switchSection('reminders')">
+                        <div class="icon-circle bg-warning bg-opacity-10 text-warning"><i class="fas fa-bell"></i></div>
+                        <span>Tasks</span>
+                    </div>
+                    <div class="nav-card" onclick="window.handleQuickAction('add-income')">
+                        <div class="icon-circle bg-info bg-opacity-10 text-info"><i class="fas fa-plus"></i></div>
+                        <span>Add</span>
+                    </div>
+                </div>
+
+                <!-- Welcome Header -->
+                <div class="welcome-header mb-4 animate-fade-in d-none d-lg-block">
+                    <div class="d-flex justify-content-between align-items-end">
+                        <div>
+                            <h1 class="display-6 fw-bold gradient-text mb-0" id="welcome-message">Welcome back!</h1>
+                            <p class="text-muted mb-0" id="current-date-full"></p>
+                        </div>
+                        <button class="btn btn-light btn-icon shadow-sm rounded-circle" id="refresh-dashboard"
+                            style="width: 40px; height: 40px;">
+                            <i class="fas fa-sync-alt text-primary"></i>
+                        </button>
+                    </div>
+                </div>
+
+                
+                <!-- Quick Guide -->
+                <details class="section-guide-card mb-4 animate-fade-in">
+                    <summary class="section-guide-header">
+                        <span class="section-guide-title"><i class="fas fa-compass"></i> Dashboard Quick Guide</span>
+                    </summary>
+                    <div class="section-guide-content">
+                        <ul class="section-guide-steps">
+                            <li><strong>Day at a Glance</strong>: This is the home screen of PersonalOS, aggregating your latest financial standing, daily habits progress, and task metrics.</li>
+                            <li><strong>Visual Highlights</strong>: The premium cards show your overall cash vs bank balances, active habits streaks, and total pending task count.</li>
+                            <li><strong>Dynamic Synchronization</strong>: Use the refresh button next to the welcome header to manually trigger data sync across your workspaces.</li>
+                        </ul>
+                    </div>
+                </details>
+
+                <!-- Net Worth & Available Capital Overview -->
+                <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden animate-fade-in" style="animation-delay: 0.35s;">
+                    <div class="card-body p-4">
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <h5 class="fw-bold mb-0 d-flex align-items-center">
+                                <i class="fas fa-wallet text-primary me-2"></i> Net Worth & Liquid Capital
+                            </h5>
+                            <button class="btn btn-sm btn-link text-decoration-none p-0" type="button" data-bs-toggle="collapse" data-bs-target="#networth-details" aria-expanded="true" aria-controls="networth-details">
+                                <i class="fas fa-chevron-down text-muted" id="networth-collapse-icon"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- Summary metrics -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <div class="p-3 rounded-4 bg-primary bg-opacity-10 border border-primary border-opacity-10 d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <div class="text-muted small mb-1 fw-medium">Available (Liquid) Capital</div>
+                                        <h3 class="mb-0 fw-bold text-primary" id="net-available-amount">₹0.00</h3>
+                                        <small class="text-muted text-xs">Cash + Banks + Wallets</small>
+                                    </div>
+                                    <div class="bg-primary text-white rounded-circle p-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                                        <i class="fas fa-money-bill-wave"></i>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="p-3 rounded-4 bg-success bg-opacity-10 border border-success border-opacity-10 d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <div class="text-muted small mb-1 fw-medium">Actual Net Worth</div>
+                                        <h3 class="mb-0 fw-bold text-success" id="net-worth-amount">₹0.00</h3>
+                                        <small class="text-muted text-xs">Assets - Liabilities</small>
+                                    </div>
+                                    <div class="bg-success text-white rounded-circle p-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                                        <i class="fas fa-chart-line"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Detailed Collapsible Grid -->
+                        <div class="collapse show" id="networth-details">
+                            <div class="row g-3">
+                                <!-- Cash & Wallets -->
+                                <div class="col-md-4 col-sm-12">
+                                    <div class="p-3 rounded-4 bg-light border border-opacity-10 h-100">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <span class="fs-5">💵</span>
+                                            <h6 class="fw-bold mb-0">Liquid & Wallets</h6>
+                                        </div>
+                                        <hr class="my-2 opacity-10">
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span class="text-muted small">Cash</span>
+                                            <span class="fw-bold small" id="breakdown-cash">₹0.00</span>
+                                        </div>
+                                        <div id="breakdown-wallets-list" class="d-flex flex-column gap-1 mb-2">
+                                            <!-- Dynamic Wallets -->
+                                        </div>
+                                        <div class="d-flex justify-content-between border-top pt-2 mt-2 font-monospace text-muted small">
+                                            <span>Subtotal</span>
+                                            <span class="fw-bold" id="breakdown-liquid-subtotal">₹0.00</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Bank Accounts -->
+                                <div class="col-md-4 col-sm-12">
+                                    <div class="p-3 rounded-4 bg-light border border-opacity-10 h-100">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <span class="fs-5">🏦</span>
+                                            <h6 class="fw-bold mb-0">Bank Accounts</h6>
+                                        </div>
+                                        <hr class="my-2 opacity-10">
+                                        <div id="breakdown-banks-list" class="d-flex flex-column gap-1 mb-2" style="max-height: 150px; overflow-y: auto;">
+                                            <!-- Dynamic Bank accounts -->
+                                        </div>
+                                        <div class="d-flex justify-content-between border-top pt-2 mt-2 font-monospace text-muted small">
+                                            <span>Subtotal</span>
+                                            <span class="fw-bold" id="breakdown-banks-subtotal">₹0.00</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Investments, Loans & CC -->
+                                <div class="col-md-4 col-sm-12">
+                                    <div class="p-3 rounded-4 bg-light border border-opacity-10 h-100">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <span class="fs-5">📈</span>
+                                            <h6 class="fw-bold mb-0">Portfolio & Credit</h6>
+                                        </div>
+                                        <hr class="my-2 opacity-10">
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span class="text-muted small">Investments (Value)</span>
+                                            <span class="fw-bold text-success small" id="breakdown-investments">₹0.00</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span class="text-muted small">Lented Amount</span>
+                                            <span class="fw-bold text-success small" id="breakdown-lent">₹0.00</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between mb-1">
+                                            <span class="text-muted small">Credit Cards (O/S)</span>
+                                            <span class="fw-bold text-danger small" id="breakdown-credit-cards">₹0.00</span>
+                                        </div>
+                                        <div id="breakdown-credit-cards-limit-info" class="text-muted text-xs text-end mb-1">
+                                            <!-- CC Limit details -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Stats Overview (Premium Cards) -->
+                <div class="row g-4 mb-5">
+                    <!-- Balance Card -->
+                    <div class="col-lg-4 col-md-6 animate-slide-up" style="animation-delay: 0.1s;">
+                        <div class="card border-0 shadow-lg h-100 overflow-hidden premium-card-1 rounded-4">
+                            <div class="card-body p-4 text-white position-relative">
+                                <div class="d-flex justify-content-between align-items-start z-1 position-relative">
+                                    <div>
+                                        <p class="mb-1 opacity-75 fw-medium">Total Balance</p>
+                                        <h2 class="display-6 fw-bold mb-0" id="today-balance">₹0.00</h2>
+                                    </div>
+                                    <div class="icon-box bg-white bg-opacity-25 rounded-circle p-3 backdrop-blur">
+                                        <i class="fas fa-wallet fa-lg"></i>
+                                    </div>
+                                </div>
+                                <div class="mt-4 z-1 position-relative">
+                                    <div class="d-flex justify-content-between small">
+                                        <span><i class="fas fa-arrow-down me-1"></i>Income</span>
+                                        <span class="fw-bold" id="income-today">₹0</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between small mt-1">
+                                        <span><i class="fas fa-arrow-up me-1"></i>Expense</span>
+                                        <span class="fw-bold" id="expense-today">₹0</span>
+                                    </div>
+                                </div>
+                                <div class="decorative-circle"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Habits Card -->
+                    <div class="col-lg-4 col-md-6 animate-slide-up" style="animation-delay: 0.2s;">
+                        <div class="card border-0 shadow-lg h-100 overflow-hidden premium-card-2 rounded-4">
+                            <div class="card-body p-4 text-white position-relative">
+                                <div class="d-flex justify-content-between align-items-start z-1 position-relative">
+                                    <div>
+                                        <p class="mb-1 opacity-75 fw-medium">Habits Active</p>
+                                        <h2 class="display-6 fw-bold mb-0" id="active-habits">0</h2>
+                                    </div>
+                                    <div class="icon-box bg-white bg-opacity-25 rounded-circle p-3 backdrop-blur">
+                                        <i class="fas fa-fire fa-lg"></i>
+                                    </div>
+                                </div>
+                                <div class="mt-4 z-1 position-relative">
+                                    <div class="progress bg-black bg-opacity-25 rounded-pill" style="height: 6px;">
+                                        <div class="progress-bar bg-white rounded-pill" role="progressbar"
+                                            style="width: 0%" id="habits-progress"></div>
+                                    </div>
+                                    <div class="d-flex justify-content-between small mt-2">
+                                        <span>Completed Today</span>
+                                        <span class="fw-bold"><span id="completed-today">0</span></span>
+                                    </div>
+                                    <div id="money-saved-container" class="small fw-bold mt-1 d-none text-white-50">
+                                        Saved: <span id="total-money-saved">₹0</span></div>
+                                </div>
+                                <div class="decorative-circle"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tasks Card -->
+                    <div class="col-lg-4 col-md-12 animate-slide-up" style="animation-delay: 0.3s;">
+                        <div class="card border-0 shadow-lg h-100 overflow-hidden premium-card-3 rounded-4">
+                            <div class="card-body p-4 text-white position-relative">
+                                <div class="d-flex justify-content-between align-items-start z-1 position-relative">
+                                    <div>
+                                        <p class="mb-1 opacity-75 fw-medium">Pending Tasks</p>
+                                        <h2 class="display-6 fw-bold mb-0" id="pending-tasks">0</h2>
+                                    </div>
+                                    <div class="icon-box bg-white bg-opacity-25 rounded-circle p-3 backdrop-blur">
+                                        <i class="fas fa-check-double fa-lg"></i>
+                                    </div>
+                                </div>
+                                <div class="mt-4 z-1 position-relative">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <span
+                                            class="badge bg-white text-dark bg-opacity-90 px-3 py-2 rounded-pill shadow-sm">
+                                            <span id="due-today">0</span> Due Today
+                                        </span>
+                                        <button
+                                            class="btn btn-sm btn-link text-white text-decoration-none p-0 fw-medium"
+                                            onclick="window.switchSection('reminders')">View All <i
+                                                class="fas fa-arrow-right ms-1"></i></button>
+                                    </div>
+                                </div>
+                                <div class="decorative-circle"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Secondary Stats Grid -->
+                <div class="row g-4 mb-5 animate-fade-in" style="animation-delay: 0.4s;">
+
+                    <div class="col-6 col-md-3">
+                        <div
+                            class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-danger">
+                            <div class="text-muted small mb-1 fw-medium">Liabilities</div>
+                            <div class="d-flex align-items-center justify-content-between">
+                                <h4 class="mb-0 fw-bold" id="total-liability">₹0</h4>
+                                <i class="fas fa-hand-holding-usd text-danger opacity-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div
+                            class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-warning">
+                            <div class="text-muted small mb-1 fw-medium">Monthly EMI</div>
+                            <div class="d-flex align-items-center justify-content-between">
+                                <h4 class="mb-0 fw-bold" id="total-monthly-emi">₹0</h4>
+                                <i class="fas fa-calendar-check text-warning opacity-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div
+                            class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-secondary">
+                            <div class="text-muted small mb-1 fw-medium">Travel (Mo)</div>
+                            <div class="d-flex align-items-center justify-content-between">
+                                <h4 class="mb-0 fw-bold" id="total-distance-month">0 km</h4>
+                                <i class="fas fa-route text-secondary opacity-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Row -->
+                <div class="row g-3 mb-4">
+                    <div class="col-lg-8 animate-slide-up" style="animation-delay: 0.5s;">
+                        <div class="card border-0 shadow-sm rounded-4 h-100">
+                            <div
+                                class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+                                <h5 class="fw-bold mb-0">Financial Flow</h5>
+                                <select class="form-select form-select-sm border-0 bg-light rounded-pill px-3"
+                                    id="chart-period" style="width: auto;">
+                                    <option value="week">This Week</option>
+                                    <option value="month">This Month</option>
+                                    <option value="year">This Year</option>
+                                </select>
+                            </div>
+                            <div class="card-body px-4 pb-4">
+                                <canvas id="financeChart" height="250"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 animate-slide-up" style="animation-delay: 0.6s;">
+                        <div class="card border-0 shadow-sm rounded-4 h-100">
+                            <div class="card-header bg-transparent border-0 pt-4 px-4">
+                                <h5 class="fw-bold mb-0">Habit Streaks 🔥</h5>
+                            </div>
+                            <div class="card-body px-4 pb-4">
+                                <div id="habit-streaks" class="d-flex flex-column gap-3">
+                                    <!-- Habit streaks will be loaded here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity & Tasks -->
+                <div class="row g-4">
+                    <div class="col-lg-6 animate-slide-up" style="animation-delay: 0.7s;">
+                        <div class="card border-0 shadow-sm rounded-4 h-100">
+                            <div
+                                class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+                                <h5 class="fw-bold mb-0">Recent Transactions</h5>
+                                <button class="btn btn-sm btn-light rounded-pill px-3 fw-medium"
+                                    onclick="window.switchSection('finance')">View All</button>
+                            </div>
+                            <div class="card-body px-4 pb-4">
+                                <div id="recent-transactions" class="d-flex flex-column gap-3">
+                                    <!-- Transactions will be loaded here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6 animate-slide-up" style="animation-delay: 0.8s;">
+                        <div class="card border-0 shadow-sm rounded-4 h-100">
+                            <div
+                                class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+                                <h5 class="fw-bold mb-0">Today's Focus</h5>
+                                <button class="btn btn-sm btn-light rounded-pill px-3 fw-medium"
+                                    onclick="window.switchSection('habits')">View All</button>
+                            </div>
+                            <div class="card-body px-4 pb-4">
+                                <div id="todays-habits" class="d-flex flex-column gap-3">
+                                    <!-- Habits will be loaded here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Finance Section -->
+            <section id="finance-section" class="content-section d-none">
+                <!-- Content will be loaded dynamically -->
+            </section>
+
+            <!-- Transactions Section -->
+            <section id="transactions-section" class="content-section d-none">
+                <!-- Content will be loaded dynamically -->
+            </section>
+
+            <!-- Notifications Section -->
+            <section id="notifications-section" class="content-section d-none">
+                <!-- Content will be loaded dynamically -->
+            </section>
+
+            <!-- Loans Section -->
+            <section id="loans-section" class="content-section d-none">
+                <div class="loan-container">
+                    <!-- Content will be loaded dynamically -->
+                </div>
+            </section>
+
+            <!-- Habits Section -->
+            <section id="habits-section" class="content-section d-none">
+                <!-- Content will be loaded dynamically -->
+            </section>
+
+            <!-- Reminders Section -->
+            <section id="reminders-section" class="content-section d-none">
+                <!-- Content will be loaded dynamically -->
+            </section>
+
+            <!-- Reports Section -->
+            <section id="reports-section" class="content-section d-none">
+                <!-- Content will be loaded dynamically -->
+            </section>
+
+            <!-- Entertainment Section -->
+            <section id="entertainment-section" class="content-section d-none">
+                <!-- Content will be loaded dynamically -->
+            </section>
+
+            <!-- Vehicles Section -->
+            <section id="vehicles-section" class="content-section d-none">
+                <!-- Content will be loaded dynamically -->
+            </section>
+
+            <!-- Groceries Section -->
+            <section id="groceries-section" class="content-section d-none">
+                <!-- Content will be loaded dynamically -->
+            </section>
+
+            <!-- Profile Section -->
+            <section id="profile-section" class="content-section d-none">
+                <!-- Content will be loaded dynamically -->
+            </section>
+
+            <!-- Settings Section -->
+            <section id="settings-section" class="content-section d-none">
+                <!-- Content will be loaded dynamically -->
+            </section>
+
+            <!-- Expiry Section -->
+            <section id="expiry-section" class="content-section d-none">
+                <!-- Content will be loaded dynamically -->
+            </section>
+
+            <!-- AI Assistant Section -->
+            <section id="ai-assistant-section" class="content-section d-none">
+                <!-- Content will be loaded dynamically -->
+            </section>
+        </main>
+    </div>
+
+    <!-- Floating Action Button (Mobile) -->
+    <div class="fab-container d-lg-none">
+        <div class="fab-options">
+            <button class="btn btn-success fab-option" data-action="add-habit" title="New Habit">
+                <i class="fas fa-check"></i>
+            </button>
+            <button class="btn btn-danger fab-option" data-action="add-expense" title="Add Expense">
+                <i class="fas fa-minus"></i>
+            </button>
+            <button class="btn btn-primary fab-option" data-action="add-income" title="Add Income">
+                <i class="fas fa-plus"></i>
+            </button>
+        </div>
+        <button class="btn btn-primary fab-main" id="fab-main-btn" aria-label="Quick Add">
+            <i class="fas fa-plus"></i>
+        </button>
+    </div>
+
+    <!-- Modals -->
+    <!-- Add Transaction Modal -->
+    <div class="modal fade" id="addTransactionModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Transaction</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="transaction-form">
+                        <input type="hidden" id="transaction-id">
+                        <div class="mb-3">
+                            <label class="form-label">Type</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="transaction-type" id="type-income"
+                                    value="income" checked>
+                                <label class="btn btn-outline-success" for="type-income">
+                                    <i class="fas fa-plus-circle me-1"></i> Income
+                                </label>
+                                <input type="radio" class="btn-check" name="transaction-type" id="type-expense"
+                                    value="expense">
+                                <label class="btn btn-outline-danger" for="type-expense">
+                                    <i class="fas fa-minus-circle me-1"></i> Expense
+                                </label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Amount</label>
+                            <div class="input-group">
+                                <span class="input-group-text">₹</span>
+                                <input type="number" class="form-control" id="transaction-amount" step="0.01" min="0"
+                                    required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Payment Mode</label>
+                            <select class="form-select" id="transaction-mode">
+                                <option value="cash">Cash</option>
+                                <option value="bank">Bank Transfer</option>
+                                <option value="upi">UPI</option>
+                                <option value="upi-bhim">UPI - BHIM</option>
+                                <option value="upi-phonepe">UPI - PhonePe</option>
+                                <option value="upi-gpay">UPI - Google Pay</option>
+                                <option value="upi-navi">UPI - Navi Pay</option>
+                                <option value="upi-cred">UPI - CRED Pay</option>
+                                <option value="credit-card">Credit Card</option>
+                                <option value="wallet">Wallet</option>
+                                <option value="debit-card">Debit Card</option>
+                                <option value="other">Other</option>
+                            </select>
+                            <div class="form-text text-muted">Cash entries stay under cash. Bank transfer, UPI, and debit card entries are tracked under bank.</div>
+                        </div>
+                        <div class="mb-3 d-none" id="credit-card-select-container">
+                            <label class="form-label">Select Credit Card</label>
+                            <select class="form-select" id="transaction-credit-card">
+                                <option value="" selected disabled>Choose a card...</option>
+                                <!-- Credit cards will be loaded dynamically via JS -->
+                            </select>
+                            <div class="form-text text-muted">Expense will be added to this card's outstanding balance.
+                            </div>
+                        </div>
+                        <div class="mb-3 d-none" id="wallet-select-container">
+                            <label class="form-label">Select Wallet</label>
+                            <select class="form-select" id="transaction-wallet">
+                                <option value="" selected disabled>Choose a wallet...</option>
+                                <!-- Wallets will be loaded dynamically via JS -->
+                            </select>
+                        </div>
+                        <div class="mb-3 d-none" id="bank-account-select-container">
+                            <label class="form-label">Bank Account <span class="text-muted small">(optional)</span></label>
+                            <select class="form-select" id="transaction-bank-account">
+                                <option value="" selected>Select bank account…</option>
+                                <!-- Bank accounts will be loaded dynamically via JS -->
+                            </select>
+                            <div class="form-text text-muted">Which bank account does this transaction belong to? Helps track per-account balances.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Category</label>
+                            <!-- Hidden input keeps value for form logic -->
+                            <input type="hidden" id="transaction-category">
+                            <!-- Custom searchable category picker -->
+                            <div class="cat-search-picker" id="cat-search-picker">
+                                <div class="cat-search-trigger" id="cat-search-trigger" onclick="toggleCatSearchDropdown()" tabindex="0">
+                                    <span class="cat-search-selected" id="cat-search-display">
+                                        <span class="cat-search-placeholder">Select Category…</span>
+                                    </span>
+                                    <i class="fas fa-chevron-down cat-search-chevron" id="cat-search-chevron"></i>
+                                </div>
+                                <div class="cat-search-dropdown" id="cat-search-dropdown">
+                                    <div class="cat-search-input-wrap">
+                                        <i class="fas fa-search cat-search-icon"></i>
+                                        <input type="text" class="cat-search-input" id="cat-search-input"
+                                            placeholder="Search categories…"
+                                            oninput="filterCatSearchOptions(this.value)"
+                                            autocomplete="off">
+                                    </div>
+                                    <div class="cat-search-list" id="cat-search-list">
+                                        <!-- Populated by JS -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control" id="transaction-description" rows="2"
+                                placeholder="Optional description"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Date</label>
+                            <input type="date" class="form-control" id="transaction-date" required>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="recurring-transaction"
+                                onchange="document.getElementById('recurring-options').classList.toggle('d-none', !this.checked)">
+                            <label class="form-check-label" for="recurring-transaction">
+                                This is a recurring transaction
+                            </label>
+                        </div>
+                        <div id="recurring-options" class="mb-3 d-none bg-light p-3 rounded">
+                            <label class="form-label">Frequency</label>
+                            <select class="form-select" id="transaction-frequency">
+                                <option value="monthly">Monthly</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="yearly">Yearly</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="save-transaction">Save Transaction</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- UPI App Selection Modal -->
+    <div class="modal fade" id="upiPaymentModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Complete UPI Payment</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="upi-payment-summary" class="small text-muted mb-3"></div>
+                    <p class="mb-2">Select UPI app:</p>
+                    <div class="upi-logo-grid mb-3" id="upi-app-list">
+                        <button type="button" class="upi-logo-btn" data-upi-app="upi-bhim">
+                            <span class="upi-logo-mark logo-bhim"><img src="https://iconlogovector.com/uploads/images/2025/08/lg-688f0ebbc155a-BHIM.webp" alt="BHIM" onerror="this.src='https://cdn-icons-png.flaticon.com/512/10102/10102748.png'"></span>
+                            <span class="upi-logo-text"><span class="name">BHIM</span><span class="hint">UPI App</span></span>
+                        </button>
+                        <button type="button" class="upi-logo-btn" data-upi-app="upi-phonepe">
+                            <span class="upi-logo-mark logo-phonepe"><img src="https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/phonepe-icon.png" alt="PhonePe"></span>
+                            <span class="upi-logo-text"><span class="name">PhonePe</span><span class="hint">UPI App</span></span>
+                        </button>
+                        <button type="button" class="upi-logo-btn" data-upi-app="upi-gpay">
+                            <span class="upi-logo-mark logo-gpay"><img src="https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/google-pay-icon.png" alt="GPay"></span>
+                            <span class="upi-logo-text"><span class="name">Google Pay</span><span class="hint">UPI App</span></span>
+                        </button>
+                        <button type="button" class="upi-logo-btn" data-upi-app="upi-navi">
+                            <span class="upi-logo-mark logo-navi"><img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT_SWCBXC5dTJHAJ7vUdUVZbWzzwouewGRJmA&s" alt="Navi"></span>
+                            <span class="upi-logo-text"><span class="name">Navi Pay</span><span class="hint">UPI App</span></span>
+                        </button>
+                        <button type="button" class="upi-logo-btn" data-upi-app="upi-cred">
+                            <span class="upi-logo-mark logo-cred"><img src="https://static.vecteezy.com/system/resources/thumbnails/069/146/524/small_2x/cred-app-icon-on-transparent-background-free-png.png" alt="CRED"></span>
+                            <span class="upi-logo-text"><span class="name">CRED Pay</span><span class="hint">UPI App</span></span>
+                        </button>
+                        <button type="button" class="upi-logo-btn" data-upi-app="upi-paytm">
+                            <span class="upi-logo-mark logo-paytm"><img src="https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/paytm-icon.png" alt="Paytm"></span>
+                            <span class="upi-logo-text"><span class="name">Paytm</span><span class="hint">UPI App</span></span>
+                        </button>
+                        <button type="button" class="upi-logo-btn" data-upi-app="upi-default">
+                            <span class="upi-logo-mark logo-upi"><img src="https://upload.wikimedia.org/wikipedia/commons/e/e1/UPI-Logo-vector.svg" alt="UPI"></span>
+                            <span class="upi-logo-text"><span class="name">Any UPI App</span><span class="hint">System Default</span></span>
+                        </button>
+                    </div>
+                    <div class="alert alert-info small mb-0">
+                        Tap <strong>Open App</strong>, complete QR payment, return to this app, then tap <strong>Payment Done & Save</strong>.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" id="upi-cancel-transaction">Cancel</button>
+                    <button type="button" class="btn btn-outline-primary" id="upi-open-app">Open App</button>
+                    <button type="button" class="btn btn-success" id="upi-save-transaction">Payment Done & Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Loan/Debt/Investment Modal -->
+    <div class="modal fade" id="addLoanModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Loan, Debt or Investment</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="loan-form">
+                        <input type="hidden" id="loan-id">
+                        <div class="mb-3">
+                            <label class="form-label">Type</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="loan-type" id="type-lent" value="lent"
+                                    checked>
+                                <label class="btn btn-outline-success" for="type-lent">
+                                    <i class="fas fa-hand-holding-usd me-1"></i> Lent / Invested
+                                </label>
+                                <input type="radio" class="btn-check" name="loan-type" id="type-borrowed"
+                                    value="borrowed">
+                                <label class="btn btn-outline-danger" for="type-borrowed">
+                                    <i class="fas fa-hand-holding me-1"></i> Borrowed (Debt)
+                                </label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Person / Entity Name</label>
+                            <input type="text" class="form-control" id="loan-person" required
+                                placeholder="Who is this with?">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Amount</label>
+                            <div class="input-group">
+                                <span class="input-group-text">₹</span>
+                                <input type="number" class="form-control" id="loan-amount" step="0.01" min="0" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <label class="form-label">Interest Rate (%)</label>
+                                <input type="number" class="form-control" id="loan-interest" step="0.1" min="0"
+                                    value="0">
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label">Due Date</label>
+                                <input type="date" class="form-control" id="loan-due-date">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" id="loan-notes" rows="2"></textarea>
+                        </div>
+                        <hr>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="loan-add-transaction" checked>
+                            <label class="form-check-label" for="loan-add-transaction">Add to Transaction Ledger</label>
+                        </div>
+                        <div id="loan-transaction-details">
+                            <div class="mb-3">
+                                <label class="form-label">Payment Mode (for ledger)</label>
+                                <select class="form-select" id="loan-payment-mode">
+                                    <option value="cash">Cash</option>
+                                    <option value="bank">Bank Transfer</option>
+                                    <option value="upi">UPI</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="save-loan">Save Record</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Habit Modal -->
+    <div class="modal fade" id="addHabitModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add New Habit</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="habit-form">
+                        <input type="hidden" id="habit-id">
+                        <div class="mb-3">
+                            <label class="form-label">Habit Type</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="habit-type" id="type-good" value="good"
+                                    checked>
+                                <label class="btn btn-outline-success" for="type-good">Build (Good)</label>
+                                <input type="radio" class="btn-check" name="habit-type" id="type-bad" value="bad">
+                                <label class="btn btn-outline-danger" for="type-bad">Quit (Bad)</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Habit Name</label>
+                            <input type="text" class="form-control" id="habit-name" placeholder="e.g., Morning Exercise"
+                                required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Category</label>
+                            <select class="form-select" id="habit-category">
+                                <option value="health">Health & Fitness</option>
+                                <option value="work">Work & Productivity</option>
+                                <option value="learning">Learning</option>
+                                <option value="personal">Personal Development</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Frequency</label>
+                            <select class="form-select" id="habit-frequency">
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly">Monthly</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" id="habit-target-label">Target (times per period)</label>
+                            <input type="number" class="form-control" id="habit-target" min="0" value="1">
+                        </div>
+                        <div class="mb-3">
+                            <div id="habit-cost-container" class="d-none">
+                                <label class="form-label">Cost per occurrence (₹)</label>
+                                <input type="number" class="form-control" id="habit-cost" min="0" step="0.01"
+                                    placeholder="Amount saved per avoidance">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Reminder Time (optional)</label>
+                            <input type="time" class="form-control" id="habit-reminder-time">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Color</label>
+                            <div id="color-picker" class="d-flex gap-2">
+                                <!-- Colors will be added dynamically -->
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="save-habit">Save Habit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Reminder Modal -->
+    <div class="modal fade" id="addReminderModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Task/Reminder</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="reminder-form">
+                        <input type="hidden" id="reminder-id">
+                        <div class="mb-3">
+                            <label class="form-label">Title</label>
+                            <input type="text" class="form-control" id="reminder-title" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control" id="reminder-description" rows="3"></textarea>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Due Date</label>
+                                <input type="date" class="form-control" id="reminder-due-date" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Time</label>
+                                <input type="time" class="form-control" id="reminder-time">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Priority</label>
+                            <select class="form-select" id="reminder-priority">
+                                <option value="low">Low</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High</option>
+                            </select>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="reminder-notification">
+                            <label class="form-check-label" for="reminder-notification">
+                                Send notification
+                            </label>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Alert Before (Days)</label>
+                            <input type="number" class="form-control" id="reminder-alert-days" min="0" value="0"
+                                placeholder="0 = On due date">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="save-reminder">Save Task</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Task Modal -->
+    <div class="modal fade" id="viewTaskModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Task Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <h4 id="view-task-title" class="mb-0"></h4>
+                        <span id="view-task-priority" class="badge"></span>
+                    </div>
+                    <div class="mb-3">
+                        <span id="view-task-status" class="badge me-2"></span>
+                        <small class="text-muted">
+                            <i class="far fa-calendar me-1"></i> <span id="view-task-date"></span>
+                            <i class="far fa-clock ms-2 me-1"></i> <span id="view-task-time"></span>
+                        </small>
+                    </div>
+                    <div class="p-3 bg-light rounded">
+                        <h6 class="text-muted mb-2">Description</h6>
+                        <p id="view-task-desc" class="mb-0" style="white-space: pre-wrap;"></p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="view-task-edit-btn">Edit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- Calculator Modal -->
+    <div class="modal fade" id="calculatorModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-calculator me-2"></i>Calculator</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-2">
+                    <div class="calculator">
+                        <input type="text" class="form-control mb-2 text-end fs-4" id="calc-display" readonly value="0">
+                        <div class="row g-1">
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn"
+                                    data-action="clear">C</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="backspace"><i
+                                        class="fas fa-backspace"></i></button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="operator"
+                                    data-value="%">%</button></div>
+                            <div class="col-3"><button class="btn btn-warning w-100 calc-btn" data-action="operator"
+                                    data-value="/">÷</button></div>
+
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number"
+                                    data-value="7">7</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number"
+                                    data-value="8">8</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number"
+                                    data-value="9">9</button></div>
+                            <div class="col-3"><button class="btn btn-warning w-100 calc-btn" data-action="operator"
+                                    data-value="*">×</button></div>
+
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number"
+                                    data-value="4">4</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number"
+                                    data-value="5">5</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number"
+                                    data-value="6">6</button></div>
+                            <div class="col-3"><button class="btn btn-warning w-100 calc-btn" data-action="operator"
+                                    data-value="-">-</button></div>
+
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number"
+                                    data-value="1">1</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number"
+                                    data-value="2">2</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="number"
+                                    data-value="3">3</button></div>
+                            <div class="col-3"><button class="btn btn-warning w-100 calc-btn" data-action="operator"
+                                    data-value="+">+</button></div>
+
+                            <div class="col-6"><button class="btn btn-light w-100 calc-btn" data-action="number"
+                                    data-value="0">0</button></div>
+                            <div class="col-3"><button class="btn btn-light w-100 calc-btn" data-action="decimal"
+                                    data-value=".">.</button></div>
+                            <div class="col-3"><button class="btn btn-primary w-100 calc-btn"
+                                    data-action="calculate">=</button></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notifications Modal -->
+    <div class="modal fade" id="notificationsModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-bell me-2"></i>Notifications</h5>
+                    <div class="ms-auto">
+                        <button class="btn btn-sm btn-link text-decoration-none" id="mark-all-read">Mark all
+                            read</button>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div id="notifications-list" class="list-group list-group-flush">
+                        <!-- Notifications will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div class="toast-container position-fixed top-0 end-0 p-3">
+        <div id="notification-toast" class="toast" role="alert">
+            <div class="toast-header">
+                <i class="fas fa-bell text-primary me-2"></i>
+                <strong class="me-auto">Notification</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body">
+                <!-- Notification message will appear here -->
+            </div>
+        </div>
+
+        <!-- Update Toast -->
+        <div id="update-toast" class="toast" role="alert" data-bs-autohide="false">
+            <div class="toast-header bg-primary text-white">
+                <i class="fas fa-cloud-download-alt me-2"></i>
+                <strong class="me-auto">Update Available</strong>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body">
+                A new version is available.
+                <button type="button" class="btn btn-sm btn-outline-primary w-100 mt-2" id="reload-app-btn">Reload to
+                    Update</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logout Confirmation Modal -->
+    <div class="modal fade" id="logoutConfirmModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-body text-center p-4">
+                    <div class="mb-3 text-warning"><i class="fas fa-sign-out-alt fa-3x"></i></div>
+                    <h5 class="mb-3">Log Out?</h5>
+                    <p class="text-muted mb-4">Are you sure you want to sign out?</p>
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-danger" id="confirm-logout-btn">Yes, Log Out</button>
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Co-Pilot Offcanvas Panel -->
+    <div class="offcanvas offcanvas-end border-0 shadow-lg" tabindex="-1" id="aiCopilotOffcanvas" style="width: min(450px, 100vw); background: rgba(var(--bs-body-bg-rgb), 0.95); backdrop-filter: blur(15px); border-radius: 1.5rem 0 0 1.5rem;">
+        <div class="offcanvas-header border-bottom border-light pb-2">
+            <h5 class="offcanvas-title fw-bold text-primary d-flex align-items-center gap-2">
+                <i class="fa-solid fa-wand-magic-sparkles gradient-text animate-pulse"></i>
+                <span class="gradient-text">AI Co-Pilot Suggestions</span>
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" style="padding: 0.75rem; font-size: 1.1rem;"></button>
+        </div>
+        <div class="offcanvas-body d-flex flex-column p-4">
+            <!-- Active Section Badge -->
+            <div class="mb-3 d-flex justify-content-between align-items-center">
+                <span class="text-xs text-muted fw-semibold">Current Context:</span>
+                <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-1 rounded-pill" id="ai-copilot-context-badge">Dashboard</span>
+            </div>
+
+            <!-- Tab pills -->
+            <ul class="nav nav-pills nav-fill bg-light p-1 rounded-3 mb-4 text-xs" role="tablist">
+                <li class="nav-item">
+                    <button class="nav-link active py-2 rounded-2 fw-semibold" id="ai-suggestions-tab" data-bs-toggle="pill" data-bs-target="#ai-suggestions-pane" type="button" role="tab">
+                        💡 Smart Tips
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link py-2 rounded-2 fw-semibold position-relative" id="ai-bugs-tab" data-bs-toggle="pill" data-bs-target="#ai-bugs-pane" type="button" role="tab">
+                        🐛 Sanity Check
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" id="ai-bugs-count-badge">0</span>
+                    </button>
+                </li>
+            </ul>
+
+            <!-- Tab content -->
+            <div class="tab-content flex-grow-1 overflow-y-auto mb-3" style="max-height: calc(100vh - 280px);">
+                <!-- Suggestions Pane -->
+                <div class="tab-pane fade show active" id="ai-suggestions-pane" role="tabpanel">
+                    <div id="ai-copilot-suggestions-content">
+                        <!-- Local tips rendered dynamically -->
+                    </div>
+                </div>
+                <!-- Sanity / Bug Checks Pane -->
+                <div class="tab-pane fade" id="ai-bugs-pane" role="tabpanel">
+                    <div id="ai-copilot-bugs-content">
+                        <!-- Local data sanity alerts rendered dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat redirection & Gemini advanced report trigger -->
+            <div class="mt-auto border-top border-light pt-3">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-warning text-dark fw-bold rounded-pill px-4" onclick="triggerGeminiCopilotReport()">
+                        <i class="fa-solid fa-wand-magic-sparkles me-2"></i>Generate Advanced AI Report
+                    </button>
+                    <button class="btn btn-outline-primary rounded-pill px-4 text-xs fw-semibold" onclick="askCopilotAboutThisSection()">
+                        <i class="fas fa-comments me-2"></i>Ask Assistant About This Section
+                    </button>
+                    <!-- Mobile-friendly bottom close button -->
+                    <button type="button" class="btn btn-outline-secondary rounded-pill fw-semibold d-lg-none" data-bs-dismiss="offcanvas" style="padding: 0.65rem;">
+                        <i class="fas fa-times me-2"></i>Close Panel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Floating AI Co-Pilot Button -->
+    <button class="btn btn-primary d-flex align-items-center justify-content-center border-0" id="global-ai-copilot-trigger" onclick="openAICopilotPanel()">
+        <i class="fa-solid fa-wand-magic-sparkles text-white fs-4"></i>
+    </button>
+
+    <!-- Floating Bulk Actions Bar -->
+    <div id="bulk-actions-bar" class="bulk-actions-bar d-none">
+        <div class="bulk-actions-content">
+            <span class="bulk-selected-count fw-bold" id="bulk-selected-count">0 selected</span>
+            <div class="bulk-actions-buttons">
+                <select class="form-select form-select-sm d-inline-block w-auto" id="bulk-bank-account-select" onchange="bulkAssignBankAccount(this.value)">
+                    <option value="" selected disabled>Assign to Bank Account...</option>
+                </select>
+                <button class="btn btn-sm btn-outline-danger" onclick="bulkDeleteTransactions()">
+                    <i class="fas fa-trash me-1"></i> Delete
+                </button>
+                <button class="btn btn-sm btn-link text-white text-decoration-none" onclick="clearBulkSelection()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- App Scripts -->
+    <script src="js/firebase-config.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            firebase.auth().onAuthStateChanged(function (user) {
+                if (!user) {
+                    window.location.href = 'index.html';
+                }
+            });
+        });
+    </script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/finance.js"></script>
+    <script src="js/cat-search-picker.js"></script>
+    <script src="js/habits.js"></script>
+    <script src="js/reminders.js"></script>
+    <script src="js/reports.js"></script>
+    <script src="js/profile.js"></script>
+    <script src="js/settings.js"></script>
+    <script src="js/entertainment.js"></script>
+    <script src="js/transactions.js"></script>
+    <script src="js/loans.js"></script>
+    <script src="js/expiry.js"></script>
+    <script src="js/notifications.js"></script>
+    <script src="js/vehicles.js"></script>
+    <script src="js/groceries.js"></script>
+    <script src="js/bank-accounts.js"></script>
+    <script src="js/pwa.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="js/ai-assistant.js"></script>
+    <script src="js/ai.js"></script>
+    <script>
+        // UI Logic for Transaction Modal - Credit Card Selection
+        document.addEventListener('DOMContentLoaded', function () {
+            const transactionMode = document.getElementById('transaction-mode');
+            const transactionCategory = document.getElementById('transaction-category');
+            const creditCardContainer = document.getElementById('credit-card-select-container');
+            const walletContainer = document.getElementById('wallet-select-container');
+            const bankAccountContainer = document.getElementById('bank-account-select-container');
+
+            // Payment modes that belong to bank (show bank account picker)
+            const BANK_MODES = new Set(['bank', 'upi', 'upi-bhim', 'upi-phonepe', 'upi-gpay', 'upi-navi', 'upi-cred', 'debit-card']);
+
+            function toggleTransactionFields() {
+                if (!transactionMode) return;
+                const mode = transactionMode.value;
+                const category = transactionCategory ? transactionCategory.value : '';
+
+                if (creditCardContainer) creditCardContainer.classList.add('d-none');
+                if (walletContainer) walletContainer.classList.add('d-none');
+                if (bankAccountContainer) bankAccountContainer.classList.add('d-none');
+
+                const ccSelect = document.getElementById('transaction-credit-card');
+                const walletSelect = document.getElementById('transaction-wallet');
+                if (ccSelect) ccSelect.required = false;
+                if (walletSelect) walletSelect.required = false;
+
+                if (mode === 'credit-card' || category === 'Credit Card Bill') {
+                    if (creditCardContainer) creditCardContainer.classList.remove('d-none');
+                    if (ccSelect) ccSelect.required = true;
+                }
+                
+                if (mode === 'wallet') {
+                    if (walletContainer) walletContainer.classList.remove('d-none');
+                    if (walletSelect) walletSelect.required = true;
+                }
+                
+                if (BANK_MODES.has(mode)) {
+                    if (bankAccountContainer) bankAccountContainer.classList.remove('d-none');
+                }
+            }
+
+            if (transactionMode) {
+                transactionMode.addEventListener('change', toggleTransactionFields);
+            }
+            if (transactionCategory) {
+                transactionCategory.addEventListener('change', toggleTransactionFields);
+            }
+
+            // UI Logic for Loan Modal - Transaction Toggle
+            const loanAddTransaction = document.getElementById('loan-add-transaction');
+            const loanTransactionDetails = document.getElementById('loan-transaction-details');
+
+            if (loanAddTransaction && loanTransactionDetails) {
+                loanAddTransaction.addEventListener('change', function () {
+                    if (this.checked) {
+                        loanTransactionDetails.classList.remove('d-none');
+                    } else {
+                        loanTransactionDetails.classList.add('d-none');
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+
+</html>
