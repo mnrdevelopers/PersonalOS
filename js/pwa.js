@@ -1,9 +1,7 @@
 let deferredPrompt;
 
-const isCapacitor = () => !!window.Capacitor;
-
-// Register Service Worker (only if not running inside Capacitor webview)
-if ('serviceWorker' in navigator && !isCapacitor()) {
+// Register Service Worker
+if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
             .then((registration) => {
@@ -83,7 +81,7 @@ const isIos = () => {
 
 const isInStandaloneMode = () => ('standalone' in window.navigator) && (window.navigator.standalone);
 
-if (isIos() && !isInStandaloneMode() && !isCapacitor()) {
+if (isIos() && !isInStandaloneMode()) {
     const iosPrompt = document.getElementById('ios-install-prompt');
     if (iosPrompt) {
         iosPrompt.style.display = 'block';
