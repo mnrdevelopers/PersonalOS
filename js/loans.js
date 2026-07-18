@@ -2269,16 +2269,68 @@ window.deleteLoan = async function(id) {
             const user = auth.currentUser;
             const batch = db.batch();
             const loanRef = db.collection('loans').doc(id);
+
+            // Fetch loan details first to check for credit card EMI conversion
+            const loanDoc = await loanRef.get();
+            if (loanDoc.exists) {
+                const loanData = loanDoc.data();
+                
+                // Retrieve cardId (either stored or fall back to matching name)
+                let cardId = loanData.cardId || loanData.convertedCardId;
+                if (!cardId && loanData.borrower && loanData.type === 'borrowed') {
+                    const cardsSnap = await db.collection('credit_cards')
+                        .where('userId', '==', user.uid)
+                        .get();
+                    const matchingCard = cardsSnap.docs.find(doc => {
+                        const c = doc.data();
+                        const fullName = `${c.bank || 'Bank'} ${c.name}`;
+                        return fullName === loanData.borrower;
+                    });
+                    if (matchingCard) cardId = matchingCard.id;
+                }
+
+                if (cardId) {
+                    const convertedAmount = Number(loanData.convertedAmount) || Number(loanData.totalAmount) || 0;
+                    const procFee = Number(loanData.processingFee) || 0;
+                    const gst = Number(loanData.gst) || 0;
+                    
+                    // Revert outstanding balance: outstanding += (convertedAmount - procFee - gst)
+                    const revertAmount = convertedAmount - procFee - gst;
+                    batch.update(db.collection('credit_cards').doc(cardId), {
+                        currentOutstanding: firebase.firestore.FieldValue.increment(revertAmount),
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+            }
             
             // Delete loan document
             batch.delete(loanRef);
 
-            // Delete related transactions
-            const transactionsSnap = await db.collection('transactions')
+            // Delete related transactions (repayments, transfers, processing fee charges)
+            const txsQuery1 = db.collection('transactions')
                 .where('userId', '==', user.uid)
                 .where('loanId', '==', id)
                 .get();
-            transactionsSnap.forEach(doc => batch.delete(doc.ref));
+            const txsQuery2 = db.collection('transactions')
+                .where('userId', '==', user.uid)
+                .where('relatedId', '==', id)
+                .get();
+            const txsQuery3 = db.collection('transactions')
+                .where('userId', '==', user.uid)
+                .where('bankAccountId', '==', id)
+                .get();
+                
+            const [snap1, snap2, snap3] = await Promise.all([txsQuery1, txsQuery2, txsQuery3]);
+            const seenTxs = new Set();
+            
+            [snap1, snap2, snap3].forEach(snap => {
+                snap.forEach(doc => {
+                    if (!seenTxs.has(doc.id)) {
+                        seenTxs.add(doc.id);
+                        batch.delete(doc.ref);
+                    }
+                });
+            });
 
             // Delete repayment history
             const repaymentsSnap = await loanRef.collection('repayments')
@@ -2291,7 +2343,17 @@ window.deleteLoan = async function(id) {
             const activeTab = document.querySelector('#loans-view-container .nav-link.active');
             const status = activeTab ? activeTab.textContent.toLowerCase() : 'active';
             loadLoansGrid(status);
-            if(window.dashboard) window.dashboard.showNotification('Loan deleted successfully', 'success');
+            
+            // Reload credit cards grid to show updated outstanding balance
+            if (typeof loadCreditCardsGrid === 'function') {
+                await loadCreditCardsGrid();
+            }
+
+            if(window.dashboard) {
+                window.dashboard.showNotification('Loan deleted and balances reverted successfully', 'success');
+                window.dashboard.updateStats();
+                window.dashboard.loadRecentTransactions();
+            }
         } catch(e) {
             console.error(e);
             if(window.dashboard) window.dashboard.showNotification('Error deleting loan', 'danger');
@@ -3282,6 +3344,10 @@ window.processCCConvertEMI = async function() {
             interestRate: interestRate,
             tenure: tenure,
             status: 'active',
+            cardId: cardId,
+            convertedAmount: amount,
+            processingFee: procFee,
+            gst: gst,
             notes: `EMI conversion of ₹${amount.toFixed(2)} outstanding. Processing Fee: ₹${procFee.toFixed(2)}, GST: ₹${gst.toFixed(2)}. First installment due on ${date}.`,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -3331,7 +3397,7 @@ window.processCCConvertEMI = async function() {
                 accountType: 'credit-card',
                 accountLabel: cardData.name,
                 creditCardId: cardId,
-                relatedId: cardId,
+                relatedId: loanRef.id, // Linked to Loan ID for cleanup when loan is deleted
                 section: 'credit_cards',
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             };
