@@ -590,6 +590,88 @@ window.loadLoansSection = async function() {
             </div>
         </div>
 
+        <!-- CC Convert to EMI Modal -->
+        <div class="modal fade" id="ccConvertEmiModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Convert Outstanding to EMI</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="emi-cc-id">
+                        <div class="mb-3">
+                            <label class="form-label d-block text-muted mb-1">Card Details</label>
+                            <div class="p-3 bg-light rounded-3">
+                                <span class="fw-bold d-block" id="emi-card-name">Credit Card</span>
+                                <span class="text-danger small fw-medium" id="emi-card-outstanding-text">Outstanding: ₹0.00</span>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Amount to Convert</label>
+                            <div class="input-group">
+                                <span class="input-group-text">₹</span>
+                                <input type="number" class="form-control" id="emi-amount" required oninput="calculateModalEMI()">
+                            </div>
+                            <div class="form-text text-muted">Cannot exceed the card's current outstanding balance.</div>
+                        </div>
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <label class="form-label">Tenure (Months)</label>
+                                <select class="form-select" id="emi-tenure" required onchange="calculateModalEMI()">
+                                    <option value="3">3 Months</option>
+                                    <option value="6" selected>6 Months</option>
+                                    <option value="9">9 Months</option>
+                                    <option value="12">12 Months</option>
+                                    <option value="18">18 Months</option>
+                                    <option value="24">24 Months</option>
+                                    <option value="36">36 Months</option>
+                                </select>
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label">Interest Rate (% p.a.)</label>
+                                <input type="number" class="form-control" id="emi-interest-rate" value="14" step="0.1" required oninput="calculateModalEMI()">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <label class="form-label">Processing Fee</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">₹</span>
+                                    <input type="number" class="form-control" id="emi-proc-fee" value="199" required oninput="calculateModalEMI()">
+                                </div>
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label">GST on Fee (18%)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">₹</span>
+                                    <input type="number" class="form-control" id="emi-gst" value="35.82" readonly>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">First Installment Date</label>
+                            <input type="date" class="form-control" id="emi-date" required>
+                        </div>
+                        <div class="mt-3 p-3 bg-primary-subtle text-primary border border-primary border-opacity-25 rounded-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="small fw-semibold">Estimated Monthly EMI:</span>
+                                <span class="h5 mb-0 fw-bold" id="emi-estimated-installment">₹0.00</span>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center small opacity-75">
+                                <span>Total Payable Interest:</span>
+                                <span id="emi-total-interest">₹0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="btn-save-cc-emi" onclick="processCCConvertEMI()">Convert & Create Loan</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Credit Card History Modal -->
         <div class="modal fade" id="ccHistoryModal" tabindex="-1">
             <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
@@ -2862,6 +2944,7 @@ window.loadCreditCardsGrid = async function() {
                                 <button class="btn btn-link text-white p-0" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></button>
                                 <ul class="dropdown-menu dropdown-menu-end">
                                     <li><a class="dropdown-item" href="javascript:void(0)" onclick="viewCreditCardHistory('${doc.id}')">View History</a></li>
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="showConvertEmiModal('${doc.id}')">Convert to EMI</a></li>
                                     <li><a class="dropdown-item" href="javascript:void(0)" onclick="editCreditCard('${doc.id}')">Edit</a></li>
                                     <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="deleteCreditCard('${doc.id}')">Delete</a></li>
                                 </ul>
@@ -3090,6 +3173,192 @@ window.processCCAction = async function() {
         window.setBtnLoading(btn, false);
         console.error(e);
         if(window.dashboard) window.dashboard.showNotification('Error processing action', 'danger');
+    }
+};
+
+window.calculateModalEMI = function() {
+    const amount = parseFloat(document.getElementById('emi-amount').value) || 0;
+    const tenure = parseInt(document.getElementById('emi-tenure').value) || 6;
+    const interestRate = parseFloat(document.getElementById('emi-interest-rate').value) || 14;
+    const procFee = parseFloat(document.getElementById('emi-proc-fee').value) || 0;
+
+    // Calculate GST (18%)
+    const gst = Math.round(procFee * 0.18 * 100) / 100;
+    document.getElementById('emi-gst').value = gst.toFixed(2);
+
+    if (amount <= 0 || tenure <= 0) {
+        document.getElementById('emi-estimated-installment').textContent = '₹0.00';
+        document.getElementById('emi-total-interest').textContent = '₹0.00';
+        return;
+    }
+
+    // Formula: EMI = P * r * (1+r)^n / ((1+r)^n - 1)
+    const monthlyRate = (interestRate / 100) / 12;
+    const emi = (amount * monthlyRate * Math.pow(1 + monthlyRate, tenure)) / (Math.pow(1 + monthlyRate, tenure) - 1);
+    const totalRepay = emi * tenure;
+    const totalInterest = totalRepay - amount;
+
+    document.getElementById('emi-estimated-installment').textContent = `₹${emi.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+    document.getElementById('emi-total-interest').textContent = `₹${totalInterest.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+};
+
+window.showConvertEmiModal = async function(cardId) {
+    try {
+        const doc = await db.collection('credit_cards').doc(cardId).get();
+        if (!doc.exists) return;
+        const data = doc.data();
+
+        document.getElementById('emi-cc-id').value = cardId;
+        document.getElementById('emi-card-name').textContent = `${data.bank || 'Bank'} ${data.name}`;
+        document.getElementById('emi-card-outstanding-text').textContent = `Outstanding Balance: ₹${(data.currentOutstanding || 0).toFixed(2)}`;
+        
+        // Default convert amount is the full outstanding
+        document.getElementById('emi-amount').value = (data.currentOutstanding || 0).toFixed(2);
+        document.getElementById('emi-amount').max = data.currentOutstanding;
+
+        // Set default date (1 month from now)
+        const nextMonth = new Date();
+        nextMonth.setMonth(nextMonth.getMonth() + 1);
+        document.getElementById('emi-date').value = nextMonth.toISOString().split('T')[0];
+
+        // Trigger calculation
+        window.calculateModalEMI();
+
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('ccConvertEmiModal'));
+        modal.show();
+    } catch (e) {
+        console.error("Error showing EMI convert modal:", e);
+    }
+};
+
+window.processCCConvertEMI = async function() {
+    const btn = document.getElementById('btn-save-cc-emi');
+    const cardId = document.getElementById('emi-cc-id').value;
+    const amount = parseFloat(document.getElementById('emi-amount').value);
+    const tenure = parseInt(document.getElementById('emi-tenure').value);
+    const interestRate = parseFloat(document.getElementById('emi-interest-rate').value);
+    const procFee = parseFloat(document.getElementById('emi-proc-fee').value) || 0;
+    const gst = parseFloat(document.getElementById('emi-gst').value) || 0;
+    const date = document.getElementById('emi-date').value;
+    const user = auth.currentUser;
+
+    if (!amount || amount <= 0 || !date) {
+        if (window.dashboard) window.dashboard.showNotification('Please enter amount and date', 'warning');
+        return;
+    }
+
+    try {
+        window.setBtnLoading(btn, true);
+        const cardDoc = await db.collection('credit_cards').doc(cardId).get();
+        if (!cardDoc.exists) throw new Error('Credit card not found');
+        const cardData = cardDoc.data();
+
+        if (amount > (cardData.currentOutstanding || 0)) {
+            if (window.dashboard) window.dashboard.showNotification('Conversion amount cannot exceed card outstanding balance', 'warning');
+            window.setBtnLoading(btn, false);
+            return;
+        }
+
+        const batch = db.batch();
+
+        // 1. Update Credit Card Outstanding Balance
+        // Deduct converted amount, add processing fee + GST
+        const netCardAdjustment = -amount + procFee + gst;
+        batch.update(db.collection('credit_cards').doc(cardId), {
+            currentOutstanding: firebase.firestore.FieldValue.increment(netCardAdjustment),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // 2. Create the Borrowed Loan
+        const loanRef = db.collection('loans').doc();
+        const loanTitle = `EMI: ${cardData.bank || 'Bank'} ${cardData.name} (₹${amount.toLocaleString('en-IN')})`;
+        const loanPayload = {
+            userId: user.uid,
+            title: loanTitle,
+            borrower: `${cardData.bank || 'Bank'} ${cardData.name}`,
+            type: 'borrowed',
+            totalAmount: amount,
+            paidAmount: 0,
+            interestRate: interestRate,
+            tenure: tenure,
+            status: 'active',
+            notes: `EMI conversion of ₹${amount.toFixed(2)} outstanding. Processing Fee: ₹${procFee.toFixed(2)}, GST: ₹${gst.toFixed(2)}. First installment due on ${date}.`,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        batch.set(loanRef, loanPayload);
+
+        // 3. Log a transfer transaction in Ledger (repay credit card from loan)
+        const transferTxRef = db.collection('transactions').doc();
+        const transferDesc = `EMI Conversion: Moved ₹${amount.toLocaleString('en-IN')} outstanding to loan`;
+        const transferTxPayload = {
+            userId: user.uid,
+            type: 'transfer',
+            category: 'Transfer',
+            amount: amount,
+            date: date,
+            description: transferDesc,
+            paymentMode: 'internal-transfer',
+            accountType: 'transfer',
+            accountLabel: `Loan -> ${cardData.name}`,
+            transferDirection: 'loan_to_card',
+            sourceAccountType: 'borrowed',
+            sourceAccountLabel: 'Loan',
+            destinationAccountType: 'credit-card',
+            destinationAccountLabel: cardData.name,
+            bankAccountId: loanRef.id,
+            destinationBankAccountId: cardId,
+            creditCardId: cardId,
+            relatedId: loanRef.id,
+            section: 'credit_cards',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        batch.set(transferTxRef, transferTxPayload);
+
+        // 4. Log the Processing Fee & GST as an expense transaction on the credit card
+        if (procFee > 0 || gst > 0) {
+            const totalCharges = procFee + gst;
+            const chargesTxRef = db.collection('transactions').doc();
+            const chargesDesc = `EMI Processing Fee (₹${procFee}) + GST (₹${gst}) for ${cardData.name}`;
+            const chargesTxPayload = {
+                userId: user.uid,
+                type: 'expense',
+                category: 'Credit Card Bill',
+                amount: totalCharges,
+                date: date,
+                description: chargesDesc,
+                paymentMode: 'credit-card',
+                accountType: 'credit-card',
+                accountLabel: cardData.name,
+                creditCardId: cardId,
+                relatedId: cardId,
+                section: 'credit_cards',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            batch.set(chargesTxRef, chargesTxPayload);
+        }
+
+        await batch.commit();
+
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('ccConvertEmiModal')).hide();
+        
+        if (window.dashboard) {
+            window.dashboard.updateStats();
+            window.dashboard.loadRecentTransactions();
+            window.dashboard.updateFinanceChart();
+            window.dashboard.showNotification('Successfully converted to EMI and created loan!', 'success');
+        }
+
+        await loadCreditCardsGrid();
+        if (typeof loadLoansGrid === 'function') {
+            await loadLoansGrid();
+        }
+
+    } catch (e) {
+        console.error("Error processing CC EMI conversion:", e);
+        if (window.dashboard) window.dashboard.showNotification('Error: ' + e.message, 'danger');
+    } finally {
+        window.setBtnLoading(btn, false);
     }
 };
 
