@@ -154,11 +154,6 @@ service cloud.firestore {
       allow create: if isOwnerCreate();
     }
 
-    // Push Subscriptions
-    match /push_subscriptions/{docId} {
-      allow read, update, delete: if isOwner(resource.data.userId);
-      allow create: if isOwnerCreate();
-    }
 
     // Grocery Items
     match /grocery_items/{docId} {

@@ -240,47 +240,7 @@ window.loadLoansSection = async function() {
                                     <div class="form-text small">Used in Push alert: "Loan reminder: ₹[amount] due from [borrower]..."</div>
                                 </div>
 
-                                <!-- Auto Push Reminder Config -->
-                                <div class="push-reminder-config-panel">
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <div>
-                                            <span class="fw-semibold small"><i class="fas fa-bell text-primary me-1"></i>Auto Push Reminder</span>
-                                            <div class="form-text mt-0">Sends automatically via local Notification server</div>
-                                        </div>
-                                        <div class="form-check form-switch mb-0">
-                                            <input class="form-check-input" type="checkbox" id="loan-reminder-enabled" onchange="toggleReminderConfig(this.checked)">
-                                        </div>
-                                    </div>
-                                    <div id="reminder-config-body" class="d-none">
-                                        <div class="mb-2">
-                                            <label class="form-label small mb-1">Days before due date to start</label>
-                                            <div class="input-group">
-                                                <input type="number" class="form-control" id="loan-reminder-days" value="3" min="1" max="60" placeholder="3" inputmode="numeric">
-                                                <span class="input-group-text">days before</span>
-                                            </div>
-                                        </div>
-                                        <div class="mb-2">
-                                            <label class="form-label small mb-1">How many times per day?</label>
-                                            <select class="form-select" id="loan-reminder-times">
-                                                <option value="1">Once a day</option>
-                                                <option value="2">Twice a day</option>
-                                                <option value="3">3 times a day</option>
-                                            </select>
-                                        </div>
-                                        <div class="mb-2">
-                                            <label class="form-label small mb-1">Custom Message Template</label>
-                                            <textarea class="form-control form-control-sm" id="loan-reminder-template" rows="3" placeholder="Leave blank to use default template..."></textarea>
-                                            <div class="form-text small" style="font-size: 0.75rem;">
-                                                Placeholders: <code>{name}</code>, <code>{amount}</code>, <code>{dueDate}</code>, <code>{context}</code>
-                                            </div>
-                                        </div>
-                                        <div class="p-2 bg-primary bg-opacity-10 rounded small text-primary">
-                                            <i class="fas fa-info-circle me-1"></i>
-                                            Requires Push server at <span id="push-server-url-hint" class="fw-semibold">localhost:3001</span>
-                                        </div>
-                                    </div>
 
-                                </div>
                             </div>
                             <div class="row">
                                 <div class="col-md-6 mb-3">
@@ -1409,15 +1369,6 @@ window.updateLoanModalUI = function(type) {
         }
     }
 };
-
-window.toggleReminderConfig = function(enabled) {
-    const body = document.getElementById('reminder-config-body');
-    if (body) body.classList.toggle('d-none', !enabled);
-    // Show server URL from localStorage
-    const hint = document.getElementById('push-server-url-hint');
-    if (hint) hint.textContent = localStorage.getItem('pushServerUrl') || 'localhost:3001';
-};
-
 window.calculateEMIAmount = function() {
     const type = document.querySelector('input[name="loan-type"]:checked').value;
     if (type !== 'emi') return;
@@ -1441,17 +1392,6 @@ window.resetLoanForm = async function() {
     document.getElementById('loan-upi-id').value = '';
     document.getElementById('loan-message-context').value = '';
     document.getElementById('loan-duration').value = '';
-    // Reset reminder config
-    const reminderToggle = document.getElementById('loan-reminder-enabled');
-    if (reminderToggle) reminderToggle.checked = false;
-    const reminderDays = document.getElementById('loan-reminder-days');
-    if (reminderDays) reminderDays.value = 3;
-    const reminderTimes = document.getElementById('loan-reminder-times');
-    if (reminderTimes) reminderTimes.value = 1;
-    const reminderTemplate = document.getElementById('loan-reminder-template');
-    if (reminderTemplate) reminderTemplate.value = '';
-    toggleReminderConfig(false);
-
 
     await window.populateLoanPaymentSelects();
 
@@ -1607,10 +1547,6 @@ window.saveLoan = async function() {
     const mobileInput = document.getElementById('loan-mobile').value;
     const upiId = document.getElementById('loan-upi-id').value.trim();
     const messageContext = document.getElementById('loan-message-context').value;
-    const reminderEnabled = document.getElementById('loan-reminder-enabled')?.checked || false;
-    const reminderDaysBefore = parseInt(document.getElementById('loan-reminder-days')?.value) || 3;
-    const reminderTimesPerDay = parseInt(document.getElementById('loan-reminder-times')?.value) || 1;
-    const reminderTemplate = document.getElementById('loan-reminder-template')?.value.trim() || '';
     const user = auth.currentUser;
 
     if (!name || !amount || !startDate) {
@@ -1647,10 +1583,6 @@ window.saveLoan = async function() {
             mobile: fullMobile,
             messageContext: messageContext || '',
             upiId: upiId || '',
-            reminderEnabled: reminderEnabled,
-            reminderDaysBefore: reminderDaysBefore,
-            reminderTimesPerDay: reminderTimesPerDay,
-            reminderTemplate: reminderTemplate,
             status: 'active',
         };
 
@@ -1670,10 +1602,6 @@ window.saveLoan = async function() {
                 mobile: fullMobile,
                 upiId: upiId || '',
                 messageContext: messageContext || '',
-                reminderEnabled: reminderEnabled,
-                reminderDaysBefore: reminderDaysBefore,
-                reminderTimesPerDay: reminderTimesPerDay,
-                reminderTemplate: reminderTemplate
             };
 
             // If EMI, ensure initialDueDate is consistent with the new dueDate (which represents the NEXT due date)
@@ -2085,29 +2013,7 @@ window.loadLoansGrid = async function(status = 'active') {
             `;
         }
 
-        let pushRemindBtn = '';
-        if (data.type === 'lent' && status === 'active') {
-            const safeName = (data.name || '').replace(/"/g, '&quot;');
-            const safeContext = (data.messageContext || '').replace(/"/g, '&quot;');
 
-            if (data.reminderEnabled) {
-                // Auto-reminder is on — show status chip instead of manual button
-                pushRemindBtn = `
-                    <span class="badge bg-primary-subtle border border-primary text-primary py-2 px-3 rounded-pill d-inline-flex align-items-center gap-1" title="Auto push reminder active">
-                        <i class="fas fa-bell"></i>
-                        Auto · ${data.reminderDaysBefore || 3}d · ${data.reminderTimesPerDay || 1}×/day
-                    </span>`;
-            } else {
-                // Manual push alert button
-                pushRemindBtn = `
-                    <button class="btn btn-sm btn-outline-primary me-1 px-3" 
-                        data-name="${safeName}" data-amount="${remainingAmount}" data-context="${safeContext}"
-                        onclick="sendPushReminder('${doc.id}', this.getAttribute('data-name'), this.getAttribute('data-amount'), this.getAttribute('data-context'))" 
-                        title="Trigger immediate Push Notification Alert">
-                        <i class="fas fa-bell"></i> Alert Me
-                    </button>`;
-            }
-        }
 
         const col = document.createElement('div');
         col.className = 'col-lg-6';
@@ -2159,7 +2065,7 @@ window.loadLoansGrid = async function(status = 'active') {
 
                     ${showActionButtons ? `
                     <div class="loan-card-footer mt-3 d-flex gap-2 justify-content-end flex-wrap">
-                        ${pushRemindBtn}
+
                         ${data.type === 'lent' ? `
                             <button class="btn btn-sm btn-success px-3" onclick="showRepaymentModal('${doc.id}')">
                                 <i class="fas fa-arrow-down me-1"></i>Payment In
@@ -2229,18 +2135,7 @@ window.editLoan = async function(id) {
         
         document.getElementById('loan-message-context').value = data.messageContext || '';
 
-        // Reminder config
-        const reminderEnabled = document.getElementById('loan-reminder-enabled');
-        if (reminderEnabled) {
-            reminderEnabled.checked = data.reminderEnabled || false;
-            toggleReminderConfig(data.reminderEnabled || false);
-        }
-        if (document.getElementById('loan-reminder-days'))
-            document.getElementById('loan-reminder-days').value = data.reminderDaysBefore || 3;
-        if (document.getElementById('loan-reminder-times'))
-            document.getElementById('loan-reminder-times').value = data.reminderTimesPerDay || 1;
-        if (document.getElementById('loan-reminder-template'))
-            document.getElementById('loan-reminder-template').value = data.reminderTemplate || '';
+
         
         // Set radio button
         const typeRadio = document.querySelector(`input[name="loan-type"][value="${data.type}"]`);
@@ -2809,49 +2704,6 @@ window.deleteRepayment = async function(loanId, repaymentId) {
     }
 };
 
-window.sendPushReminder = async function(id, name, amount, context) {
-    try {
-        const user = firebase.auth().currentUser;
-        if (!user) return;
-        const idToken = await user.getIdToken();
-        const serverUrl = (localStorage.getItem('pushServerUrl') || 'http://localhost:3001').replace(/\/$/, '');
-
-        const msgContext = (context && context !== 'null' && context !== 'undefined') ? ` (${context})` : '';
-        const bodyText = `Manual loan reminder: ₹${parseFloat(amount).toLocaleString('en-IN')} due from ${name}${msgContext}.`;
-
-        if (window.dashboard) window.dashboard.showLoading();
-
-        const res = await fetch(`${serverUrl}/api/push/send`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${idToken}`
-            },
-            body: JSON.stringify({
-                notification: {
-                    title: '🤝 Loan Reminder Alert',
-                    body: bodyText,
-                    tag: 'bill-reminder',
-                    icon: '/android-icons/android-launchericon-192-192.png',
-                    badge: '/android-icons/android-launchericon-72-72.png',
-                    data: { url: '/#loans' }
-                }
-            })
-        });
-
-        const data = await res.json();
-        if (data.success) {
-            if (window.dashboard) window.dashboard.showNotification('✅ Push reminder alert sent successfully!', 'success');
-        } else {
-            if (window.dashboard) window.dashboard.showNotification('❌ Failed: ' + (data.error || 'Check server'), 'danger');
-        }
-    } catch(e) {
-        console.error("Error sending push reminder:", e);
-        if (window.dashboard) window.dashboard.showNotification('Push server unreachable.', 'danger');
-    } finally {
-        if (window.dashboard) window.dashboard.hideLoading();
-    }
-};
 
 window.triggerUpiPayment = async function() {
     const loanId = document.getElementById('repay-loan-id').value;
