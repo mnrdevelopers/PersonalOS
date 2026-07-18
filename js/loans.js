@@ -133,8 +133,8 @@ window.loadLoansSection = async function() {
             <div id="loans-view-container">
                 <div class="loans-filter-bar">
                     <ul class="nav nav-pills gap-2 small loans-status-tabs">
-                    <li class="nav-item"><button type="button" class="nav-link active py-1 px-3 border-0 bg-transparent" onclick="filterLoans('active', this)">Active</button></li>
-                    <li class="nav-item"><button type="button" class="nav-link py-1 px-3 border-0 bg-transparent" onclick="filterLoans('closed', this)">Closed</button></li>
+                    <li class="nav-item"><button type="button" class="nav-link active py-1 px-3 rounded-pill" onclick="filterLoans('active', this)">Active</button></li>
+                    <li class="nav-item"><button type="button" class="nav-link py-1 px-3 rounded-pill" onclick="filterLoans('closed', this)">Closed</button></li>
                     </ul>
                     <select class="form-select form-select-sm loans-type-filter" id="loan-type-filter" onchange="filterLoanType(this.value)">
                         <option value="all">All Types</option>
@@ -173,8 +173,8 @@ window.loadLoansSection = async function() {
             <div id="earmarked-view-container" class="d-none">
                 <div class="loans-filter-bar mb-3">
                     <ul class="nav nav-pills gap-2 small loans-status-tabs" id="earmarked-status-tabs">
-                        <li class="nav-item"><button type="button" class="nav-link active py-1 px-3 border-0 bg-transparent" onclick="filterEarmarked('active', this)">Locked</button></li>
-                        <li class="nav-item"><button type="button" class="nav-link py-1 px-3 border-0 bg-transparent" onclick="filterEarmarked('returned', this)">Returned / Released</button></li>
+                        <li class="nav-item"><button type="button" class="nav-link active py-1 px-3 rounded-pill" onclick="filterEarmarked('active', this)">Locked</button></li>
+                        <li class="nav-item"><button type="button" class="nav-link py-1 px-3 rounded-pill" onclick="filterEarmarked('returned', this)">Returned / Released</button></li>
                     </ul>
                 </div>
                 <div class="row g-3" id="earmarked-grid">
@@ -237,15 +237,15 @@ window.loadLoansSection = async function() {
                                 <div class="mb-3">
                                     <label class="form-label">Reminder Context (Message)</label>
                                     <input type="text" class="form-control" id="loan-message-context" placeholder="e.g. Tatkal, Hand Loan">
-                                    <div class="form-text small">Used in WhatsApp: "Your [Context] payment..."</div>
+                                    <div class="form-text small">Used in Push alert: "Loan reminder: ₹[amount] due from [borrower]..."</div>
                                 </div>
 
-                                <!-- Auto WhatsApp Reminder Config -->
-                                <div class="wa-reminder-config-panel">
+                                <!-- Auto Push Reminder Config -->
+                                <div class="push-reminder-config-panel">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                         <div>
-                                            <span class="fw-semibold small"><i class="fab fa-whatsapp text-success me-1"></i>Auto WhatsApp Reminder</span>
-                                            <div class="form-text mt-0">Sends automatically via local WA server</div>
+                                            <span class="fw-semibold small"><i class="fas fa-bell text-primary me-1"></i>Auto Push Reminder</span>
+                                            <div class="form-text mt-0">Sends automatically via local Notification server</div>
                                         </div>
                                         <div class="form-check form-switch mb-0">
                                             <input class="form-check-input" type="checkbox" id="loan-reminder-enabled" onchange="toggleReminderConfig(this.checked)">
@@ -274,9 +274,9 @@ window.loadLoansSection = async function() {
                                                 Placeholders: <code>{name}</code>, <code>{amount}</code>, <code>{dueDate}</code>, <code>{context}</code>
                                             </div>
                                         </div>
-                                        <div class="p-2 bg-success bg-opacity-10 rounded small text-success">
+                                        <div class="p-2 bg-primary bg-opacity-10 rounded small text-primary">
                                             <i class="fas fa-info-circle me-1"></i>
-                                            Requires WA server at <span id="wa-server-url-hint" class="fw-semibold">localhost:3001</span>
+                                            Requires Push server at <span id="push-server-url-hint" class="fw-semibold">localhost:3001</span>
                                         </div>
                                     </div>
 
@@ -1251,7 +1251,7 @@ window.switchLoanView = function(view, element) {
                 <button class="btn btn-sm btn-outline-secondary loans-toolbar-btn" onclick="showTransferWalletModal()">
                     <i class="fas fa-exchange-alt me-2"></i>Transfer
                 </button>
-                <button class="btn btn-sm btn-info text-white loans-toolbar-btn" onclick="showAddWalletModal()">
+                <button class="btn btn-sm btn-info text-dark loans-toolbar-btn" onclick="showAddWalletModal()">
                     <i class="fas fa-wallet me-2"></i>Add Wallet
                 </button>
             `;
@@ -1414,8 +1414,8 @@ window.toggleReminderConfig = function(enabled) {
     const body = document.getElementById('reminder-config-body');
     if (body) body.classList.toggle('d-none', !enabled);
     // Show server URL from localStorage
-    const hint = document.getElementById('wa-server-url-hint');
-    if (hint) hint.textContent = localStorage.getItem('waServerUrl') || 'localhost:3001';
+    const hint = document.getElementById('push-server-url-hint');
+    if (hint) hint.textContent = localStorage.getItem('pushServerUrl') || 'localhost:3001';
 };
 
 window.calculateEMIAmount = function() {
@@ -1890,36 +1890,7 @@ window.loadLoansGrid = async function(status = 'active') {
             .get()
     ]);
 
-    // Sync active lent loans with reminders to the local server
-    if (status === 'active') {
-        const activeLentWithReminders = snapshot.docs
-            .filter(doc => {
-                const d = doc.data();
-                return d.type === 'lent' && d.status === 'active' && d.reminderEnabled === true;
-            })
-            .map(doc => {
-                const d = doc.data();
-                return {
-                    id: doc.id,
-                    name: d.name,
-                    mobile: d.mobile,
-                    dueDate: d.dueDate,
-                    totalAmount: d.totalAmount,
-                    paidAmount: d.paidAmount || 0,
-                    reminderDaysBefore: d.reminderDaysBefore || 3,
-                    reminderTimesPerDay: d.reminderTimesPerDay || 1,
-                    messageContext: d.messageContext || '',
-                    reminderTemplate: d.reminderTemplate || ''
-                };
-            });
 
-        const serverUrl = (localStorage.getItem('waServerUrl') || 'http://localhost:3001').replace(/\/$/, '');
-        fetch(`${serverUrl}/sync-loans`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(activeLentWithReminders)
-        }).catch(err => console.log("Local WA server not running or unreachable for sync."));
-    }
 
     // Client-side filtering for type (since Firestore compound queries with != or multiple filters can be tricky without composite indexes)
     let docs = snapshot.docs;
@@ -1962,7 +1933,7 @@ window.loadLoansGrid = async function(status = 'active') {
     // Render Stats
     statsContainer.innerHTML = `
         <div class="col-6 col-md-3">
-            <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-danger">
+            <div class="card stat-mini-card p-3 rounded-4 shadow-sm h-100 border-start border-4 border-danger">
                 <div class="text-muted small mb-1 fw-medium">${status === 'active' ? 'Outstanding Debt' : 'Total Repaid Debt'}</div>
                 <div class="d-flex align-items-center justify-content-between">
                     <h4 class="mb-0 fw-bold text-danger">₹${totalBorrowed.toFixed(0)}</h4>
@@ -1971,7 +1942,7 @@ window.loadLoansGrid = async function(status = 'active') {
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-success">
+            <div class="card stat-mini-card p-3 rounded-4 shadow-sm h-100 border-start border-4 border-success">
                 <div class="text-muted small mb-1 fw-medium">Total Assets</div>
                 <div class="d-flex align-items-center justify-content-between">
                     <h4 class="mb-0 fw-bold text-success">₹${(totalLent + totalInvested).toFixed(0)}</h4>
@@ -1980,7 +1951,7 @@ window.loadLoansGrid = async function(status = 'active') {
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-primary">
+            <div class="card stat-mini-card p-3 rounded-4 shadow-sm h-100 border-start border-4 border-primary">
                 <div class="text-muted small mb-1 fw-medium">Net Position</div>
                 <div class="d-flex align-items-center justify-content-between">
                     <h4 class="mb-0 fw-bold text-primary">₹${((totalLent + totalInvested) - totalBorrowed).toFixed(0)}</h4>
@@ -1989,7 +1960,7 @@ window.loadLoansGrid = async function(status = 'active') {
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-warning">
+            <div class="card stat-mini-card p-3 rounded-4 shadow-sm h-100 border-start border-4 border-warning">
                 <div class="text-muted small mb-1 fw-medium">Monthly EMI</div>
                 <div class="d-flex align-items-center justify-content-between">
                     <h4 class="mb-0 fw-bold text-warning">₹${totalEmi.toFixed(0)}</h4>
@@ -2114,27 +2085,26 @@ window.loadLoansGrid = async function(status = 'active') {
             `;
         }
 
-        let whatsappBtn = '';
+        let pushRemindBtn = '';
         if (data.type === 'lent' && status === 'active') {
             const safeName = (data.name || '').replace(/"/g, '&quot;');
-            const safeMobile = (data.mobile || '').replace(/"/g, '&quot;');
             const safeContext = (data.messageContext || '').replace(/"/g, '&quot;');
 
             if (data.reminderEnabled) {
                 // Auto-reminder is on — show status chip instead of manual button
-                whatsappBtn = `
-                    <span class="wa-auto-badge" title="Auto WA reminder active">
-                        <i class="fab fa-whatsapp"></i>
+                pushRemindBtn = `
+                    <span class="badge bg-primary-subtle border border-primary text-primary py-2 px-3 rounded-pill d-inline-flex align-items-center gap-1" title="Auto push reminder active">
+                        <i class="fas fa-bell"></i>
                         Auto · ${data.reminderDaysBefore || 3}d · ${data.reminderTimesPerDay || 1}×/day
                     </span>`;
-            } else if (safeMobile) {
-                // Manual remind button
-                whatsappBtn = `
-                    <button class="btn btn-sm btn-success me-1" 
-                        data-name="${safeName}" data-amount="${remainingAmount}" data-mobile="${safeMobile}" data-context="${safeContext}"
-                        onclick="sendWhatsAppReminder('${doc.id}', this.getAttribute('data-name'), this.getAttribute('data-amount'), this.getAttribute('data-mobile'), this.getAttribute('data-context'))" 
-                        title="Send WhatsApp Reminder">
-                        <i class="fab fa-whatsapp"></i> Remind
+            } else {
+                // Manual push alert button
+                pushRemindBtn = `
+                    <button class="btn btn-sm btn-outline-primary me-1 px-3" 
+                        data-name="${safeName}" data-amount="${remainingAmount}" data-context="${safeContext}"
+                        onclick="sendPushReminder('${doc.id}', this.getAttribute('data-name'), this.getAttribute('data-amount'), this.getAttribute('data-context'))" 
+                        title="Trigger immediate Push Notification Alert">
+                        <i class="fas fa-bell"></i> Alert Me
                     </button>`;
             }
         }
@@ -2189,7 +2159,7 @@ window.loadLoansGrid = async function(status = 'active') {
 
                     ${showActionButtons ? `
                     <div class="loan-card-footer mt-3 d-flex gap-2 justify-content-end flex-wrap">
-                        ${whatsappBtn}
+                        ${pushRemindBtn}
                         ${data.type === 'lent' ? `
                             <button class="btn btn-sm btn-success px-3" onclick="showRepaymentModal('${doc.id}')">
                                 <i class="fas fa-arrow-down me-1"></i>Payment In
@@ -2839,43 +2809,47 @@ window.deleteRepayment = async function(loanId, repaymentId) {
     }
 };
 
-window.sendWhatsAppReminder = async function(id, name, amount, mobile, context) {
+window.sendPushReminder = async function(id, name, amount, context) {
     try {
-        let cleanMobile = '';
-        let message = '';
-        
-        // Try synchronous path first (fixes iOS popup blocker)
-        if (mobile && mobile !== 'null' && mobile !== 'undefined') {
-            const remaining = parseFloat(amount);
-            const msgContext = (context && context !== 'null' && context !== 'undefined') ? context : 'outstanding';
-            
-            message = `Hi ${name}, your ${msgContext} payment of ₹${remaining.toFixed(2)} is due. Please pay the amount at your earliest convenience. Thank you.`;
-            cleanMobile = mobile.replace(/\D/g, '');
-        } else {
-            // Fallback to async fetch
-            const doc = await db.collection('loans').doc(id).get();
-            if (!doc.exists) return;
-            const data = doc.data();
-            
-            const remaining = data.totalAmount - (data.paidAmount || 0);
-            const msgContext = data.messageContext ? data.messageContext : 'outstanding';
-            const dbMobile = data.mobile;
-            
-            if (!dbMobile) {
-                if(window.dashboard) window.dashboard.showNotification('No mobile number saved for this loan.', 'warning');
-                return;
-            }
-            message = `Hi ${data.name}, your ${msgContext} payment of ₹${remaining.toFixed(2)} is due. Please pay the amount at your earliest convenience. Thank you.`;
-            cleanMobile = dbMobile.replace(/\D/g, '');
-        }
+        const user = firebase.auth().currentUser;
+        if (!user) return;
+        const idToken = await user.getIdToken();
+        const serverUrl = (localStorage.getItem('pushServerUrl') || 'http://localhost:3001').replace(/\/$/, '');
 
-        const encodedMsg = encodeURIComponent(message);
-        
-        // Use wa.me for better mobile compatibility (supports WhatsApp Business)
-        window.open(`https://wa.me/${cleanMobile}?text=${encodedMsg}`, '_blank');
-        
+        const msgContext = (context && context !== 'null' && context !== 'undefined') ? ` (${context})` : '';
+        const bodyText = `Manual loan reminder: ₹${parseFloat(amount).toLocaleString('en-IN')} due from ${name}${msgContext}.`;
+
+        if (window.dashboard) window.dashboard.showLoading();
+
+        const res = await fetch(`${serverUrl}/api/push/send`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({
+                notification: {
+                    title: '🤝 Loan Reminder Alert',
+                    body: bodyText,
+                    tag: 'bill-reminder',
+                    icon: '/android-icons/android-launchericon-192-192.png',
+                    badge: '/android-icons/android-launchericon-72-72.png',
+                    data: { url: '/#loans' }
+                }
+            })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            if (window.dashboard) window.dashboard.showNotification('✅ Push reminder alert sent successfully!', 'success');
+        } else {
+            if (window.dashboard) window.dashboard.showNotification('❌ Failed: ' + (data.error || 'Check server'), 'danger');
+        }
     } catch(e) {
-        console.error("Error sending reminder:", e);
+        console.error("Error sending push reminder:", e);
+        if (window.dashboard) window.dashboard.showNotification('Push server unreachable.', 'danger');
+    } finally {
+        if (window.dashboard) window.dashboard.hideLoading();
     }
 };
 
@@ -2956,19 +2930,19 @@ window.loadCreditCardsGrid = async function() {
         // Render Card Stats
         statsContainer.innerHTML = `
             <div class="col-6 col-md-4">
-                <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-primary">
+                <div class="card stat-mini-card p-3 rounded-4 shadow-sm h-100 border-start border-4 border-primary">
                     <div class="text-muted small mb-1 fw-medium">Total Limit</div>
                     <h4 class="mb-0 fw-bold text-primary">₹${totalLimit.toFixed(0)}</h4>
                 </div>
             </div>
             <div class="col-6 col-md-4">
-                <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-danger">
+                <div class="card stat-mini-card p-3 rounded-4 shadow-sm h-100 border-start border-4 border-danger">
                     <div class="text-muted small mb-1 fw-medium">Total Outstanding</div>
                     <h4 class="mb-0 fw-bold text-danger">₹${totalOutstanding.toFixed(0)}</h4>
                 </div>
             </div>
             <div class="col-12 col-md-4">
-                <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-success">
+                <div class="card stat-mini-card p-3 rounded-4 shadow-sm h-100 border-start border-4 border-success">
                     <div class="text-muted small mb-1 fw-medium">Available Credit</div>
                     <h4 class="mb-0 fw-bold text-success">₹${(totalLimit - totalOutstanding).toFixed(0)}</h4>
                 </div>
@@ -3400,7 +3374,7 @@ window.loadWalletsGrid = async function() {
         // Update Stats
         statsContainer.innerHTML = `
             <div class="col-12 col-md-4">
-                <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-info">
+                <div class="card stat-mini-card p-3 rounded-4 shadow-sm h-100 border-start border-4 border-info">
                     <div class="text-muted small mb-1 fw-medium">Total Wallet Balance</div>
                     <h4 class="mb-0 fw-bold text-info">₹${totalBalance.toFixed(2)}</h4>
                 </div>
@@ -3987,19 +3961,19 @@ window.loadInvestmentsGrid = async function() {
         // Render Stats
         statsContainer.innerHTML = `
             <div class="col-12 col-md-4">
-                <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-primary">
+                <div class="card stat-mini-card p-3 rounded-4 shadow-sm h-100 border-start border-4 border-primary">
                     <div class="text-muted small mb-1 fw-medium">Current Portfolio Value</div>
                     <h4 class="mb-0 fw-bold text-primary">₹${totalCurrent.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</h4>
                 </div>
             </div>
             <div class="col-6 col-md-4">
-                <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 border-secondary">
+                <div class="card stat-mini-card p-3 rounded-4 shadow-sm h-100 border-start border-4 border-secondary">
                     <div class="text-muted small mb-1 fw-medium">Invested Amount</div>
                     <h4 class="mb-0 fw-bold text-secondary">₹${totalInvested.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</h4>
                 </div>
             </div>
             <div class="col-6 col-md-4">
-                <div class="stat-mini-card p-3 rounded-4 bg-white shadow-sm h-100 border-start border-4 ${totalProfit >= 0 ? 'border-success' : 'border-danger'}">
+                <div class="card stat-mini-card p-3 rounded-4 shadow-sm h-100 border-start border-4 ${totalProfit >= 0 ? 'border-success' : 'border-danger'}">
                     <div class="text-muted small mb-1 fw-medium">Total Profit/Loss</div>
                     <h4 class="mb-0 fw-bold ${profitClass}">₹${totalProfit.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</h4>
                 </div>

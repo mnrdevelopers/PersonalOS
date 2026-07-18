@@ -1,4 +1,4 @@
-const CACHE_NAME = 'personalos-v50';
+const CACHE_NAME = 'personalos-v57';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -68,8 +68,14 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Only handle http(s) requests
-  if (!event.request.url.startsWith('http')) {
+  // Only intercept HTTP GET requests
+  if (!event.request.url.startsWith('http') || event.request.method !== 'GET') {
+    return;
+  }
+
+  // Skip intercepting push notifications server and cloud databases
+  const url = event.request.url;
+  if (url.includes('/api/push/') || url.includes('firestore.googleapis.com') || url.includes('firebaseio.com')) {
     return;
   }
 
@@ -86,8 +92,91 @@ self.addEventListener('fetch', (event) => {
         });
         return response;
       })
-      .catch(() => {
-        return caches.match(event.request);
+      .catch(async () => {
+        const cachedResponse = await caches.match(event.request);
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+        // Fallback response to avoid Service Worker TypeError
+        return new Response('Network error and resource not cached.', {
+          status: 503,
+          statusText: 'Service Unavailable',
+          headers: new Headers({ 'Content-Type': 'text/plain' })
+        });
       })
   );
+});
+
+// ─── PUSH NOTIFICATIONS HANDLERS ─────────────────────────────────────────────
+
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch (err) {
+    // Fallback if not JSON
+    payload = {
+      notification: {
+        title: 'Personal OS Alert',
+        body: event.data.text()
+      }
+    };
+  }
+
+  const notification = payload.notification || {};
+  const title = notification.title || 'Personal OS';
+  
+  const options = {
+    body: notification.body || '',
+    icon: notification.icon || '/android-icons/android-launchericon-192-192.png',
+    badge: notification.badge || '/android-icons/android-launchericon-72-72.png',
+    image: notification.image || undefined,
+    tag: notification.tag || 'personalos-alert',
+    vibrate: notification.vibrate || [100, 50, 100],
+    timestamp: notification.timestamp ? new Date(notification.timestamp).getTime() : Date.now(),
+    data: notification.data || {},
+    actions: notification.actions || [
+      { action: 'open', title: 'Open Personal OS' },
+      { action: 'dismiss', title: 'Dismiss' }
+    ],
+    silent: notification.silent || false
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  if (event.action === 'dismiss') {
+    return;
+  }
+
+  const targetUrl = event.notification.data?.url || '/';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // Look for already open windows and focus them
+      for (let i = 0; i < windowClients.length; i++) {
+        const client = windowClients[i];
+        const clientUrl = new URL(client.url, self.location.origin).pathname + new URL(client.url, self.location.origin).hash;
+        if (clientUrl === targetUrl || client.url === targetUrl || client.url.endsWith(targetUrl)) {
+          return client.focus();
+        }
+      }
+      
+      // Otherwise open new window
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+
+self.addEventListener('notificationclose', (event) => {
+  console.log('[SW] Notification closed:', event.notification.tag);
 });

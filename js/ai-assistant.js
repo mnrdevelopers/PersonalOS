@@ -1428,6 +1428,7 @@ window.sendAIChatMessage = async function() {
                     }
 
                     _aiChatHistory.push({ role: 'model', parts: [{ text: replyText }] });
+                    sendAIPushNotification();
                 } else {
                     console.error('OpenRouter error response:', resData);
                     const errDetail = resData.error?.message || 'Empty response received from OpenRouter API.';
@@ -1588,6 +1589,7 @@ window.sendAIChatMessage = async function() {
             }
 
             _aiChatHistory.push({ role: 'model', parts: [{ text: replyText }] });
+            sendAIPushNotification();
         } else {
             console.error('Gemini error response:', resData);
             const errDetail = resData.error?.message || 'Empty response received from Gemini API.';
@@ -1787,5 +1789,35 @@ async function executeAIAction(action, data) {
         if (window.dashboard) {
             window.dashboard.showNotification('AI failed to execute action.', 'danger');
         }
+    }
+}
+
+async function sendAIPushNotification() {
+    try {
+        const user = firebase.auth().currentUser;
+        if (!user) return;
+
+        const idToken = await user.getIdToken();
+        const serverUrl = (localStorage.getItem('pushServerUrl') || 'http://localhost:3001').replace(/\/$/, '');
+
+        await fetch(`${serverUrl}/api/push/send`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({
+                notification: {
+                    title: 'Personal OS',
+                    body: 'Your AI has completed the requested task.',
+                    tag: 'ai-response',
+                    icon: '/android-icons/android-launchericon-192-192.png',
+                    badge: '/android-icons/android-launchericon-72-72.png',
+                    data: { url: '/#ai-assistant' }
+                }
+            })
+        });
+    } catch (e) {
+        console.warn('[PushAI] Failed to send AI completion push notification:', e.message);
     }
 }

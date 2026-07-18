@@ -124,76 +124,62 @@ window.loadSettingsSection = async function() {
             </div>
         </div>
 
-        <div class="card mb-4" id="wa-server-settings-card">
+        <div class="card mb-4" id="push-settings-card">
             <div class="card-header d-flex align-items-center gap-2">
-                <i class="fab fa-whatsapp text-success fs-5"></i>
-                <h5 class="mb-0">WhatsApp Auto-Reminder Server</h5>
+                <i class="fas fa-bell text-primary fs-5"></i>
+                <h5 class="mb-0">Web Push Notifications</h5>
             </div>
             <div class="card-body">
                 <p class="text-muted small mb-3">
-                    A local Node.js server that automatically sends WhatsApp payment reminders for your lent loans.
-                    Run <code>node server.js</code> inside <code>wa-server/</code> to start.
+                    Configure and manage Web Push notifications for reminders, bills, birthdays, and AI responses. 
+                    Runs locally via standard VAPID Web Push protocol.
                 </p>
 
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Server URL</label>
+                    <label class="form-label fw-semibold">Push Server URL</label>
                     <div class="input-group">
-                        <input type="text" class="form-control" id="wa-server-url-input"
+                        <input type="text" class="form-control" id="push-server-url-input"
                                placeholder="http://localhost:3001"
-                               value="${localStorage.getItem('waServerUrl') || 'http://localhost:3001'}">
-                        <button class="btn btn-outline-primary" onclick="saveWaServerUrl()">Save</button>
-                        <button class="btn btn-outline-secondary" onclick="checkWaStatus()">
+                               value="${localStorage.getItem('pushServerUrl') || 'http://localhost:3001'}">
+                        <button class="btn btn-outline-primary" onclick="savePushServerUrl()">Save</button>
+                        <button class="btn btn-outline-secondary" onclick="updatePushSettingsUI()">
                             <i class="fas fa-sync-alt"></i>
                         </button>
                     </div>
-                    <div class="form-text">Must be running on this machine. Default: http://localhost:3001</div>
+                    <div class="form-text">Default server port: 3001</div>
                 </div>
 
                 <!-- Status Badge -->
-                <div id="wa-status-area" class="mb-3">
-                    <div class="wa-status-badge" id="wa-status-badge">
-                        <span class="wa-status-dot"></span>
-                        <span id="wa-status-text">Click refresh to check</span>
+                <div id="push-status-area" class="mb-3">
+                    <label class="form-label small fw-semibold d-block mb-1">Notification Status</label>
+                    <div class="badge p-2 bg-light border text-dark fs-7 d-inline-flex align-items-center gap-2" id="push-status-badge">
+                        <span class="spinner-border spinner-border-sm text-secondary" id="push-status-spinner"></span>
+                        <span id="push-status-text">Checking permission...</span>
                     </div>
                 </div>
 
-                <!-- QR Code area (shown when auth needed) -->
-                <div id="wa-qr-area" class="d-none text-center mb-3">
-                    <p class="small text-muted mb-2">Scan this QR code with WhatsApp to connect</p>
-                    <img id="wa-qr-img" src="" alt="WhatsApp QR Code"
-                         class="img-fluid rounded border" style="max-width: 220px;">
-                    <div class="small text-muted mt-2">WhatsApp → Settings → Linked Devices → Link a Device</div>
-                </div>
-
-                <!-- Test Message -->
-                <div class="border-top pt-3">
-                    <label class="form-label small fw-semibold">Send Test Message</label>
-                    <div class="input-group input-group-sm">
-                        <input type="text" class="form-control" id="wa-test-phone"
-                               placeholder="Phone with country code e.g. 919876543210">
-                        <button class="btn btn-success" onclick="sendWaTestMessage()">
-                            <i class="fab fa-whatsapp me-1"></i>Test
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Trigger Now -->
-                <div class="mt-3 d-flex gap-2">
-                    <button class="btn btn-sm btn-outline-primary" onclick="triggerWaJobNow()">
-                        <i class="fas fa-bolt me-1"></i>Run Reminders Now
+                <!-- Controls -->
+                <div class="d-flex gap-2 mb-3">
+                    <button class="btn btn-primary btn-sm" id="btn-enable-push" onclick="enablePushNotifications()" style="display:none;">
+                        <i class="fas fa-bell me-1"></i>Enable Notifications
                     </button>
-                    <button type="button" onclick="toggleWaLog()" class="btn btn-sm btn-outline-secondary">
-                        <i class="fas fa-list me-1"></i>View Send Log
+                    <button class="btn btn-outline-danger btn-sm" id="btn-disable-push" onclick="disablePushNotifications()" style="display:none;">
+                        <i class="fas fa-bell-slash me-1"></i>Disable Notifications
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" id="btn-test-push" onclick="sendTestPushNotification()" style="display:none;">
+                        <i class="fas fa-paper-plane me-1"></i>Send Test Notification
                     </button>
                 </div>
 
-                <!-- Inline Log Container -->
-                <div id="wa-log-area" class="d-none mt-3 border-top pt-3">
+                <!-- Notification History -->
+                <div class="border-top pt-3 mt-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <label class="form-label small fw-semibold mb-0">📋 Sent Reminders Log</label>
-                        <button type="button" class="btn btn-sm btn-link p-0 text-muted text-decoration-none" onclick="toggleWaLog(false)">Hide</button>
+                        <label class="form-label small fw-semibold mb-0">📋 Notification History</label>
+                        <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none text-muted" onclick="loadNotificationHistory()">Refresh History</button>
                     </div>
-                    <pre id="wa-log-content" class="p-3 rounded small border mb-0" style="max-height: 250px; overflow-y: auto; font-family: monospace; white-space: pre-wrap; word-break: break-all;"></pre>
+                    <div id="push-history-container" class="rounded border p-2 bg-light overflow-y-auto" style="max-height: 200px; font-size: 0.85rem;">
+                        <div class="text-center text-muted py-3">Loading history...</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -305,118 +291,219 @@ window.togglePasswordVisibility = function(id) {
     }
 };
 
-// ─── WhatsApp Server Helpers ─────────────────────────────────────────────────
+// ─── Web Push Settings Helpers ────────────────────────────────────────────────
 
-function getWaServerUrl() {
-    return (localStorage.getItem('waServerUrl') || 'http://localhost:3001').replace(/\/$/, '');
+function getPushServerUrl() {
+    return (localStorage.getItem('pushServerUrl') || 'http://localhost:3001').replace(/\/$/, '');
 }
 
-window.saveWaServerUrl = function() {
-    const val = (document.getElementById('wa-server-url-input')?.value || '').trim();
+window.savePushServerUrl = function() {
+    const val = (document.getElementById('push-server-url-input')?.value || '').trim();
     if (val) {
-        localStorage.setItem('waServerUrl', val);
-        if(window.dashboard) window.dashboard.showNotification('WA server URL saved', 'success');
-        checkWaStatus();
+        localStorage.setItem('pushServerUrl', val);
+        if (window.dashboard) window.dashboard.showNotification('Push server URL saved', 'success');
+        window.updatePushSettingsUI();
     }
 };
 
-window.checkWaStatus = async function() {
-    const badge = document.getElementById('wa-status-badge');
-    const statusText = document.getElementById('wa-status-text');
-    const qrArea = document.getElementById('wa-qr-area');
-    const qrImg = document.getElementById('wa-qr-img');
+window.updatePushSettingsUI = async function() {
+    const badge = document.getElementById('push-status-badge');
+    const spinner = document.getElementById('push-status-spinner');
+    const statusText = document.getElementById('push-status-text');
+    const btnEnable = document.getElementById('btn-enable-push');
+    const btnDisable = document.getElementById('btn-disable-push');
+    const btnTest = document.getElementById('btn-test-push');
 
-    if (badge) badge.className = 'wa-status-badge wa-status-checking';
-    if (statusText) statusText.textContent = 'Checking...';
-    if (qrArea) qrArea.classList.add('d-none');
+    if (!badge || !statusText) return;
 
+    if (spinner) spinner.style.display = 'inline-block';
+    statusText.textContent = 'Checking...';
+
+    if (btnEnable) btnEnable.style.display = 'none';
+    if (btnDisable) btnDisable.style.display = 'none';
+    if (btnTest) btnTest.style.display = 'none';
+
+    const status = await window.getPushStatus();
+    if (spinner) spinner.style.display = 'none';
+
+    if (status === 'unsupported') {
+        badge.className = 'badge p-2 bg-danger-subtle border border-danger text-danger fs-7';
+        statusText.textContent = 'Unsupported browser';
+    } else if (status === 'denied') {
+        badge.className = 'badge p-2 bg-danger-subtle border border-danger text-danger fs-7';
+        statusText.textContent = 'Blocked by browser';
+    } else if (status === 'subscribed') {
+        badge.className = 'badge p-2 bg-success-subtle border border-success text-success fs-7';
+        statusText.textContent = 'Subscribed & Active';
+        if (btnDisable) btnDisable.style.display = 'inline-block';
+        if (btnTest) btnTest.style.display = 'inline-block';
+
+        // Auto-heal check: if backend server database has no subscriptions for this user, re-send it
+        (async () => {
+            try {
+                const user = firebase.auth().currentUser;
+                if (!user) return;
+                const idToken = await user.getIdToken();
+                const serverUrl = getPushServerUrl();
+                const checkRes = await fetch(`${serverUrl}/api/push/subscriptions`, {
+                    headers: { 'Authorization': `Bearer ${idToken}` }
+                });
+                if (checkRes.ok) {
+                    const activeSubs = await checkRes.json();
+                    if (activeSubs.length === 0) {
+                        console.log('[PushSettings] Server database is empty. Re-registering this device...');
+                        const registration = await navigator.serviceWorker.ready;
+                        const subscription = await registration.pushManager.getSubscription();
+                        if (subscription) {
+                            await fetch(`${serverUrl}/api/push/subscribe`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${idToken}`
+                                },
+                                body: JSON.stringify({
+                                    subscription,
+                                    metadata: window.getDeviceMetadata ? window.getDeviceMetadata() : {}
+                                })
+                            });
+                            console.log('[PushSettings] Successfully re-synced device subscription with server.');
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('[PushSettings] Background subscription sync failed:', e.message);
+            }
+        })();
+    } else if (status === 'default' || status === 'granted_but_unsubscribed') {
+        badge.className = 'badge p-2 bg-warning-subtle border border-warning text-warning fs-7';
+        statusText.textContent = 'Not Subscribed';
+        if (btnEnable) btnEnable.style.display = 'inline-block';
+    } else {
+        badge.className = 'badge p-2 bg-secondary-subtle border border-secondary text-secondary fs-7';
+        statusText.textContent = 'Check Offline or Error';
+        if (btnEnable) btnEnable.style.display = 'inline-block';
+    }
+
+    loadNotificationHistory();
+};
+
+window.enablePushNotifications = async function() {
     try {
-        const res = await fetch(`${getWaServerUrl()}/status`, { signal: AbortSignal.timeout(5000) });
-        const data = await res.json();
-
-        if (badge) {
-            badge.className = `wa-status-badge wa-status-${data.status}`;
-        }
-        if (statusText) statusText.textContent = data.message || data.status;
-
-        // Show QR code if needed
-        if (data.status === 'qr_required' && data.qrCode && qrArea && qrImg) {
-            qrImg.src = data.qrCode;
-            qrArea.classList.remove('d-none');
-        }
+        if (window.dashboard) window.dashboard.showLoading();
+        await window.subscribeToPush();
+        if (window.dashboard) window.dashboard.showNotification('Push notifications enabled!', 'success');
     } catch (err) {
-        if (badge) badge.className = 'wa-status-badge wa-status-disconnected';
-        if (statusText) statusText.textContent = 'Server offline — is node server.js running?';
+        if (window.dashboard) window.dashboard.showNotification(err.message, 'danger');
+    } finally {
+        if (window.dashboard) window.dashboard.hideLoading();
+        window.updatePushSettingsUI();
     }
 };
 
-window.sendWaTestMessage = async function() {
-    const phone = document.getElementById('wa-test-phone')?.value.trim();
-    if (!phone) {
-        if(window.dashboard) window.dashboard.showNotification('Enter a phone number first', 'warning');
-        return;
-    }
+window.disablePushNotifications = async function() {
     try {
-        const res = await fetch(`${getWaServerUrl()}/test-message`, {
+        if (window.dashboard) window.dashboard.showLoading();
+        await window.unsubscribeFromPush();
+        if (window.dashboard) window.dashboard.showNotification('Push notifications disabled.', 'info');
+    } catch (err) {
+        if (window.dashboard) window.dashboard.showNotification(err.message, 'danger');
+    } finally {
+        if (window.dashboard) window.dashboard.hideLoading();
+        window.updatePushSettingsUI();
+    }
+};
+
+window.sendTestPushNotification = async function() {
+    try {
+        const user = firebase.auth().currentUser;
+        if (!user) return;
+        const idToken = await user.getIdToken();
+        const serverUrl = getPushServerUrl();
+
+        const res = await fetch(`${serverUrl}/api/push/send`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone }),
-            signal: AbortSignal.timeout(10000)
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({
+                notification: {
+                    title: '🔔 Test Notification',
+                    body: 'Your Web Push notification system is working perfectly!',
+                    tag: 'custom-notification',
+                    icon: '/android-icons/android-launchericon-192-192.png',
+                    badge: '/android-icons/android-launchericon-72-72.png',
+                    data: { url: '/#settings' }
+                }
+            })
         });
+
         const data = await res.json();
         if (data.success) {
-            if(window.dashboard) window.dashboard.showNotification('✅ Test message sent to ' + data.to, 'success');
+            if (window.dashboard) window.dashboard.showNotification('Test notification triggered!', 'success');
         } else {
-            if(window.dashboard) window.dashboard.showNotification('❌ ' + (data.error || 'Failed'), 'danger');
+            if (window.dashboard) window.dashboard.showNotification('Failed: ' + (data.message || 'Error'), 'danger');
         }
+        loadNotificationHistory();
     } catch (err) {
-        if(window.dashboard) window.dashboard.showNotification('Server unreachable: ' + err.message, 'danger');
+        if (window.dashboard) window.dashboard.showNotification('Push server offline: ' + err.message, 'danger');
     }
 };
 
-window.triggerWaJobNow = async function() {
-    try {
-        await fetch(`${getWaServerUrl()}/run-now`, { method: 'POST', signal: AbortSignal.timeout(5000) });
-        if(window.dashboard) window.dashboard.showNotification('Reminder job triggered!', 'success');
-    } catch (err) {
-        if(window.dashboard) window.dashboard.showNotification('Server unreachable', 'danger');
-    }
-};
-
-window.toggleWaLog = async function(forceState) {
-    const area = document.getElementById('wa-log-area');
-    const content = document.getElementById('wa-log-content');
-    if (!area || !content) return;
-
-    // Resolve state to toggle
-    const currentlyHidden = area.classList.contains('d-none');
-    const targetShow = forceState !== undefined ? forceState : currentlyHidden;
-
-    if (!targetShow) {
-        area.classList.add('d-none');
-        return;
-    }
-
-    // Show area and set loading state
-    area.classList.remove('d-none');
-    content.textContent = 'Loading logs from server...';
-    content.className = 'p-3 rounded small border mb-0 bg-light text-muted';
+window.loadNotificationHistory = async function() {
+    const container = document.getElementById('push-history-container');
+    if (!container) return;
 
     try {
-        const res = await fetch(`${getWaServerUrl()}/log`, { signal: AbortSignal.timeout(5000) });
-        const data = await res.json();
+        const user = firebase.auth().currentUser;
+        if (!user) return;
+        const idToken = await user.getIdToken();
+        const serverUrl = getPushServerUrl();
+
+        const res = await fetch(`${serverUrl}/api/push/history`, {
+            headers: {
+                'Authorization': `Bearer ${idToken}`
+            }
+        });
         
-        if (Object.keys(data).length === 0) {
-            content.textContent = 'No logs found. Reminders haven\'t run or sent any messages yet today.';
-            content.className = 'p-3 rounded small border mb-0 bg-light text-muted';
-        } else {
-            content.textContent = JSON.stringify(data, null, 2);
-            content.className = 'p-3 rounded small border mb-0 bg-light text-dark';
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+
+        if (data.length === 0) {
+            container.innerHTML = '<div class="text-center text-muted py-3">No notifications sent yet.</div>';
+            return;
         }
+
+        container.innerHTML = data.map(log => {
+            const time = new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const date = new Date(log.timestamp).toLocaleDateString();
+            const badgeClass = log.status === 'success' ? 'bg-success' : 'bg-danger';
+            return `
+                <div class="border-bottom py-2 px-1">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fw-semibold">${log.title}</span>
+                        <span class="badge ${badgeClass}" style="font-size: 0.65rem;">${log.status}</span>
+                    </div>
+                    <p class="mb-0 text-muted small">${log.body}</p>
+                    <div class="d-flex justify-content-between mt-1" style="font-size: 0.7rem;">
+                        <span class="text-primary">${log.category}</span>
+                        <span class="text-muted">${date} ${time}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
     } catch (err) {
-        content.textContent = '❌ Failed to fetch logs. Is the node server running?';
-        content.className = 'p-3 rounded small border mb-0 bg-danger bg-opacity-10 text-danger';
+        container.innerHTML = `<div class="text-center text-danger py-3">Could not load logs. Is the push server running?</div>`;
     }
+};
+
+// Run once inside dashboard tab click trigger if it binds window.updatePushSettingsUI
+const originalLoadSettings = window.loadSettingsSection;
+window.loadSettingsSection = async function() {
+    await originalLoadSettings.apply(this, arguments);
+    setTimeout(() => {
+        window.updatePushSettingsUI();
+    }, 100);
 };
 
 
