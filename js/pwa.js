@@ -21,10 +21,11 @@ if ('serviceWorker' in navigator) {
             
         // Handle controller change — guard with refreshing flag so notification fires only once
         let refreshing = false;
+        const hasControllerOnLoad = !!navigator.serviceWorker.controller;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
             if (refreshing) return;
-            refreshing = true;
-            if (navigator.serviceWorker.controller) {
+            if (hasControllerOnLoad) {
+                refreshing = true;
                 showUpdateNotification();
             }
         });
