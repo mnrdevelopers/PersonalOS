@@ -606,6 +606,14 @@ window.loadFinanceSection = async function() {
                                     <option value="cash_to_bank">Cash → Bank</option>
                                     <option value="bank_to_cash">Bank → Cash</option>
                                     <option value="bank_to_bank">Bank → Bank (between accounts)</option>
+                                    <option value="card_to_bank">Credit Card → Bank</option>
+                                </select>
+                            </div>
+                            <!-- Source credit card (shown for card_to_bank) -->
+                            <div class="mb-3 transfer-bank-row" id="transfer-source-card-row">
+                                <label class="form-label">Source Credit Card</label>
+                                <select class="form-select" id="transfer-source-credit-card">
+                                    <option value="">Select card…</option>
                                 </select>
                             </div>
                             <!-- Source bank account (shown for bank_to_cash and bank_to_bank) -->
@@ -1367,6 +1375,38 @@ window.changeFinancePage = function(delta) {
     loadFinanceData();
 };
 
+window.populateTransferCreditCardSelect = async function(selectId, selectedId = '') {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+
+    const user = auth.currentUser;
+    if (!user) return;
+
+    try {
+        const snapshot = await db.collection('credit_cards').where('userId', '==', user.uid).get();
+
+        select.innerHTML = '<option value="" selected disabled>Select card…</option>';
+        if (snapshot.empty) {
+            select.innerHTML += '<option value="" disabled>No credit cards found</option>';
+            return;
+        }
+
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const last4Text = data.last4 ? ` (..${data.last4})` : '';
+            const opt = document.createElement('option');
+            opt.value = doc.id;
+            opt.textContent = `💳 ${data.name}${last4Text}`;
+            if (selectedId && selectedId === doc.id) {
+                opt.selected = true;
+            }
+            select.appendChild(opt);
+        });
+    } catch (e) {
+        console.error('[Finance] Error populating credit card select:', e);
+    }
+};
+
 window.openTransferModal = async function(id = '', data = null) {
     const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('transferModal'));
     const directionInput = document.getElementById('transfer-direction');
@@ -1395,6 +1435,9 @@ window.openTransferModal = async function(id = '', data = null) {
         });
     }
 
+    // Populate credit card select
+    await window.populateTransferCreditCardSelect('transfer-source-credit-card', data?.creditCardId || data?.bankAccountId || '');
+
     // Trigger direction change UI
     window.onTransferDirectionChange(directionInput.value);
 
@@ -1404,11 +1447,15 @@ window.openTransferModal = async function(id = '', data = null) {
 window.onTransferDirectionChange = function(direction) {
     const sourceRow = document.getElementById('transfer-source-bank-row');
     const destRow   = document.getElementById('transfer-dest-bank-row');
+    const cardRow   = document.getElementById('transfer-source-card-row');
     if (!sourceRow || !destRow) return;
 
-    // Show/hide bank account pickers based on direction
+    // Show/hide bank account/card pickers based on direction
     sourceRow.classList.toggle('visible', direction === 'bank_to_cash' || direction === 'bank_to_bank');
-    destRow.classList.toggle('visible', direction === 'cash_to_bank' || direction === 'bank_to_bank');
+    destRow.classList.toggle('visible', direction === 'cash_to_bank' || direction === 'bank_to_bank' || direction === 'card_to_bank');
+    if (cardRow) {
+        cardRow.classList.toggle('visible', direction === 'card_to_bank');
+    }
 };
 
 window.saveTransferTransaction = async function() {
@@ -1423,6 +1470,7 @@ window.saveTransferTransaction = async function() {
     const description = document.getElementById('transfer-description').value.trim();
     const sourceBankAccountId = document.getElementById('transfer-source-bank-account')?.value || '';
     const destBankAccountId = document.getElementById('transfer-dest-bank-account')?.value || '';
+    const sourceCreditCardId = document.getElementById('transfer-source-credit-card')?.value || '';
 
     if (!direction || !amount || amount <= 0 || !date) {
         if (window.dashboard) window.dashboard.showNotification('Enter a valid transfer amount and date', 'warning');
@@ -1454,6 +1502,17 @@ window.saveTransferTransaction = async function() {
         resolvedDestBankName = resolvedDestBankId ? (window.getBankAccountLabel ? window.getBankAccountLabel(resolvedDestBankId) : null) : null;
         sourceAccountLabel = resolvedSourceBankName || 'Bank';
         destinationAccountLabel = resolvedDestBankName || 'Bank';
+    } else if (direction === 'card_to_bank') {
+        sourceAccountType = 'credit-card';  destinationAccountType = 'bank';
+        resolvedDestBankId = destBankAccountId || null;
+        resolvedDestBankName = resolvedDestBankId ? (window.getBankAccountLabel ? window.getBankAccountLabel(resolvedDestBankId) : null) : null;
+        destinationAccountLabel = resolvedDestBankName || window.getAccountTypeLabel('bank');
+        
+        resolvedSourceBankId = sourceCreditCardId || null;
+        const ccSelect = document.getElementById('transfer-source-credit-card');
+        const selectedCcOption = ccSelect ? ccSelect.options[ccSelect.selectedIndex] : null;
+        sourceAccountLabel = selectedCcOption ? selectedCcOption.textContent.replace('💳 ', '') : 'Credit Card';
+        resolvedSourceBankName = sourceAccountLabel;
     } else {
         sourceAccountType = 'cash'; destinationAccountType = 'bank';
         sourceAccountLabel = 'Cash'; destinationAccountLabel = 'Bank';
@@ -1478,6 +1537,7 @@ window.saveTransferTransaction = async function() {
         bankAccountName: resolvedSourceBankName,
         destinationBankAccountId: resolvedDestBankId,
         destinationBankAccountName: resolvedDestBankName,
+        creditCardId: sourceAccountType === 'credit-card' ? resolvedSourceBankId : null,
         recurring: false,
         frequency: null,
         nextDueDate: null,
@@ -1486,12 +1546,21 @@ window.saveTransferTransaction = async function() {
 
     try {
         window.setBtnLoading(btn, true);
+        let oldTx = null;
         if (id) {
+            const doc = await db.collection('transactions').doc(id).get();
+            if (doc.exists) oldTx = doc.data();
+
             payload.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
             await db.collection('transactions').doc(id).update(payload);
         } else {
             payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
             await db.collection('transactions').add(payload);
+        }
+
+        // Adjust credit card balances for the transfer
+        if (window.adjustBalancesForTxChange) {
+            await window.adjustBalancesForTxChange(oldTx, payload);
         }
 
         bootstrap.Modal.getOrCreateInstance(document.getElementById('transferModal')).hide();
@@ -1523,12 +1592,20 @@ function getTxOutstandingEffect(tx) {
     if (!tx) return { cardId: null, effect: 0 };
     const amount = Number(tx.amount) || 0;
     
-    // Check if a credit card was selected, checking either creditCardId or relatedId field
-    const cardId = (tx.paymentMode === 'credit-card' || tx.category === 'Credit Card Bill')
-        ? (tx.creditCardId || tx.relatedId)
-        : null;
+    // Check if a credit card was selected
+    let cardId = null;
+    if (tx.paymentMode === 'credit-card' || tx.category === 'Credit Card Bill') {
+        cardId = tx.creditCardId || tx.relatedId;
+    } else if (tx.type === 'transfer' && tx.transferDirection === 'card_to_bank') {
+        cardId = tx.creditCardId || tx.bankAccountId;
+    }
         
     if (!cardId) return { cardId: null, effect: 0 };
+    
+    if (tx.type === 'transfer') {
+        // A transfer out of the credit card increases its outstanding balance
+        return { cardId, effect: amount };
+    }
     
     if (tx.paymentMode === 'credit-card') {
         const effect = tx.type === 'expense' ? amount : (tx.type === 'income' ? -amount : 0);
