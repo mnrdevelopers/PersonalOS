@@ -2173,6 +2173,9 @@ class Dashboard {
             let resolvedBankAccountName = null;
             if (accountMeta.type === 'bank' && bankAccountId) {
                 resolvedBankAccountId = bankAccountId;
+                if (!window._bankAccountsCache) {
+                    await window.getUserBankAccounts();
+                }
                 resolvedBankAccountName = window.getBankAccountLabel ? window.getBankAccountLabel(bankAccountId) : null;
                 if (resolvedBankAccountName && resolvedBankAccountName !== 'Bank') {
                     resolvedAccountLabel = resolvedBankAccountName;
@@ -2305,6 +2308,16 @@ class Dashboard {
         if (!this.pendingUpiTransaction) return;
 
         const paymentMode = this.selectedUpiApp || this.pendingUpiTransaction.paymentMode;
+        
+        // Ensure cache is loaded so getBankAccountLabel works
+        if (this.pendingUpiTransaction.bankAccountId && !window._bankAccountsCache) {
+            await window.getUserBankAccounts();
+        }
+
+        const resolvedBankAccountName = (this.pendingUpiTransaction.bankAccountId && window.getBankAccountLabel)
+            ? window.getBankAccountLabel(this.pendingUpiTransaction.bankAccountId)
+            : null;
+
         const accountMeta = window.getTransactionAccountMeta
             ? window.getTransactionAccountMeta(paymentMode)
             : { type: 'bank', label: 'Bank' };
@@ -2313,7 +2326,8 @@ class Dashboard {
             ...this.pendingUpiTransaction,
             paymentMode,
             accountType: accountMeta.type,
-            accountLabel: accountMeta.label,
+            accountLabel: (resolvedBankAccountName && resolvedBankAccountName !== 'Bank') ? resolvedBankAccountName : (this.pendingUpiTransaction.accountLabel || accountMeta.label),
+            bankAccountName: resolvedBankAccountName || this.pendingUpiTransaction.bankAccountName || null,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 

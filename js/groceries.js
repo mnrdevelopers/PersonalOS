@@ -1935,6 +1935,9 @@ window.confirmCheckout = async function() {
             let resolvedBankAccountName = null;
             if (accountMeta.type === 'bank' && bankAccountId) {
                 resolvedBankAccountId = bankAccountId;
+                if (!window._bankAccountsCache) {
+                    await window.getUserBankAccounts();
+                }
                 resolvedBankAccountName = window.getBankAccountLabel ? window.getBankAccountLabel(bankAccountId) : null;
                 if (resolvedBankAccountName && resolvedBankAccountName !== 'Bank') {
                     resolvedAccountLabel = resolvedBankAccountName;
