@@ -96,7 +96,7 @@ window.loadSettingsSection = async function() {
                 <h5 class="mb-0">Data Management</h5>
             </div>
             <div class="card-body">
-                <button class="btn btn-outline-primary mb-2" onclick="exportData()">
+                <button type="button" class="btn btn-outline-primary mb-2" onclick="exportData()">
                     <i class="fas fa-download me-2"></i>Export All Data (JSON)
                 </button>
                 <div class="text-muted small">Download a copy of your transactions, habits, and reminders.</div>
@@ -141,8 +141,8 @@ window.loadSettingsSection = async function() {
                         <input type="text" class="form-control" id="push-server-url-input"
                                placeholder="http://localhost:3001"
                                value="${localStorage.getItem('pushServerUrl') || 'http://localhost:3001'}">
-                        <button class="btn btn-outline-primary" onclick="savePushServerUrl()">Save</button>
-                        <button class="btn btn-outline-secondary" onclick="updatePushSettingsUI()">
+                        <button type="button" class="btn btn-outline-primary" onclick="savePushServerUrl()">Save</button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="updatePushSettingsUI()">
                             <i class="fas fa-sync-alt"></i>
                         </button>
                     </div>
@@ -160,13 +160,13 @@ window.loadSettingsSection = async function() {
 
                 <!-- Controls -->
                 <div class="d-flex gap-2 mb-3">
-                    <button class="btn btn-primary btn-sm" id="btn-enable-push" onclick="enablePushNotifications()" style="display:none;">
+                    <button type="button" class="btn btn-primary btn-sm" id="btn-enable-push" onclick="enablePushNotifications()" style="display:none;">
                         <i class="fas fa-bell me-1"></i>Enable Notifications
                     </button>
-                    <button class="btn btn-outline-danger btn-sm" id="btn-disable-push" onclick="disablePushNotifications()" style="display:none;">
+                    <button type="button" class="btn btn-outline-danger btn-sm" id="btn-disable-push" onclick="disablePushNotifications()" style="display:none;">
                         <i class="fas fa-bell-slash me-1"></i>Disable Notifications
                     </button>
-                    <button class="btn btn-outline-secondary btn-sm" id="btn-test-push" onclick="sendTestPushNotification()" style="display:none;">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-test-push" onclick="sendTestPushNotification()" style="display:none;">
                         <i class="fas fa-paper-plane me-1"></i>Send Test Notification
                     </button>
                 </div>
@@ -191,13 +191,13 @@ window.loadSettingsSection = async function() {
             </div>
             <div class="card-body">
                 <p>Once you delete your account, there is no going back. Please be certain.</p>
-                <button class="btn btn-danger" onclick="deleteAccount()">Delete Account</button>
+                <button type="button" class="btn btn-danger" onclick="deleteAccount()">Delete Account</button>
             </div>
         </div>
     `;
 
     setTimeout(() => {
-        if (typeof checkWaStatus === 'function') checkWaStatus();
+        if (typeof updatePushSettingsUI === 'function') updatePushSettingsUI();
     }, 100);
 };
 
