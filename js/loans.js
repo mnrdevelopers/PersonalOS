@@ -342,6 +342,14 @@ window.loadLoansSection = async function() {
                                     <input type="number" class="form-control" id="repay-amount" step="0.01" min="0" required>
                                 </div>
                             </div>
+                            <div class="mb-3" id="div-repay-interest-group">
+                                <label class="form-label">Interest Portion (if EMI)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">₹</span>
+                                    <input type="number" class="form-control" id="repay-interest" step="0.01" min="0" value="0">
+                                </div>
+                                <div class="form-text small">Only the principal amount (Amount minus Interest/Fees/Penalty) will reflect/reduce credit card outstanding.</div>
+                            </div>
                             <div class="mb-3">
                                 <label class="form-label">Penalty / Bounce Charges</label>
                                 <div class="input-group">
@@ -426,6 +434,13 @@ window.loadLoansSection = async function() {
                                 <div class="input-group">
                                     <span class="input-group-text">₹</span>
                                     <input type="number" class="form-control" id="edit-repay-amount" step="0.01" min="0" required>
+                                </div>
+                            </div>
+                            <div class="mb-3" id="div-edit-repay-interest-group">
+                                <label class="form-label">Interest Portion (if EMI)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">₹</span>
+                                    <input type="number" class="form-control" id="edit-repay-interest" step="0.01" min="0" value="0">
                                 </div>
                             </div>
                             <div class="mb-3">
@@ -2402,20 +2417,38 @@ window.showRepaymentModal = async function(loanId) {
     document.getElementById('repay-payment-mode').onchange = () => toggleLoanPaymentFields('repay');
     toggleLoanPaymentFields('repay');
 
-    // Check if we should show UPI button
-    const upiContainer = document.getElementById('upi-pay-container');
-    if (upiContainer) {
-        upiContainer.classList.add('d-none'); // Hide by default
-        try {
-            const doc = await db.collection('loans').doc(loanId).get();
-            if (doc.exists) {
-                const data = doc.data();
-                // Show if it's a liability (borrowed) and has contact info
+    // Fetch loan details to prefill EMI amount and calculate interest portion
+    try {
+        const doc = await db.collection('loans').doc(loanId).get();
+        if (doc.exists) {
+            const data = doc.data();
+            
+            // Prefill EMI amount
+            if (data.emiAmount && data.emiAmount > 0) {
+                document.getElementById('repay-amount').value = data.emiAmount;
+            }
+
+            // Calculate estimated interest for this installment
+            let estimatedInterest = 0;
+            if (data.interestRate && data.interestRate > 0) {
+                const remainingPrincipal = Math.max(0, (data.totalAmount || 0) - (data.paidAmount || 0));
+                const monthlyRate = (data.interestRate / 100) / 12;
+                estimatedInterest = Math.round(remainingPrincipal * monthlyRate * 100) / 100;
+            }
+            document.getElementById('repay-interest').value = estimatedInterest > 0 ? estimatedInterest.toFixed(2) : '0';
+
+            // Show UPI button if it's a liability (borrowed) and has contact info
+            const upiContainer = document.getElementById('upi-pay-container');
+            if (upiContainer) {
                 if (data.type === 'borrowed' && data.mobile) {
                     upiContainer.classList.remove('d-none');
+                } else {
+                    upiContainer.classList.add('d-none');
                 }
             }
-        } catch (e) { console.error(e); }
+        }
+    } catch (e) {
+        console.error("Error loading loan for repayment modal:", e);
     }
     
     modal.show();
@@ -2425,6 +2458,7 @@ window.saveRepayment = async function() {
     const btn = document.getElementById('btn-save-repayment');
     const loanId = document.getElementById('repay-loan-id').value;
     const amount = parseFloat(document.getElementById('repay-amount').value);
+    const interest = parseFloat(document.getElementById('repay-interest').value) || 0;
     const penalty = parseFloat(document.getElementById('repay-penalty').value) || 0;
     const processingFee = parseFloat(document.getElementById('repay-proc-fee').value) || 0;
     const date = document.getElementById('repay-date').value;
@@ -2439,8 +2473,8 @@ window.saveRepayment = async function() {
         if(window.dashboard) window.dashboard.showNotification('Please enter amount and date', 'warning');
         return;
     }
-    if ((amount - penalty - processingFee) <= 0) {
-        if(window.dashboard) window.dashboard.showNotification('Amount must be greater than penalty + processing fee', 'warning');
+    if ((amount - interest - penalty - processingFee) <= 0) {
+        if(window.dashboard) window.dashboard.showNotification('Principal amount (Amount minus Interest/Fees/Penalty) must be greater than 0', 'warning');
         return;
     }
 
@@ -2449,7 +2483,7 @@ window.saveRepayment = async function() {
         const loanDoc = await db.collection('loans').doc(loanId).get();
         const loanData = loanDoc.data();
         
-        const effectiveAmount = amount - penalty - processingFee;
+        const effectiveAmount = amount - interest - penalty - processingFee;
         const outstandingBefore = Math.max(0, (loanData.totalAmount || 0) - (loanData.paidAmount || 0));
         const appliedPrincipal = Math.min(effectiveAmount, outstandingBefore);
         const carryForwardAmount = Math.max(0, effectiveAmount - appliedPrincipal);
@@ -2465,10 +2499,11 @@ window.saveRepayment = async function() {
         }
         
         let transactionId = null;
+        let interestTransactionId = null;
         let penaltyTransactionId = null;
         let procFeeTransactionId = null;
 
-        // Handle Credit Card Deduction (If I am paying back a loan using CC)
+        // Handle Credit Card Deduction (If I am paying back a loan using a different CC)
         if (paymentMode === 'credit-card' && creditCardId && loanData.type === 'borrowed') {
             await db.collection('credit_cards').doc(creditCardId).update({
                 currentOutstanding: firebase.firestore.FieldValue.increment(amount)
@@ -2489,9 +2524,19 @@ window.saveRepayment = async function() {
             });
         }
 
+        // Handle Credit Card outstanding reduction for the linked card on this EMI/Borrowed loan
+        if (loanData.cardId && (loanData.type === 'emi' || loanData.type === 'borrowed')) {
+            // "no interest only original amount should reflect"
+            if (appliedPrincipal > 0) {
+                await db.collection('credit_cards').doc(loanData.cardId).update({
+                    currentOutstanding: firebase.firestore.FieldValue.increment(-appliedPrincipal)
+                });
+            }
+        }
+
         if (linkLedger) {
             const type = loanData.type === 'lent' ? 'income' : 'expense';
-            const principalAmount = amount - penalty - processingFee;
+            const principalAmount = amount - interest - penalty - processingFee;
             
             // 1. Record Principal Repayment
             if (principalAmount > 0) {
@@ -2502,7 +2547,7 @@ window.saveRepayment = async function() {
                     amount: principalAmount,
                     type: type,
                     category: 'Loan Repayment',
-                    description: `Repayment: ${loanData.name}`,
+                    description: `Repayment Principal: ${loanData.name}`,
                     paymentMode: paymentMode,
                     relatedId: (paymentMode === 'credit-card' ? creditCardId : (paymentMode === 'wallet' ? walletId : null)),
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -2510,6 +2555,25 @@ window.saveRepayment = async function() {
                 const enrichedTx = getEnrichedTransactionPayload(baseTx, paymentMode, bankAccountId);
                 const transactionRef = await db.collection('transactions').add(enrichedTx);
                 transactionId = transactionRef.id;
+            }
+
+            // 1.5 Record Interest Repayment
+            if (interest > 0) {
+                const baseInterestTx = {
+                    userId: user.uid,
+                    loanId: loanId,
+                    date: date,
+                    amount: interest,
+                    type: 'expense',
+                    category: 'Finance Charges',
+                    description: `Repayment Interest: ${loanData.name}`,
+                    paymentMode: paymentMode,
+                    relatedId: (paymentMode === 'credit-card' ? creditCardId : (paymentMode === 'wallet' ? walletId : null)),
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                const enrichedInterestTx = getEnrichedTransactionPayload(baseInterestTx, paymentMode, bankAccountId);
+                const interestRef = await db.collection('transactions').add(enrichedInterestTx);
+                interestTransactionId = interestRef.id;
             }
 
             // 2. Record Penalty Transaction
@@ -2549,10 +2613,11 @@ window.saveRepayment = async function() {
             }
         }
 
-        // Always add to a subcollection for history tracking, linking transaction if created
+        // Always add to a subcollection for history tracking, linking transactions if created
         await db.collection('loans').doc(loanId).collection('repayments').add({
             userId: user.uid,
             amount: amount,
+            interest: interest,
             appliedPrincipal: appliedPrincipal,
             carryForwardAmount: carryForwardAmount,
             carryForwardLoanId: carryForwardLoanId,
@@ -2560,6 +2625,7 @@ window.saveRepayment = async function() {
             processingFee: processingFee,
             date: date,
             transactionId: transactionId, // Will be null if not linked to ledger
+            interestTransactionId: interestTransactionId,
             penaltyTransactionId: penaltyTransactionId,
             procFeeTransactionId: procFeeTransactionId,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -2605,6 +2671,9 @@ window.viewRepaymentHistory = async function(loanId) {
             const data = doc.data();
             let amountDisplay = `₹${data.amount.toFixed(2)}`;
             let details = [];
+            if (data.interest && data.interest > 0) {
+                details.push(`<span class="text-primary"><i class="fas fa-percent me-1"></i>Interest: ₹${data.interest.toFixed(2)}</span>`);
+            }
             if (data.penalty && data.penalty > 0) {
                 details.push(`<span class="text-danger"><i class="fas fa-exclamation-circle me-1"></i>Penalty: ₹${data.penalty.toFixed(2)}</span>`);
             }
@@ -2647,6 +2716,7 @@ window.editRepayment = async function(loanId, repaymentId) {
         document.getElementById('edit-repay-loan-id').value = loanId;
         document.getElementById('edit-repay-id').value = repaymentId;
         document.getElementById('edit-repay-amount').value = repaymentData.amount;
+        document.getElementById('edit-repay-interest').value = repaymentData.interest || 0;
         document.getElementById('edit-repay-date').value = repaymentData.date;
         
         const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('editRepaymentModal'));
@@ -2662,6 +2732,7 @@ window.saveChanges = async function() {
     const loanId = document.getElementById('edit-repay-loan-id').value;
     const repaymentId = document.getElementById('edit-repay-id').value;
     const newAmount = parseFloat(document.getElementById('edit-repay-amount').value);
+    const newInterest = parseFloat(document.getElementById('edit-repay-interest').value) || 0;
     const newDate = document.getElementById('edit-repay-date').value;
     const user = auth.currentUser;
 
@@ -2694,6 +2765,7 @@ window.saveChanges = async function() {
         const processingFee = repaymentData.processingFee || 0;
         const carryForwardAmount = repaymentData.carryForwardAmount || 0;
         const transactionId = repaymentData.transactionId;
+        const interestTransactionId = repaymentData.interestTransactionId;
         if (carryForwardAmount > 0) {
             if(window.dashboard) window.dashboard.showNotification('This entry includes carry-forward. Delete and add repayment again instead of editing.', 'warning');
             window.setBtnLoading(btn, false);
@@ -2701,10 +2773,10 @@ window.saveChanges = async function() {
         }
         const oldPrincipal = repaymentData.appliedPrincipal !== undefined
             ? repaymentData.appliedPrincipal
-            : (originalAmount - penalty - processingFee);
-        const newPrincipal = newAmount - penalty - processingFee;
+            : (originalAmount - (repaymentData.interest || 0) - penalty - processingFee);
+        const newPrincipal = newAmount - newInterest - penalty - processingFee;
         if (newPrincipal <= 0) {
-            if(window.dashboard) window.dashboard.showNotification('Repayment amount is too low after penalty/fee.', 'warning');
+            if(window.dashboard) window.dashboard.showNotification('Principal amount is too low after interest/penalty/fee.', 'warning');
             window.setBtnLoading(btn, false);
             return;
         }
@@ -2718,8 +2790,21 @@ window.saveChanges = async function() {
             batch.update(txRef, { amount: newPrincipal, date: newDate });
         } 
 
+        // If an interest transaction was linked, update it.
+        if (interestTransactionId) {
+            const interestTxRef = db.collection('transactions').doc(interestTransactionId);
+            batch.update(interestTxRef, { amount: newInterest, date: newDate });
+        }
+
+        // Update the credit card's outstanding if linked
+        if (loanData.cardId && (loanData.type === 'emi' || loanData.type === 'borrowed')) {
+            batch.update(db.collection('credit_cards').doc(loanData.cardId), {
+                currentOutstanding: firebase.firestore.FieldValue.increment(-amountDifference)
+            });
+        }
+
         // Update the repayment
-        batch.update(repaymentRef, { amount: newAmount, date: newDate });
+        batch.update(repaymentRef, { amount: newAmount, interest: newInterest, date: newDate, appliedPrincipal: newPrincipal });
 
         // Update the loan's paid amount + status consistency
         const recalculatedPaid = (loanData.paidAmount || 0) + amountDifference;
@@ -2773,10 +2858,11 @@ window.deleteRepayment = async function(loanId, repaymentId) {
         const processingFee = repaymentData.processingFee || 0;
         const principal = repaymentData.appliedPrincipal !== undefined
             ? repaymentData.appliedPrincipal
-            : (totalAmount - penalty - processingFee);
+            : (totalAmount - (repaymentData.interest || 0) - penalty - processingFee);
         const carryForwardAmount = repaymentData.carryForwardAmount || 0;
         const carryForwardLoanId = repaymentData.carryForwardLoanId || null;
         const transactionId = repaymentData.transactionId;
+        const interestTransactionId = repaymentData.interestTransactionId;
         const penaltyTransactionId = repaymentData.penaltyTransactionId;
         const procFeeTransactionId = repaymentData.procFeeTransactionId;
 
@@ -2788,6 +2874,12 @@ window.deleteRepayment = async function(loanId, repaymentId) {
             batch.delete(txRef);
         }
         
+        // If an interest transaction was linked, delete it.
+        if (interestTransactionId) {
+            const interestTxRef = db.collection('transactions').doc(interestTransactionId);
+            batch.delete(interestTxRef);
+        }
+
         // If a penalty transaction was linked, delete it.
         if (penaltyTransactionId) {
             const pTxRef = db.collection('transactions').doc(penaltyTransactionId);
@@ -2798,6 +2890,15 @@ window.deleteRepayment = async function(loanId, repaymentId) {
         if (procFeeTransactionId) {
             const pfTxRef = db.collection('transactions').doc(procFeeTransactionId);
             batch.delete(pfTxRef);
+        }
+
+        // If credit card is linked, increment card outstanding back (reversing outstanding reduction)
+        if (loanData.cardId && (loanData.type === 'emi' || loanData.type === 'borrowed')) {
+            if (principal > 0) {
+                batch.update(db.collection('credit_cards').doc(loanData.cardId), {
+                    currentOutstanding: firebase.firestore.FieldValue.increment(principal)
+                });
+            }
         }
 
         // Delete the repayment
