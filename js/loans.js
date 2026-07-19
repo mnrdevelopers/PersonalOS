@@ -2056,8 +2056,14 @@ window.loadLoansGrid = async function(status = 'active') {
 
         let detailsHtml = '';
         if (data.emiAmount && data.emiAmount > 0) {
-            const totalInstallments = Math.ceil(data.totalAmount / data.emiAmount);
-            const paidInstallments = Math.floor((data.paidAmount || 0) / data.emiAmount);
+            // Use stored tenure if available (correct for interest-bearing EMIs).
+            // Fallback: divide totalAmount by emiAmount (only accurate for zero-interest EMIs).
+            const totalInstallments = data.tenure || data.durationMonths ||
+                Math.ceil(data.totalAmount / data.emiAmount);
+            const paidInstallments = Math.min(
+                totalInstallments,
+                Math.round((data.paidAmount || 0) / data.emiAmount)
+            );
             const remaining = Math.max(0, totalInstallments - paidInstallments);
             
             detailsHtml = `
@@ -3297,15 +3303,23 @@ window.processCCConvertEMI = async function() {
     const btn = document.getElementById('btn-save-cc-emi');
     const cardId = document.getElementById('emi-cc-id').value;
     const amount = parseFloat(document.getElementById('emi-amount').value);
-    const tenure = parseInt(document.getElementById('emi-tenure').value);
-    const interestRate = parseFloat(document.getElementById('emi-interest-rate').value);
+    const tenure = parseInt(document.getElementById('emi-tenure').value) || 6;
+    const interestRate = parseFloat(document.getElementById('emi-interest-rate').value) || 0;
     const procFee = parseFloat(document.getElementById('emi-proc-fee').value) || 0;
     const gst = parseFloat(document.getElementById('emi-gst').value) || 0;
     const date = document.getElementById('emi-date').value;
     const user = auth.currentUser;
 
-    if (!amount || amount <= 0 || !date) {
-        if (window.dashboard) window.dashboard.showNotification('Please enter amount and date', 'warning');
+    if (!amount || amount <= 0) {
+        if (window.dashboard) window.dashboard.showNotification('Please enter a valid conversion amount', 'warning');
+        return;
+    }
+    if (!date) {
+        if (window.dashboard) window.dashboard.showNotification('Please select the first installment date', 'warning');
+        return;
+    }
+    if (tenure <= 0) {
+        if (window.dashboard) window.dashboard.showNotification('Please select a valid tenure', 'warning');
         return;
     }
 
@@ -3331,18 +3345,20 @@ window.processCCConvertEMI = async function() {
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
-        // 2. Create the Borrowed Loan
+        // 2. Create the EMI Loan (type: 'emi' so it appears under EMI tab, not Liability)
         const loanRef = db.collection('loans').doc();
         const loanTitle = `EMI: ${cardData.bank || 'Bank'} ${cardData.name} (₹${amount.toLocaleString('en-IN')})`;
         const loanPayload = {
             userId: user.uid,
             title: loanTitle,
+            name: `${cardData.bank || 'Bank'} ${cardData.name}`,
             borrower: `${cardData.bank || 'Bank'} ${cardData.name}`,
-            type: 'borrowed',
+            type: 'emi',
             totalAmount: amount,
             paidAmount: 0,
             interestRate: interestRate,
             tenure: tenure,
+            durationMonths: tenure,
             status: 'active',
             cardId: cardId,
             convertedAmount: amount,
