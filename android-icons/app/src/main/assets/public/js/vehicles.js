@@ -1989,17 +1989,26 @@ window.deleteVehicle = async function(id) {
     
     try {
         if(window.dashboard) window.dashboard.showLoading();
+        const user = firebase.auth().currentUser;
+        if (!user) throw new Error("User not authenticated");
+
         const batch = db.batch();
         
         // Delete vehicle
         batch.delete(db.collection('vehicles').doc(id));
         
         // Delete logs
-        const logsSnap = await db.collection('vehicle_logs').where('vehicleId', '==', id).get();
+        const logsSnap = await db.collection('vehicle_logs')
+            .where('userId', '==', user.uid)
+            .where('vehicleId', '==', id)
+            .get();
         logsSnap.forEach(doc => batch.delete(doc.ref));
         
         // Delete alerts
-        const alertsSnap = await db.collection('service_alerts').where('vehicleId', '==', id).get();
+        const alertsSnap = await db.collection('service_alerts')
+            .where('userId', '==', user.uid)
+            .where('vehicleId', '==', id)
+            .get();
         alertsSnap.forEach(doc => batch.delete(doc.ref));
         
         await batch.commit();
@@ -2007,6 +2016,7 @@ window.deleteVehicle = async function(id) {
         if (window.dashboard) window.dashboard.showNotification('Vehicle deleted', 'success');
         loadVehicleDashboard();
     } catch(e) {
+        console.error("Error deleting vehicle:", e);
         if(window.dashboard) window.dashboard.showNotification('Error deleting vehicle', 'danger');
     } finally {
         if(window.dashboard) window.dashboard.hideLoading();
